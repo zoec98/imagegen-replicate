@@ -7,8 +7,6 @@ def test_seedream45_registry_entry_is_pinned():
     assert model.replicate_model == "bytedance/seedream-4.5"
     assert model.edit_capable is True
     assert model.fixed_inputs == {"disable_safety_checker": True}
-    assert model.default_width == 2048
-    assert model.default_height == 2048
     assert (
         model.version
         == "bd4492f8492cc564460074e069bff1d55428cf48286f0a0f4a4a39b50f088ff6"

@@ -37,11 +37,6 @@ Project scripts live in `scripts/`:
 - `scripts/run-dev.cmd`: Windows CMD version of the Flask development server launcher.
 - `scripts/get_schema owner/model`: fetch `https://replicate.com/<owner>/<model>/api/schema`.
 
-Replicate prediction timing is configured by `.env`:
-
-- `IMAGEGEN_REPLICATE_POLL_SECONDS`: seconds between prediction polling requests.
-- `IMAGEGEN_REPLICATE_TIMEOUT_SECONDS`: maximum seconds to wait for a prediction.
-
 ## Expected Application Shape
 
 Keep the application small and explicit until real duplication appears.
@@ -50,12 +45,8 @@ Preferred structure as the app grows:
 
 - `src/imagegen/`: application package.
 - `src/imagegen/app.py`: Flask application factory and route registration.
-- `src/imagegen/api_routes.py`: JSON `/api/*` route registration and response shaping.
 - `src/imagegen/replicate_client.py`: wrapper around Replicate API calls, downloads, and error handling.
-- `src/imagegen/model_registry.py`: configured model metadata and parameter schemas.
-- `src/imagegen/request_store.py`: local generation request lifecycle state.
-- `src/imagegen/source_images.py`: validation and resolution of local edit source images.
-- `src/imagegen/metadata.py`: generated image metadata provider boundary.
+- `src/imagegen/models.py`: configured model metadata and parameter schemas.
 - `src/imagegen/palettes.py`: style and character palette loading and validation.
 - `src/imagegen/templates/`: Jinja templates.
 - `src/imagegen/static/`: CSS, JavaScript, and local UI assets.
@@ -77,8 +68,6 @@ Keep Replicate-specific code behind a small project wrapper so the UI and route 
 
 Always send `disable_safety_checker: true` for models that support that parameter. This is an application policy and should be stored in fixed model inputs, not exposed as a normal user-facing parameter.
 
-Use prediction creation plus polling for Replicate calls, not webhooks. The MVP runs in residential/NAT environments where callback URLs are not dependable. Prefer `replicate.Client(...).predictions.create(model=<model-key>, input=<payload>)`, poll with `predictions.get(prediction.id)`, and enforce configured timeout/no-retry behavior in the wrapper. Do not use schema-page version ids as `predictions.create(version=...)` unless a diagnostic script proves that specific version id is accepted by Replicate's prediction API.
-
 For generated images:
 
 - Treat Replicate outputs as untrusted remote URLs or file-like values.
@@ -86,16 +75,6 @@ For generated images:
 - Store downloaded files under an application-controlled output directory.
 - Generate collision-resistant filenames.
 - Preserve useful metadata, such as model name, prompt, parameters, source URL, and creation time.
-- For the MVP, limit downloads to expected decoded 24-bit RGB size plus small overhead: `expected_width * expected_height * 3 + 1 MiB`.
-- Preserve the original output format for now, based on image content type.
-- Metadata access must go through `metadata.py`. The current provider reads sidecar metadata as `<image-filename>.json`, but this is expected to move into image EXIF later.
-
-For image-edit source images:
-
-- Store source images in the same application-controlled image directory as generated results, because re-edits of generated images are expected to be common.
-- Accept source images by local filename/id in API payloads, not as arbitrary browser-submitted paths or URLs.
-- Validate source filenames server-side and resolve them through `source_images.py`.
-- Pass resolved local file handles to the Replicate Python client for edit-capable models.
 
 ## Model Configuration
 
@@ -134,20 +113,6 @@ Do not assume the Replicate schema is a complete description of the underlying m
 
 Validate all submitted parameters server-side. The browser UI may help the user, but server validation is authoritative.
 
-## API Routes
-
-The UI is app-like and JavaScript-driven. Normal generation uses `/api/*` routes and should not require a page reload.
-
-Mutating `/api/*` routes must:
-
-- Require `Content-Type: application/json`.
-- Require `X-CSRF-Token` matching the session token generated on `GET /`.
-- Require `request.remote_addr` to match the client IP stored with that session token.
-- Avoid CORS; do not emit permissive CORS headers.
-- Return JSON errors with actionable messages.
-
-Do not expose `disable_safety_checker` as a user parameter. Reject or ignore browser attempts to set it, and keep the fixed model input set to `true`.
-
 ## Prompt Palettes
 
 Style and character palettes are reusable prompt fragments. Store them in a form that is easy to test and review, such as JSON, TOML, YAML, or Python data structures.
@@ -169,7 +134,7 @@ The UI should provide:
 
 - Model selector.
 - Mode-aware fields for text-to-image and image-edit workflows.
-- Source image selection controls for image-edit models when that workflow is implemented.
+- Image upload controls for image-edit models.
 - Model-specific parameter widgets.
 - Style and character palette insertion.
 - Generate button with loading and error states.
@@ -178,7 +143,7 @@ The UI should provide:
 
 Responsive behavior matters. Test layouts at mobile, tablet, and desktop widths. Controls should remain usable on touch devices, with adequate spacing and no text overlap.
 
-Keep JavaScript focused and local to the Flask UI. The generation workflow requires JavaScript; avoid reintroducing reload-based generation paths.
+Keep JavaScript progressive and focused. Server-rendered Flask/Jinja pages are preferred unless there is a clear reason for a heavier frontend.
 
 ## Testing Expectations
 
@@ -221,7 +186,6 @@ Keep this file focused on contributors and agents.
 - Do not skip `uv run pytest` and `uv run ruff check src tests` after code changes unless the reason is documented in the final response.
 - Assume tests are quick and cheap, always run `uv run pytest` in full, not individual tests.
 - Do not make `disable_safety_checker` user-configurable when a model supports it; keep it set to `true` in generated Replicate payloads.
-- Do not add mutating `/api/*` routes without the CSRF, JSON, same-client-IP, and no-CORS rules above.
 - Do not hide Replicate errors behind generic messages in logs; preserve actionable details while avoiding credential leakage.
 - Do not trust browser-submitted parameters, filenames, MIME types, or output URLs.
 - Do not use destructive git commands or revert unrelated user changes.

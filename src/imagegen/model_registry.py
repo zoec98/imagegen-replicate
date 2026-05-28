@@ -1,8 +1,4 @@
-"""Configured model metadata.
-
-This module stores static model definitions, including Replicate model keys,
-schema metadata, user-facing parameters, and fixed non-user-facing inputs.
-"""
+"""Configured Replicate models for imagegen."""
 
 from dataclasses import dataclass
 from typing import Literal
