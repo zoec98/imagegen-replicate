@@ -1,10 +1,10 @@
 # AGENTS.md
 
-This file is for developers and coding agents working on `imagen`. End-user setup and usage belong in [README.md](README.md).
+This file is for developers and coding agents working on `imagegen`. End-user setup and usage belong in [README.md](README.md).
 
 ## Project Intent
 
-`imagen` is a Python Flask application for preparing and submitting image generation requests to Replicate through the official Python API module.
+`imagegen` is a Python Flask application for preparing and submitting image generation requests to Replicate through the official Python API module.
 
 The application should support:
 
@@ -37,13 +37,13 @@ Keep the application small and explicit until real duplication appears.
 
 Preferred structure as the app grows:
 
-- `src/imagen/`: application package.
-- `src/imagen/app.py`: Flask application factory and route registration.
-- `src/imagen/replicate_client.py`: wrapper around Replicate API calls, downloads, and error handling.
-- `src/imagen/models.py`: configured model metadata and parameter schemas.
-- `src/imagen/palettes.py`: style and character palette loading and validation.
-- `src/imagen/templates/`: Jinja templates.
-- `src/imagen/static/`: CSS, JavaScript, and local UI assets.
+- `src/imagegen/`: application package.
+- `src/imagegen/app.py`: Flask application factory and route registration.
+- `src/imagegen/replicate_client.py`: wrapper around Replicate API calls, downloads, and error handling.
+- `src/imagegen/models.py`: configured model metadata and parameter schemas.
+- `src/imagegen/palettes.py`: style and character palette loading and validation.
+- `src/imagegen/templates/`: Jinja templates.
+- `src/imagegen/static/`: CSS, JavaScript, and local UI assets.
 - `tests/`: focused tests for request construction, palette handling, downloads, and route behavior.
 
 Use a Flask application factory, for example `create_app(config: dict | None = None)`, so tests can create isolated apps.

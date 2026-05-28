@@ -1,19 +1,29 @@
 [project]
-name = "imagen"
+name = "imagegen"
 version = "0.1.0"
-description = "Add your description here"
+description = "Flask UI for Replicate image generation requests"
 readme = "README.md"
 authors = [
     { name = "Zoe Cordelier", email = "zoe.cordelier@gmail.com" }
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "flask>=3.1.3",
+    "httpx>=0.28.1",
     "pyrefly>=0.60.0",
+    "python-dotenv>=1.2.2",
+    "replicate>=1.0.7",
 ]
 
 [project.scripts]
-imagen = "imagen:main"
+imagegen = "imagegen:main"
 
 [build-system]
 requires = ["uv_build>=0.9.27,<0.10.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "ruff>=0.15.14",
+]

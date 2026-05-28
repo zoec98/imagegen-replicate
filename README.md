@@ -1,6 +1,6 @@
-# imagen
+# imagegen
 
-`imagen` is a Flask web application for creating image generation requests and running them through Replicate. It is intended to support text-to-image and image-edit workflows, multiple Replicate models, model-specific parameters, reusable style palettes, reusable character palettes, and local access to downloaded image results.
+`imagegen` is a Flask web application for creating image generation requests and running them through Replicate. It is intended to support text-to-image and image-edit workflows, multiple Replicate models, model-specific parameters, reusable style palettes, reusable character palettes, and local access to downloaded image results.
 
 This project is currently an early scaffold. Developer and agent contribution guidance lives in [AGENTS.md](AGENTS.md).
 
@@ -15,7 +15,7 @@ This project is currently an early scaffold. Developer and agent contribution gu
 Clone the repository and enter the project directory:
 
 ```bash
-cd imagen
+cd img-replicate
 ```
 
 Install the project environment:
@@ -37,13 +37,13 @@ For local development, you can place environment setup in your shell profile or 
 At this scaffold stage, the package exposes a placeholder command:
 
 ```bash
-uv run imagen
+uv run imagegen
 ```
 
 Once the Flask app entry point is implemented, the expected local run command will be:
 
 ```bash
-uv run flask --app imagen.app run --debug
+uv run flask --app imagegen.app run --debug
 ```
 
 Then open:

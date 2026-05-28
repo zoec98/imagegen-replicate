@@ -49,6 +49,9 @@ results/
 # Logs and runtime files
 *.log
 *.pid
+*.sqlite
+*.sqlite3
+*.db
 
 # macOS and editor files
 .DS_Store

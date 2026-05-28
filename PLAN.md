@@ -23,7 +23,7 @@ Configuration behavior:
   - We check if the .env file is present, if not we create it.
   - We check for each variable if it is present and has a value. If not, we use the default value and add the comment explaining the options.
 - Read `REPLICATE_API_TOKEN` from the environment.
-- Read optional app settings such as `IMAGEN_OUTPUT_DIR`, `IMAGEN_MODEL`, and `IMAGEN_FLASK_SECRET_KEY`.
+- Read optional app settings such as `IMAGEGEN_OUTPUT_DIR`, `IMAGEGEN_MODEL`, and `IMAGEGEN_FLASK_SECRET_KEY`.
 - Default generated image storage to `data/images/`.
 - Ensure `data/` remains ignored by git.
 
@@ -47,7 +47,7 @@ Missing information and parts:
 
 Create a Flask application factory:
 
-- `src/imagen/app.py`
+- `src/imagegen/app.py`
 - `create_app(config: dict | None = None) -> Flask`
 
 Add routes:
@@ -70,7 +70,7 @@ Missing information and parts:
 
 Create a small wrapper around Replicate:
 
-- `src/imagen/replicate_client.py`
+- `src/imagegen/replicate_client.py`
 - Accept prompt text and model configuration.
 - Submit the request through the official `replicate` package.
 - Normalize output into a list of downloadable image URLs or file-like outputs.
@@ -135,7 +135,7 @@ Responsive gallery behavior:
 Implementation details:
 
 - Use server-rendered Jinja templates.
-- Keep CSS in `src/imagen/static/`.
+- Keep CSS in `src/imagegen/static/`.
 - Use CSS grid with responsive media queries.
 - Make the textarea vertically resizable.
 - Preserve prompt text after failed submissions where practical.
@@ -183,7 +183,7 @@ Missing information and parts:
 Run the Flask app locally:
 
 ```bash
-uv run flask --app imagen.app run --debug
+uv run flask --app imagegen.app run --debug
 ```
 
 Manual verification flow:
