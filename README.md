@@ -43,13 +43,13 @@ uv run imagegen
 Once the Flask app entry point is implemented, the expected local run command will be:
 
 ```bash
-uv run flask --app imagegen.app run --debug
+scripts/run-dev.sh
 ```
 
 Then open:
 
 ```text
-http://127.0.0.1:5000
+http://127.0.0.1:5002
 ```
 
 ## Usage
@@ -81,3 +81,9 @@ uv run ruff check --fix src tests
 ```
 
 See [AGENTS.md](AGENTS.md) for project structure, testing expectations, Replicate integration rules, UI guidance, and agent guardrails.
+
+Developer scripts live in [scripts/](scripts):
+
+- `scripts/run-dev.sh`
+- `scripts/run-dev.cmd`
+- `scripts/get_schema bytedance/seedream-4.5`

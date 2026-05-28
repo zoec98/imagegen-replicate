@@ -9,7 +9,7 @@ Add the runtime dependencies needed for the MVP:
 - `flask`
 - `replicate`
 - `python-dotenv`
-- `httpx` or `requests` for downloading returned image URLs
+- `httpx` for downloading returned image URLs
 
 Add development dependencies if missing:
 
@@ -34,10 +34,26 @@ Missing information and parts:
 - Whether model id should be configured as owner/model, owner/model:version, or a project-specific alias.
   - We maintain a model registry. It is keyed with a model specific alias, for example "seedream45".
   - For each model, the registry stores:
-    - The replicate documentation URL, here "https://replicate.com/bytedance/seedream-4.5/api"
-    - The replicate python module name, here ""bytedance/seedream-4.5"
-    - The models input JSON parameters, each with name, description, type and default values (optional list of valid choices)
-      - Here apparently "size", "prompt" and "aspect_ratio".
+    - The Replicate schema URL, here `https://replicate.com/bytedance/seedream-4.5/api/schema`.
+    - The Replicate model key, here `bytedance/seedream-4.5`.
+    - The pinned Replicate version id advertised by the schema page.
+    - An `edit_capable` boolean stored outside normal parameters. It is true for models that accept one or more source images.
+    - Fixed non-user-facing input values, including `disable_safety_checker: true` when the model supports it.
+    - The model input JSON parameters extracted from `components.schemas.Input`.
+    - The model output shape extracted from `components.schemas.Output`.
+    - For each parameter: name, description, type, default value, required flag, valid choices, numeric bounds, array item format, and `x-order`.
+  - Use `scripts/get_schema bytedance/seedream-4.5` to fetch the schema source.
+  - The current useful Seedream 4.5 input fields extracted from the schema page are:
+    - `prompt`: required string, order 0.
+    - `image_input`: array of URI strings, default `[]`, order 1.
+    - `size`: select, choices `2K` and `4K`, default `2K`, order 2.
+    - `aspect_ratio`: select, choices `match_input_image`, `1:1`, `4:3`, `3:4`, `16:9`, `9:16`, `3:2`, `2:3`, and `21:9`, default `match_input_image`, order 3.
+    - `sequential_image_generation`: select, choices `disabled` and `auto`, default `disabled`, order 4.
+    - `max_images`: integer, range 1-15, default 1, order 5.
+    - `disable_safety_checker`: boolean supported by Replicate, but not exposed as a normal parameter. Keep it in fixed inputs as `true`.
+    - Output: array of URI strings.
+  - The schema page can embed multiple schema/version objects. If they disagree, prefer the current/latest version shown by the page and document the ambiguity.
+  - Do not treat the Replicate schema as the complete Seedream 4.5 capability set across all suppliers. Other suppliers support and honor custom `width` and `height` values. The registry should be able to represent provider-specific and conditional parameters, such as `size: custom` plus `width` and `height` fields when that provider supports them.
 - Whether generated output metadata should be stored in sidecar JSON files in this stage.
   - We want at this stage store a metadata JSON next to the downloaded image, with the full image name + ".json"
 - Whether `.env.example` should be committed with non-secret defaults.
@@ -183,12 +199,12 @@ Missing information and parts:
 Run the Flask app locally:
 
 ```bash
-uv run flask --app imagegen.app run --debug
+scripts/run-dev.sh
 ```
 
 Manual verification flow:
 
-1. Open `http://127.0.0.1:5000`.
+1. Open `http://127.0.0.1:5002`.
 2. Enter a prompt in the resizable textarea.
 3. Press Generate.
 4. Confirm the request is sent to Replicate.

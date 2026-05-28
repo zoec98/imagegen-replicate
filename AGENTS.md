@@ -31,6 +31,12 @@ uv run ruff check --fix src tests
 
 When adding runtime dependencies, use `uv add <package>`. When adding test or tooling dependencies, use `uv add --dev <package>`.
 
+Project scripts live in `scripts/`:
+
+- `scripts/run-dev.sh`: start the Flask development server on `0.0.0.0:5002`.
+- `scripts/run-dev.cmd`: Windows CMD version of the Flask development server launcher.
+- `scripts/get_schema owner/model`: fetch `https://replicate.com/<owner>/<model>/api/schema`.
+
 ## Expected Application Shape
 
 Keep the application small and explicit until real duplication appears.
@@ -60,6 +66,8 @@ REPLICATE_API_TOKEN
 
 Keep Replicate-specific code behind a small project wrapper so the UI and route tests can use fakes without calling the network.
 
+Always send `disable_safety_checker: true` for models that support that parameter. This is an application policy and should be stored in fixed model inputs, not exposed as a normal user-facing parameter.
+
 For generated images:
 
 - Treat Replicate outputs as untrusted remote URLs or file-like values.
@@ -74,12 +82,34 @@ Model definitions should be data-driven. Each supported model should declare:
 
 - Stable internal id.
 - Display name.
-- Replicate model/version identifier.
+- Replicate model key, such as `bytedance/seedream-4.5`.
+- Pinned Replicate version id.
+- Schema URL in the form `https://replicate.com/<owner>/<model>/api/schema`.
+- Edit capability as a boolean, stored in model metadata outside normal parameters. Set it to `true` for any model that accepts one or more source images.
+- Fixed input values that must always be sent but are not user-facing parameters, such as `disable_safety_checker: true`.
 - Mode: `text-to-image` or `image-edit`.
 - Prompt field behavior.
 - Required and optional parameters.
 - Parameter widget type, such as text, textarea, number, slider, select, checkbox, image upload, or seed.
-- Defaults, bounds, and choices.
+- Defaults, bounds, choices, array item formats, and display order.
+- Output shape, especially whether outputs are image URLs.
+
+Use `scripts/get_schema owner/model` before adding or updating a model registry entry. The Replicate schema page is HTML, but it embeds a dereferenced OpenAPI schema in JSON script data. Extract useful registry information from `components.schemas.Input` and `components.schemas.Output`:
+
+- `required`: server-required input names.
+- `properties`: parameter names and metadata.
+- image/source input fields such as `image_input`: evidence that the model is edit-capable.
+- `type` and nested `items`: widget and validation shape.
+- `enum`: select choices.
+- `default`: form defaults.
+- `minimum` and `maximum`: numeric bounds.
+- `format`: URI/date/file hints.
+- `x-order`: stable UI ordering.
+- `description`: user-facing help text.
+
+If the page exposes multiple embedded schemas or versions, prefer the schema associated with the current/latest version shown by the page, and record the schema URL and pinned version in the registry. If that association is ambiguous, document the ambiguity in the change summary instead of guessing silently.
+
+Do not assume the Replicate schema is a complete description of the underlying model's capabilities across all suppliers. For Seedream 4.5 specifically, other suppliers support and honor custom `width` and `height` parameters. Model metadata should be flexible enough to represent provider-specific and conditional parameters, for example showing `width` and `height` only when a provider/schema supports `size: custom`.
 
 Validate all submitted parameters server-side. The browser UI may help the user, but server validation is authoritative.
 
@@ -155,6 +185,7 @@ Keep this file focused on contributors and agents.
 - Do not add broad abstractions before at least two concrete model integrations prove the shape.
 - Do not skip `uv run pytest` and `uv run ruff check src tests` after code changes unless the reason is documented in the final response.
 - Assume tests are quick and cheap, always run `uv run pytest` in full, not individual tests.
+- Do not make `disable_safety_checker` user-configurable when a model supports it; keep it set to `true` in generated Replicate payloads.
 - Do not hide Replicate errors behind generic messages in logs; preserve actionable details while avoiding credential leakage.
 - Do not trust browser-submitted parameters, filenames, MIME types, or output URLs.
 - Do not use destructive git commands or revert unrelated user changes.

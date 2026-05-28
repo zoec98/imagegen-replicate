@@ -1,0 +1,300 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+    printf 'usage: %s owner/model\n' "$0" >&2
+    printf 'example: %s bytedance/seedream-4.5\n' "$0" >&2
+    exit 2
+fi
+
+uv run python - "$1" <<'PY'
+from __future__ import annotations
+
+import html
+import json
+import re
+import sys
+from dataclasses import dataclass
+from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
+
+@dataclass(frozen=True)
+class SchemaCandidate:
+    version_id: str | None
+    created_at: str | None
+    schema: dict[str, Any]
+
+
+def main() -> int:
+    model = sys.argv[1]
+    if "/" not in model:
+        print(f"model must be in owner/model form, got: {model}", file=sys.stderr)
+        return 2
+
+    url = f"https://replicate.com/{model}/api/schema"
+    page = fetch(url)
+    model_latest_version = find_latest_version(page)
+    latest_created_at = find_latest_created_at(page)
+    candidates = dedupe_candidates(find_schema_candidates(page))
+
+    print(f"# Replicate Schema: `{model}`")
+    print()
+    print(f"- Schema URL: <{url}>")
+    if model_latest_version:
+        print(f"- Page latest version: `{model_latest_version}`")
+    if latest_created_at:
+        print(f"- Page latest version created: `{latest_created_at}`")
+    print(f"- Embedded schema candidates: {len(candidates)}")
+    print()
+
+    if not candidates:
+        print("No embedded OpenAPI schema candidates found.", file=sys.stderr)
+        return 1
+
+    preferred = choose_candidate(candidates, model_latest_version)
+    print_candidate_summary(preferred, preferred=True)
+
+    alternatives = [candidate for candidate in candidates if candidate is not preferred]
+    if alternatives:
+        print("## Other Embedded Candidates")
+        print()
+        for candidate in alternatives:
+            print_candidate_summary(candidate, preferred=False)
+
+    return 0
+
+
+def fetch(url: str) -> str:
+    request = Request(
+        url,
+        headers={
+            "Accept": "text/html,application/json",
+            "User-Agent": "imagegen-schema-fetch/0.1",
+        },
+    )
+    try:
+        with urlopen(request, timeout=30) as response:
+            return response.read().decode("utf-8", errors="replace")
+    except HTTPError as error:
+        raise SystemExit(f"HTTP {error.code} while fetching {url}") from error
+    except URLError as error:
+        raise SystemExit(f"Could not fetch {url}: {error.reason}") from error
+
+
+def find_latest_version(page: str) -> str | None:
+    matches = re.findall(r'"latest_version"\s*:\s*\{\s*"id"\s*:\s*"([^"]+)"', page)
+    if not matches:
+        return None
+    return matches[-1]
+
+
+def find_latest_created_at(page: str) -> str | None:
+    match = re.search(r'replicate:latest_version_created_at"\s+content="([^"]+)"', page)
+    if not match:
+        return None
+    return match.group(1)
+
+
+def find_schema_candidates(page: str) -> list[SchemaCandidate]:
+    candidates: list[SchemaCandidate] = []
+    for script_body in iter_json_script_bodies(page):
+        try:
+            data = json.loads(html.unescape(script_body))
+        except json.JSONDecodeError:
+            continue
+        for node in walk(data):
+            if not isinstance(node, dict):
+                continue
+            extras = node.get("_extras")
+            if not isinstance(extras, dict):
+                continue
+            schema = extras.get("dereferenced_openapi_schema")
+            if not isinstance(schema, dict):
+                continue
+            version_id = node.get("id")
+            created_at = node.get("created_at")
+            candidates.append(
+                SchemaCandidate(
+                    version_id=version_id if isinstance(version_id, str) else None,
+                    created_at=created_at if isinstance(created_at, str) else None,
+                    schema=schema,
+                )
+            )
+    return candidates
+
+
+def dedupe_candidates(candidates: list[SchemaCandidate]) -> list[SchemaCandidate]:
+    seen: set[tuple[str | None, str]] = set()
+    deduped: list[SchemaCandidate] = []
+    for candidate in candidates:
+        schema_key = json.dumps(candidate.schema, sort_keys=True, separators=(",", ":"))
+        key = (candidate.version_id, schema_key)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(candidate)
+    return deduped
+
+
+def iter_json_script_bodies(page: str) -> list[str]:
+    return re.findall(
+        r'<script[^>]+type="application/json"[^>]*>(.*?)</script>',
+        page,
+        flags=re.S,
+    )
+
+
+def walk(value: Any) -> list[Any]:
+    values: list[Any] = []
+    stack = [value]
+    while stack:
+        current = stack.pop()
+        values.append(current)
+        if isinstance(current, dict):
+            stack.extend(current.values())
+        elif isinstance(current, list):
+            stack.extend(current)
+    return values
+
+
+def choose_candidate(
+    candidates: list[SchemaCandidate],
+    latest_version: str | None,
+) -> SchemaCandidate:
+    if latest_version:
+        for candidate in candidates:
+            if candidate.version_id == latest_version:
+                return candidate
+    return candidates[0]
+
+
+def print_candidate_summary(candidate: SchemaCandidate, *, preferred: bool) -> None:
+    heading = "## Preferred Embedded Schema" if preferred else "### Candidate"
+    print(heading)
+    print()
+    if candidate.version_id:
+        print(f"- Version id: `{candidate.version_id}`")
+    else:
+        print("- Version id: not embedded with this schema")
+    if candidate.created_at:
+        print(f"- Created at: `{candidate.created_at}`")
+    else:
+        print("- Created at: not embedded with this schema")
+    print()
+
+    input_schema = schema_component(candidate.schema, "Input")
+    output_schema = schema_component(candidate.schema, "Output")
+
+    if input_schema:
+        print("### Input")
+        print()
+        required = input_schema.get("required", [])
+        if required:
+            print("- Required: " + ", ".join(f"`{name}`" for name in required))
+        else:
+            print("- Required: none")
+        print()
+        print("| Order | Name | Type | Default | Choices | Bounds | Description |")
+        print("| ---: | --- | --- | --- | --- | --- | --- |")
+        properties = input_schema.get("properties", {})
+        for name, prop in sorted(
+            properties.items(),
+            key=lambda item: item[1].get("x-order", 999),
+        ):
+            print(parameter_row(name, prop, required))
+        print()
+
+    if output_schema:
+        print("### Output")
+        print()
+        print(f"- Shape: {schema_type(output_schema)}")
+        if isinstance(output_schema.get("items"), dict):
+            print(f"- Items: {schema_type(output_schema['items'])}")
+        print()
+
+    print("### Registry Hints")
+    print()
+    if input_schema:
+        for name, prop in sorted(
+            input_schema.get("properties", {}).items(),
+            key=lambda item: item[1].get("x-order", 999),
+        ):
+            hints = {
+                "name": name,
+                "type": registry_type(prop),
+                "default": prop.get("default", ""),
+                "choices": prop.get("enum", []),
+                "minimum": prop.get("minimum"),
+                "maximum": prop.get("maximum"),
+                "order": prop.get("x-order"),
+            }
+            compact = {key: value for key, value in hints.items() if value not in (None, [], "")}
+            print(f"- `{name}`: `{json.dumps(compact, ensure_ascii=False)}`")
+    print()
+
+
+def schema_component(schema: dict[str, Any], name: str) -> dict[str, Any] | None:
+    component = schema.get("components", {}).get("schemas", {}).get(name)
+    return component if isinstance(component, dict) else None
+
+
+def parameter_row(name: str, prop: dict[str, Any], required: list[str]) -> str:
+    order = markdown_value(prop.get("x-order", ""))
+    label = f"`{name}`"
+    if name in required:
+        label += " *"
+    type_name = schema_type(prop)
+    default = markdown_value(prop.get("default", ""))
+    choices = ", ".join(f"`{choice}`" for choice in prop.get("enum", []))
+    bounds = format_bounds(prop)
+    description = markdown_value(prop.get("description", ""))
+    return f"| {order} | {label} | {type_name} | {default} | {choices} | {bounds} | {description} |"
+
+
+def schema_type(prop: dict[str, Any]) -> str:
+    type_name = prop.get("type", "unknown")
+    item_schema = prop.get("items")
+    if type_name == "array" and isinstance(item_schema, dict):
+        return f"array[{schema_type(item_schema)}]"
+    item_format = prop.get("format")
+    if item_format:
+        return f"{type_name}:{item_format}"
+    return str(type_name)
+
+
+def registry_type(prop: dict[str, Any]) -> str:
+    if prop.get("enum"):
+        return "select"
+    type_name = prop.get("type")
+    if type_name in {"array", "boolean", "integer", "string"}:
+        return str(type_name)
+    return "string"
+
+
+def format_bounds(prop: dict[str, Any]) -> str:
+    minimum = prop.get("minimum")
+    maximum = prop.get("maximum")
+    if minimum is None and maximum is None:
+        return ""
+    if minimum is None:
+        return f"<= `{maximum}`"
+    if maximum is None:
+        return f">= `{minimum}`"
+    return f"`{minimum}`-`{maximum}`"
+
+
+def markdown_value(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    if isinstance(value, bool):
+        return "`true`" if value else "`false`"
+    if isinstance(value, (int, float)):
+        return f"`{value}`"
+    text = str(value).replace("|", "\\|").replace("\n", " ")
+    return f"`{text}`"
+
+
+raise SystemExit(main())
+PY
