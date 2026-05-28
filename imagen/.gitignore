@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# uv
+.uv-cache/
+
+# Tests, coverage, and type checkers
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.pyre/
+.ruff_cache/
+.pytype/
+
+# Flask
+instance/
+.webassets-cache/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Non-committable application data
+data/
+uploads/
+outputs/
+results/
+
+# Logs and runtime files
+*.log
+*.pid
+*.sqlite
+*.sqlite3
+*.db
+
+# macOS and editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
