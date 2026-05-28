@@ -30,17 +30,11 @@ Set your Replicate API token:
 export REPLICATE_API_TOKEN="your-token"
 ```
 
-For local development, you can place environment setup in your shell profile or a local `.env` file if the application adds dotenv support later. Do not commit secrets.
+For local development, you can place environment setup in your shell profile or a local `.env` file. The application creates missing default `.env` keys when it starts. Do not commit secrets.
 
 ## Running
 
-At this scaffold stage, the package exposes a placeholder command:
-
-```bash
-uv run imagegen
-```
-
-Once the Flask app entry point is implemented, the expected local run command will be:
+Start the Flask development server:
 
 ```bash
 scripts/run-dev.sh
@@ -51,6 +45,8 @@ Then open:
 ```text
 http://127.0.0.1:5002
 ```
+
+The Flask skeleton is present. Actual Replicate request execution and image downloading are implemented in later MVP stages.
 
 ## Usage
 

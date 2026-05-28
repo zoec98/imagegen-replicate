@@ -79,8 +79,11 @@ Missing information and parts:
 
 - Final route naming convention.
 - Whether image full view should be a plain direct image response or an HTML page with the image centered.
+  - Full image view shows the plain image, no HTML.
 - Whether failed generations should redirect with flash messages or return an inline error response.
+  - Flash Message, shown without time limit. 
 - Whether the app should use sessions and Flask flash messages in the MVP.
+  - We will use sessions.
 
 ## Stage 3: Replicate Service Wrapper
 
@@ -100,9 +103,14 @@ For tests:
 Missing information and parts:
 
 - Exact Replicate API call shape for the chosen MVP model.
+  - I do not understand the question. What are the options?
+  - We will be running in residential setups behind NAT, and can't use webhooks. We need to poll, or wait. We can poll and display updates in 1-second intervals (.env parameter) if that helps.
 - Expected Replicate output format for the chosen model.
+  - We store files as <model-alias>-<requestid>-<sequencenumber>.<type>
 - Timeout and retry policy for generation requests.
+  - No retry. Timeout 60s.
 - Whether the MVP should support streaming/progress or only blocking generation.
+  - We can't do webhooks. If we can do streaming/progress with polling, we will do that.
 
 ## Stage 4: Image Download And Local Gallery
 

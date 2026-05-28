@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>imagegen</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  </head>
+  <body>
+    <main class="workspace">
+      <form class="prompt-form" method="post" action="{{ url_for('generate') }}">
+        <div class="prompt-bar">
+          <label for="prompt">Prompt</label>
+          <button type="submit">Generate</button>
+        </div>
+        <textarea id="prompt" name="prompt" rows="8">{{ prompt }}</textarea>
+        {% if error %}
+          <p class="error" role="alert">{{ error }}</p>
+        {% endif %}
+      </form>
+
+      <section class="gallery" aria-label="Generated images">
+        {% for image in images %}
+          <a class="gallery-item" href="{{ image.view_url }}" target="_blank" rel="noopener">
+            <img src="{{ image.url }}" alt="{{ image.filename }}">
+          </a>
+        {% else %}
+          <p class="empty">No generated images yet.</p>
+        {% endfor %}
+      </section>
+    </main>
+  </body>
+</html>
