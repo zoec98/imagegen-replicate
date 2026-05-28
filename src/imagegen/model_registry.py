@@ -29,6 +29,8 @@ class ReplicateModel:
     version: str
     edit_capable: bool
     fixed_inputs: dict[str, object]
+    default_width: int
+    default_height: int
     modes: tuple[ModelMode, ...]
     parameters: tuple[ModelParameter, ...]
 
@@ -45,6 +47,8 @@ SEEDREAM45 = ReplicateModel(
     version="bd4492f8492cc564460074e069bff1d55428cf48286f0a0f4a4a39b50f088ff6",
     edit_capable=True,
     fixed_inputs={"disable_safety_checker": True},
+    default_width=2048,
+    default_height=2048,
     modes=("text-to-image", "image-edit"),
     parameters=(
         ModelParameter(

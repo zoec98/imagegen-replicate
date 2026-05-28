@@ -53,7 +53,7 @@ Then open:
 http://127.0.0.1:5002
 ```
 
-The Flask skeleton and Replicate prediction wrapper are present. Image downloading is implemented in a later MVP stage.
+The Flask app submits Replicate predictions, polls for completion, downloads returned images, and stores local metadata sidecars.
 
 ## Usage
 
@@ -70,7 +70,7 @@ The planned UI flow is:
 9. Preview the returned image results.
 10. Download or reuse the generated files from the local results area.
 
-Generated files should be downloaded from Replicate and stored locally by the application with useful metadata, including the model, prompt, parameters, source URL, and creation time.
+Generated files are downloaded from Replicate into `data/images/` by default. Each image has a sidecar metadata file named `<image-filename>.json` with the model, prompt, parameters, source URL, creation time, content type, and byte size.
 
 ## Development
 

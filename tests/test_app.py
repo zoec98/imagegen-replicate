@@ -66,7 +66,7 @@ def test_generate_calls_injected_generator_and_redirects(tmp_path):
 
     def fake_generate(prompt, app_config):
         calls.append((prompt, app_config.model_alias))
-        return type("Result", (), {"output_urls": ["https://example.com/out.png"]})()
+        return type("Result", (), {"stored_images": [tmp_path / "out.png"]})()
 
     client = make_app(tmp_path, IMAGEGEN_GENERATE=fake_generate).test_client()
 
@@ -98,6 +98,25 @@ def test_image_route_serves_stored_file(tmp_path):
     client = make_app(tmp_path).test_client()
 
     response = client.get("/images/sample.png")
+
+    assert response.status_code == 200
+    assert response.data == b"image-bytes"
+
+
+def test_image_route_uses_env_relative_output_dir(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    output_dir = tmp_path / "data" / "images"
+    output_dir.mkdir(parents=True)
+    (output_dir / "sample.png").write_bytes(b"image-bytes")
+    (tmp_path / ".env").write_text(
+        "IMAGEGEN_OUTPUT_DIR=data/images\n"
+        "IMAGEGEN_MODEL=seedream45\n"
+        "IMAGEGEN_FLASK_SECRET_KEY=test-secret\n",
+        encoding="utf-8",
+    )
+    app = create_app({"TESTING": True, "IMAGEGEN_ENV_PATH": tmp_path / ".env"})
+
+    response = app.test_client().get("/images/sample.png")
 
     assert response.status_code == 200
     assert response.data == b"image-bytes"

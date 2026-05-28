@@ -71,9 +71,9 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
             flash(str(error), "error")
             return redirect(url_for("index"))
 
-        output_count = len(getattr(result, "output_urls", []))
+        output_count = len(getattr(result, "stored_images", []))
         flash(
-            f"Generation finished with {output_count} output URL(s). Downloading is not implemented yet.",
+            f"Generation finished and saved {output_count} image(s).",
             "success",
         )
         return redirect(url_for("index"))

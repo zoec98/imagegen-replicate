@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 
 import pytest
 
@@ -72,7 +71,7 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     config = load_config(env_path)
 
     assert config.replicate_api_token == "test-token"
-    assert config.output_dir == Path("custom/images")
+    assert config.output_dir == tmp_path / "custom/images"
     assert config.model_alias == "seedream45"
     assert config.model is MODEL_REGISTRY["seedream45"]
     assert config.flask_secret_key == "test-secret"

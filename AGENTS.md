@@ -82,6 +82,9 @@ For generated images:
 - Store downloaded files under an application-controlled output directory.
 - Generate collision-resistant filenames.
 - Preserve useful metadata, such as model name, prompt, parameters, source URL, and creation time.
+- For the MVP, limit downloads to expected decoded 24-bit RGB size plus small overhead: `expected_width * expected_height * 3 + 1 MiB`.
+- Preserve the original output format for now, based on image content type.
+- Write sidecar metadata as `<image-filename>.json`.
 
 ## Model Configuration
 

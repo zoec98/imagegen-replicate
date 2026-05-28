@@ -88,7 +88,7 @@ def write_env_example(path: str | Path = ".env.example") -> Path:
 def load_config(env_path: str | Path = ".env") -> AppConfig:
     """Ensure .env exists, load it, and return typed application config."""
 
-    env_file = ensure_env_file(env_path)
+    env_file = ensure_env_file(env_path).resolve()
     load_dotenv(env_file, override=False)
 
     model_alias = os.getenv("IMAGEGEN_MODEL", DEFAULT_MODEL_ALIAS).strip()
@@ -98,9 +98,13 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
         msg = f"Unknown IMAGEGEN_MODEL {model_alias!r}. Expected one of: {choices}."
         raise ValueError(msg)
 
+    output_dir = Path(os.getenv("IMAGEGEN_OUTPUT_DIR", "data/images")).expanduser()
+    if not output_dir.is_absolute():
+        output_dir = env_file.parent / output_dir
+
     return AppConfig(
         replicate_api_token=os.getenv("REPLICATE_API_TOKEN", "").strip(),
-        output_dir=Path(os.getenv("IMAGEGEN_OUTPUT_DIR", "data/images")).expanduser(),
+        output_dir=output_dir,
         model_alias=model_alias,
         model=model,
         flask_secret_key=os.getenv(

@@ -5,15 +5,18 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
 import replicate
 
 from imagegen.config import AppConfig
+from imagegen.image_store import StoredImage, persist_generated_images
 from imagegen.model_registry import ReplicateModel
 
 
 TERMINAL_STATUSES = {"succeeded", "failed", "canceled"}
+PersistImages = Callable[..., list[StoredImage]]
 
 
 class PredictionLike(Protocol):
@@ -39,6 +42,7 @@ class PredictionsApi(Protocol):
 class ReplicateResult:
     prediction_id: str
     output_urls: list[str]
+    stored_images: list[StoredImage]
     logs: str
 
 
@@ -57,6 +61,7 @@ def generate_image_urls(
     predictions_api: PredictionsApi | None = None,
     sleep: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
+    persist_images: PersistImages = persist_generated_images,
 ) -> ReplicateResult:
     predictions = predictions_api or _replicate_predictions(app_config)
     prediction_input = build_prediction_input(prompt, app_config.model)
@@ -72,9 +77,19 @@ def generate_image_urls(
         sleep=sleep,
         clock=clock,
     )
+    output_urls = normalize_output_urls(prediction.output)
+    stored_images = persist_images(
+        output_urls,
+        output_dir=Path(app_config.output_dir),
+        model=app_config.model,
+        prompt=prompt,
+        prediction_id=prediction.id,
+        prediction_input=prediction_input,
+    )
     return ReplicateResult(
         prediction_id=prediction.id,
-        output_urls=normalize_output_urls(prediction.output),
+        output_urls=output_urls,
+        stored_images=stored_images,
         logs=prediction.logs or "",
     )
 

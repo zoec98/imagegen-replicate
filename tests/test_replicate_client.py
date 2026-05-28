@@ -71,21 +71,30 @@ def test_generate_image_urls_creates_prediction_and_polls(tmp_path):
     )
     api = FakePredictionsApi(created, [completed])
     sleeps = []
+    stored = []
+
+    def fake_persist(urls, **kwargs):
+        stored.append((urls, kwargs))
+        return [tmp_path / "seedream45-abc123-01.png"]
 
     result = generate_image_urls(
         "a red house",
         app_config(tmp_path),
         predictions_api=api,
         sleep=sleeps.append,
+        persist_images=fake_persist,
     )
 
     assert result.prediction_id == "abc123"
     assert result.output_urls == ["https://example.com/one.png"]
+    assert result.stored_images == [tmp_path / "seedream45-abc123-01.png"]
     assert result.logs == "done"
     assert sleeps == [1.0]
     assert api.create_calls[0]["model"] == MODEL_REGISTRY["seedream45"].replicate_model
     assert api.create_calls[0]["input"]["disable_safety_checker"] is True
     assert api.get_calls == ["abc123"]
+    assert stored[0][0] == ["https://example.com/one.png"]
+    assert stored[0][1]["prediction_id"] == "abc123"
 
 
 def test_generate_image_urls_raises_on_failed_prediction(tmp_path):
@@ -100,6 +109,7 @@ def test_generate_image_urls_raises_on_failed_prediction(tmp_path):
             app_config(tmp_path),
             predictions_api=api,
             sleep=lambda seconds: None,
+            persist_images=lambda urls, **kwargs: [],
         )
 
 
@@ -117,6 +127,7 @@ def test_generate_image_urls_times_out(tmp_path):
             predictions_api=api,
             sleep=lambda seconds: None,
             clock=lambda: next(now),
+            persist_images=lambda urls, **kwargs: [],
         )
 
 

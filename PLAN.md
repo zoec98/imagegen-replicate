@@ -138,10 +138,16 @@ Supported file extensions for discovery:
 Missing information and parts:
 
 - Maximum image download size.
+  - We will not accept files larger than a 24 bit BMP of the expected dimensions would be, plus 1 MiB for metadata/header overhead: expected width x height x 3 bytes per pixel + 1 MiB.
+  - This is a reasonable MVP guardrail; it is not a perfect compressed-image validity check.
 - Whether original output format should always be preserved.
+  - For now, yes. We will later implement PNG -> JPG conversion.
 - Whether generated images should have metadata sidecars.
+  - For now, yes. We will later implement EXIF metadata preservation.
 - Whether uploads and generated outputs should share a storage root later.
+  - Yes.
 - Whether old generated files need cleanup or retention limits.
+  - Out of scope for this MVP.
 
 ## Stage 5: Main UI
 
