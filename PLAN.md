@@ -163,7 +163,7 @@ Responsive gallery behavior:
 
 - Phone: 1 column.
 - iPad/tablet: 3 columns where space allows.
-- Desktop: 3 columns by default, with room to expand later if useful.
+- Desktop: 3 or more columns by default depending on window width.
 
 Implementation details:
 
@@ -176,10 +176,15 @@ Implementation details:
 Missing information and parts:
 
 - Desired visual style beyond a functional MVP.
+  - "Modern flat UI"
 - Whether the gallery should use square thumbnails or natural image aspect ratios.
+- - Natural image aspect ratios in square placeholders so we get a proper grid, I presume?
 - Whether the image should open via direct file URL or a dedicated full-view route.
+  - Image direct open, no full view. We want easy downloads.
 - Whether the prompt field needs a minimum/maximum length.
+  - No limits on prompt length.
 - Whether keyboard shortcuts are desired for generate.
+  - Not now.
 
 ## Stage 6: Local Tests
 

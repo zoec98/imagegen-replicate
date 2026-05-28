@@ -37,6 +37,10 @@ def test_index_renders_prompt_form(tmp_path):
     assert response.status_code == 200
     assert b'<form class="prompt-form"' in response.data
     assert b'name="prompt"' in response.data
+    assert b'name="size"' in response.data
+    assert b'name="aspect_ratio"' in response.data
+    assert b'name="max_images"' in response.data
+    assert b"disable_safety_checker" not in response.data
     assert b"Generate" in response.data
 
 
@@ -49,6 +53,7 @@ def test_index_lists_existing_images(tmp_path):
 
     assert response.status_code == 200
     assert b"first.png" in response.data
+    assert b'href="/images/first.png"' in response.data
     assert b"ignore.txt" not in response.data
 
 

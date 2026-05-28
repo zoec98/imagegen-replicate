@@ -18,21 +18,61 @@
             </div>
           {% endif %}
         {% endwith %}
-        <div class="prompt-bar">
-          <label for="prompt">Prompt</label>
-          <button type="submit">Generate</button>
+
+        <div class="prompt-panel">
+          <div class="prompt-bar">
+            <div>
+              <p class="model-name">{{ model.display_name }}</p>
+              <label for="prompt">Prompt</label>
+            </div>
+            <button class="generate-button" type="submit">Generate</button>
+          </div>
+          <textarea id="prompt" name="prompt" rows="9">{{ prompt }}</textarea>
         </div>
-        <textarea id="prompt" name="prompt" rows="8">{{ prompt }}</textarea>
+
+        <div class="parameter-grid" aria-label="Model parameters">
+          {% for parameter in parameters %}
+            <label class="field" for="parameter-{{ parameter.name }}">
+              <span>{{ parameter.name.replace("_", " ") }}</span>
+              {% if parameter.choices %}
+                <select id="parameter-{{ parameter.name }}" name="{{ parameter.name }}">
+                  {% for choice in parameter.choices %}
+                    <option value="{{ choice }}" {% if choice == parameter.default %}selected{% endif %}>{{ choice }}</option>
+                  {% endfor %}
+                </select>
+              {% elif parameter.type == "integer" %}
+                <input
+                  id="parameter-{{ parameter.name }}"
+                  name="{{ parameter.name }}"
+                  type="number"
+                  value="{{ parameter.default }}"
+                  {% if parameter.minimum is not none %}min="{{ parameter.minimum }}"{% endif %}
+                  {% if parameter.maximum is not none %}max="{{ parameter.maximum }}"{% endif %}
+                >
+              {% else %}
+                <input id="parameter-{{ parameter.name }}" name="{{ parameter.name }}" value="{{ parameter.default }}">
+              {% endif %}
+            </label>
+          {% endfor %}
+        </div>
       </form>
 
-      <section class="gallery" aria-label="Generated images">
+      <section class="gallery-section" aria-label="Generated images">
+        <div class="section-bar">
+          <h1>Images</h1>
+        </div>
+        <div class="gallery">
         {% for image in images %}
-          <a class="gallery-item" href="{{ image.view_url }}" target="_blank" rel="noopener">
-            <img src="{{ image.url }}" alt="{{ image.filename }}">
-          </a>
+          <figure class="gallery-item">
+            <a href="{{ image.url }}" target="_blank" rel="noopener">
+              <img src="{{ image.url }}" alt="{{ image.filename }}">
+            </a>
+            <figcaption>{{ image.filename }}</figcaption>
+          </figure>
         {% else %}
           <p class="empty">No generated images yet.</p>
         {% endfor %}
+        </div>
       </section>
     </main>
   </body>

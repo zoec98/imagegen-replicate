@@ -31,7 +31,6 @@ GenerateHandler = Callable[[str, AppConfig], Any]
 class GalleryImage:
     filename: str
     url: str
-    view_url: str
 
 
 def create_app(config: dict[str, Any] | None = None) -> Flask:
@@ -54,6 +53,14 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
                 Path(app.config["IMAGEGEN_OUTPUT_DIR"]),
             ),
             model=app_config.model,
+            parameters=[
+                parameter
+                for parameter in sorted(
+                    app_config.model.parameters,
+                    key=lambda item: item.order if item.order is not None else 999,
+                )
+                if parameter.name not in {"prompt", "image_input"}
+            ],
             prompt="",
         )
 
@@ -109,7 +116,6 @@ def list_gallery_images(output_dir: Path) -> list[GalleryImage]:
         GalleryImage(
             filename=path.name,
             url=url_for("image_file", filename=path.name),
-            view_url=url_for("image_view", filename=path.name),
         )
         for path in files
     ]
