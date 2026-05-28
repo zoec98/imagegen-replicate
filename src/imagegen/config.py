@@ -1,4 +1,8 @@
-"""Application configuration and .env management."""
+"""Application configuration and .env management.
+
+This module owns local `.env` file creation/update and conversion of environment
+variables into the typed AppConfig used by the Flask app and service wrappers.
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,9 @@
-"""Replicate prediction wrapper."""
+"""Replicate prediction wrapper.
+
+This module contains the only runtime Replicate API calls. It builds prediction
+payloads from model metadata, creates predictions, polls them to completion, and
+hands returned image URLs to the local image store.
+"""
 
 from __future__ import annotations
 

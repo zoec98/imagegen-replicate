@@ -1,4 +1,8 @@
-"""Local storage for generated image files and metadata."""
+"""Local storage for generated image files and metadata.
+
+This module downloads Replicate image outputs, validates basic response safety,
+writes files under the configured output directory, and creates sidecar metadata.
+"""
 
 from __future__ import annotations
 
