@@ -39,6 +39,16 @@ ENV_SETTINGS: tuple[EnvSetting, ...] = (
         default="dev-secret-change-me",
         comment="Flask secret key for local development. Replace for shared deployments.",
     ),
+    EnvSetting(
+        name="IMAGEGEN_REPLICATE_POLL_SECONDS",
+        default="1.0",
+        comment="Seconds between Replicate prediction polling requests.",
+    ),
+    EnvSetting(
+        name="IMAGEGEN_REPLICATE_TIMEOUT_SECONDS",
+        default="60.0",
+        comment="Maximum seconds to wait for a Replicate prediction before timing out.",
+    ),
 )
 
 
@@ -49,6 +59,8 @@ class AppConfig:
     model_alias: str
     model: ReplicateModel
     flask_secret_key: str
+    replicate_poll_seconds: float
+    replicate_timeout_seconds: float
 
 
 def ensure_env_file(path: str | Path = ".env") -> Path:
@@ -94,6 +106,11 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
         flask_secret_key=os.getenv(
             "IMAGEGEN_FLASK_SECRET_KEY",
             "dev-secret-change-me",
+        ),
+        replicate_poll_seconds=_float_env("IMAGEGEN_REPLICATE_POLL_SECONDS", 1.0),
+        replicate_timeout_seconds=_float_env(
+            "IMAGEGEN_REPLICATE_TIMEOUT_SECONDS",
+            60.0,
         ),
     )
 
@@ -142,3 +159,18 @@ def _find_setting_line(lines: list[str], name: str) -> int | None:
         if _line_key(line) == name:
             return index
     return None
+
+
+def _float_env(name: str, default: float) -> float:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        return default
+    try:
+        parsed = float(value)
+    except ValueError as error:
+        msg = f"{name} must be a number."
+        raise ValueError(msg) from error
+    if parsed <= 0:
+        msg = f"{name} must be greater than zero."
+        raise ValueError(msg)
+    return parsed

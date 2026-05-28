@@ -17,6 +17,8 @@ def test_ensure_env_file_creates_expected_defaults(tmp_path):
     assert "IMAGEGEN_OUTPUT_DIR=data/images" in content
     assert "IMAGEGEN_MODEL=seedream45" in content
     assert "IMAGEGEN_FLASK_SECRET_KEY=dev-secret-change-me" in content
+    assert "IMAGEGEN_REPLICATE_POLL_SECONDS=1.0" in content
+    assert "IMAGEGEN_REPLICATE_TIMEOUT_SECONDS=60.0" in content
 
 
 def test_ensure_env_file_preserves_existing_values(tmp_path):
@@ -35,6 +37,8 @@ def test_ensure_env_file_preserves_existing_values(tmp_path):
     assert "IMAGEGEN_OUTPUT_DIR=custom/images" in content
     assert "IMAGEGEN_MODEL=seedream45" in content
     assert "IMAGEGEN_FLASK_SECRET_KEY=dev-secret-change-me" in content
+    assert "IMAGEGEN_REPLICATE_POLL_SECONDS=1.0" in content
+    assert "IMAGEGEN_REPLICATE_TIMEOUT_SECONDS=60.0" in content
 
 
 def test_write_env_example_uses_non_secret_defaults(tmp_path):
@@ -52,12 +56,16 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     monkeypatch.delenv("IMAGEGEN_OUTPUT_DIR", raising=False)
     monkeypatch.delenv("IMAGEGEN_MODEL", raising=False)
     monkeypatch.delenv("IMAGEGEN_FLASK_SECRET_KEY", raising=False)
+    monkeypatch.delenv("IMAGEGEN_REPLICATE_POLL_SECONDS", raising=False)
+    monkeypatch.delenv("IMAGEGEN_REPLICATE_TIMEOUT_SECONDS", raising=False)
     env_path = tmp_path / ".env"
     env_path.write_text(
         "REPLICATE_API_TOKEN=test-token\n"
         "IMAGEGEN_OUTPUT_DIR=custom/images\n"
         "IMAGEGEN_MODEL=seedream45\n"
-        "IMAGEGEN_FLASK_SECRET_KEY=test-secret\n",
+        "IMAGEGEN_FLASK_SECRET_KEY=test-secret\n"
+        "IMAGEGEN_REPLICATE_POLL_SECONDS=2.5\n"
+        "IMAGEGEN_REPLICATE_TIMEOUT_SECONDS=30\n",
         encoding="utf-8",
     )
 
@@ -68,6 +76,8 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     assert config.model_alias == "seedream45"
     assert config.model is MODEL_REGISTRY["seedream45"]
     assert config.flask_secret_key == "test-secret"
+    assert config.replicate_poll_seconds == 2.5
+    assert config.replicate_timeout_seconds == 30.0
 
 
 def test_load_config_rejects_unknown_model(tmp_path, monkeypatch):

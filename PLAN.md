@@ -103,14 +103,17 @@ For tests:
 Missing information and parts:
 
 - Exact Replicate API call shape for the chosen MVP model.
-  - I do not understand the question. What are the options?
-  - We will be running in residential setups behind NAT, and can't use webhooks. We need to poll, or wait. We can poll and display updates in 1-second intervals (.env parameter) if that helps.
+  - The API call shape question is whether to use `replicate.run(...)` as a blocking convenience call or create a prediction and poll it.
+  - Use prediction creation plus polling: `replicate.Client(...).predictions.create(model=<model-key>, input=<payload>)`, followed by polling `predictions.get(prediction.id)`.
+  - Do not call `predictions.create(version=<schema-page-version>)` for Seedream 4.5. The version id extracted from Replicate's schema page is not accepted by the prediction API; the tested working shape is `model="bytedance/seedream-4.5"`.
+  - Do not use webhooks for the MVP because residential/NAT setups cannot reliably receive callbacks.
+  - Poll interval is configured by `IMAGEGEN_REPLICATE_POLL_SECONDS`, default `1.0`.
 - Expected Replicate output format for the chosen model.
   - We store files as <model-alias>-<requestid>-<sequencenumber>.<type>
 - Timeout and retry policy for generation requests.
-  - No retry. Timeout 60s.
+  - No retry. Timeout is configured by `IMAGEGEN_REPLICATE_TIMEOUT_SECONDS`, default `60.0`.
 - Whether the MVP should support streaming/progress or only blocking generation.
-  - We can't do webhooks. If we can do streaming/progress with polling, we will do that.
+  - We do not use webhooks. Polling support belongs in the wrapper; the current route blocks until success/failure/timeout, and future UI work can display polling progress at 1-second intervals.
 
 ## Stage 4: Image Download And Local Gallery
 

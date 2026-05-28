@@ -35,33 +35,39 @@ def main() -> int:
 
     url = f"https://replicate.com/{model}/api/schema"
     page = fetch(url)
-    model_latest_version = find_latest_version(page)
+    schema_page_latest_version = find_latest_version(page)
     latest_created_at = find_latest_created_at(page)
     candidates = dedupe_candidates(find_schema_candidates(page))
 
     print(f"# Replicate Schema: `{model}`")
     print()
+    print(f"- Model key: `{model}`")
+    print(f"- Prediction API call shape: `predictions.create(model=\"{model}\", input=<payload>)`")
     print(f"- Schema URL: <{url}>")
-    if model_latest_version:
-        print(f"- Page latest version: `{model_latest_version}`")
+    if schema_page_latest_version:
+        print(f"- Schema page latest version id: `{schema_page_latest_version}`")
     if latest_created_at:
-        print(f"- Page latest version created: `{latest_created_at}`")
+        print(f"- Schema page latest version created: `{latest_created_at}`")
     print(f"- Embedded schema candidates: {len(candidates)}")
+    print(
+        "- Note: schema/page version ids are metadata and are not assumed valid "
+        "for `predictions.create(version=...)`."
+    )
     print()
 
     if not candidates:
         print("No embedded OpenAPI schema candidates found.", file=sys.stderr)
         return 1
 
-    preferred = choose_candidate(candidates, model_latest_version)
-    print_candidate_summary(preferred, preferred=True)
+    preferred = choose_candidate(candidates, schema_page_latest_version)
+    print_candidate_summary(preferred, model=model, preferred=True)
 
     alternatives = [candidate for candidate in candidates if candidate is not preferred]
     if alternatives:
         print("## Other Embedded Candidates")
         print()
         for candidate in alternatives:
-            print_candidate_summary(candidate, preferred=False)
+            print_candidate_summary(candidate, model=model, preferred=False)
 
     return 0
 
@@ -170,14 +176,19 @@ def choose_candidate(
     return candidates[0]
 
 
-def print_candidate_summary(candidate: SchemaCandidate, *, preferred: bool) -> None:
+def print_candidate_summary(
+    candidate: SchemaCandidate,
+    *,
+    model: str,
+    preferred: bool,
+) -> None:
     heading = "## Preferred Embedded Schema" if preferred else "### Candidate"
     print(heading)
     print()
     if candidate.version_id:
-        print(f"- Version id: `{candidate.version_id}`")
+        print(f"- Schema embedded version id: `{candidate.version_id}`")
     else:
-        print("- Version id: not embedded with this schema")
+        print("- Schema embedded version id: not embedded with this schema")
     if candidate.created_at:
         print(f"- Created at: `{candidate.created_at}`")
     else:
@@ -216,11 +227,23 @@ def print_candidate_summary(candidate: SchemaCandidate, *, preferred: bool) -> N
 
     print("### Registry Hints")
     print()
+    print(f"- `replicate_model`: `{model}`")
+    if candidate.version_id:
+        print(f"- `schema_version_id`: `{candidate.version_id}`")
+    print("- `prediction_create`: `model=<replicate_model>`")
+    print("- `do_not_assume`: `schema_version_id works as predictions.create(version=...)`")
     if input_schema:
         for name, prop in sorted(
             input_schema.get("properties", {}).items(),
             key=lambda item: item[1].get("x-order", 999),
         ):
+            if name == "disable_safety_checker":
+                print(
+                    "- `disable_safety_checker`: "
+                    "`fixed_inputs={\"disable_safety_checker\": true}` "
+                    "(project policy; do not expose as a user parameter)"
+                )
+                continue
             hints = {
                 "name": name,
                 "type": registry_type(prop),

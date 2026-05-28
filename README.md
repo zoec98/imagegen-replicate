@@ -30,6 +30,13 @@ Set your Replicate API token:
 export REPLICATE_API_TOKEN="your-token"
 ```
 
+Optional Replicate timing settings:
+
+```bash
+export IMAGEGEN_REPLICATE_POLL_SECONDS="1.0"
+export IMAGEGEN_REPLICATE_TIMEOUT_SECONDS="60.0"
+```
+
 For local development, you can place environment setup in your shell profile or a local `.env` file. The application creates missing default `.env` keys when it starts. Do not commit secrets.
 
 ## Running
@@ -46,7 +53,7 @@ Then open:
 http://127.0.0.1:5002
 ```
 
-The Flask skeleton is present. Actual Replicate request execution and image downloading are implemented in later MVP stages.
+The Flask skeleton and Replicate prediction wrapper are present. Image downloading is implemented in a later MVP stage.
 
 ## Usage
 

@@ -39,9 +39,21 @@ button {
   font: inherit;
 }
 
-.error {
-  color: #b00020;
+.messages {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.message {
   margin: 0;
+}
+
+.message-error {
+  color: #b00020;
+}
+
+.message-success {
+  color: #0a6b2b;
 }
 
 .gallery {

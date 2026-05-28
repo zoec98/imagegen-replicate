@@ -37,6 +37,11 @@ Project scripts live in `scripts/`:
 - `scripts/run-dev.cmd`: Windows CMD version of the Flask development server launcher.
 - `scripts/get_schema owner/model`: fetch `https://replicate.com/<owner>/<model>/api/schema`.
 
+Replicate prediction timing is configured by `.env`:
+
+- `IMAGEGEN_REPLICATE_POLL_SECONDS`: seconds between prediction polling requests.
+- `IMAGEGEN_REPLICATE_TIMEOUT_SECONDS`: maximum seconds to wait for a prediction.
+
 ## Expected Application Shape
 
 Keep the application small and explicit until real duplication appears.
@@ -67,6 +72,8 @@ REPLICATE_API_TOKEN
 Keep Replicate-specific code behind a small project wrapper so the UI and route tests can use fakes without calling the network.
 
 Always send `disable_safety_checker: true` for models that support that parameter. This is an application policy and should be stored in fixed model inputs, not exposed as a normal user-facing parameter.
+
+Use prediction creation plus polling for Replicate calls, not webhooks. The MVP runs in residential/NAT environments where callback URLs are not dependable. Prefer `replicate.Client(...).predictions.create(model=<model-key>, input=<payload>)`, poll with `predictions.get(prediction.id)`, and enforce configured timeout/no-retry behavior in the wrapper. Do not use schema-page version ids as `predictions.create(version=...)` unless a diagnostic script proves that specific version id is accepted by Replicate's prediction API.
 
 For generated images:
 

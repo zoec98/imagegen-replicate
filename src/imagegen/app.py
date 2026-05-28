@@ -10,6 +10,7 @@ from typing import Any
 from flask import (
     Flask,
     abort,
+    flash,
     redirect,
     render_template,
     request,
@@ -19,6 +20,7 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 from imagegen.config import AppConfig, load_config
+from imagegen.replicate_client import generate_image_urls
 
 
 IMAGE_EXTENSIONS = {".gif", ".jpeg", ".jpg", ".png", ".webp"}
@@ -38,7 +40,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     app.secret_key = app_config.flask_secret_key
     app.config.update(
         IMAGEGEN_APP_CONFIG=app_config,
-        IMAGEGEN_GENERATE=_not_implemented_generate,
+        IMAGEGEN_GENERATE=generate_image_urls,
         IMAGEGEN_OUTPUT_DIR=app_config.output_dir,
     )
     if config:
@@ -53,39 +55,27 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
             ),
             model=app_config.model,
             prompt="",
-            error=None,
         )
 
     @app.post("/generate")
     def generate():
         prompt = request.form.get("prompt", "").strip()
         if not prompt:
-            return (
-                render_template(
-                    "index.html",
-                    images=list_gallery_images(Path(app.config["IMAGEGEN_OUTPUT_DIR"])),
-                    model=app_config.model,
-                    prompt=request.form.get("prompt", ""),
-                    error="Prompt is required.",
-                ),
-                400,
-            )
+            flash("Prompt is required.", "error")
+            return redirect(url_for("index"))
 
         generator = app.config["IMAGEGEN_GENERATE"]
         try:
-            generator(prompt, app_config)
-        except NotImplementedError:
-            return (
-                render_template(
-                    "index.html",
-                    images=list_gallery_images(Path(app.config["IMAGEGEN_OUTPUT_DIR"])),
-                    model=app_config.model,
-                    prompt=prompt,
-                    error="Generation service is not implemented yet.",
-                ),
-                501,
-            )
+            result = generator(prompt, app_config)
+        except Exception as error:
+            flash(str(error), "error")
+            return redirect(url_for("index"))
 
+        output_count = len(getattr(result, "output_urls", []))
+        flash(
+            f"Generation finished with {output_count} output URL(s). Downloading is not implemented yet.",
+            "success",
+        )
         return redirect(url_for("index"))
 
     @app.get("/images/<path:filename>")
@@ -100,11 +90,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         safe_name = _safe_image_filename(filename)
         if safe_name is None:
             abort(404)
-        return render_template(
-            "image_view.html",
-            filename=safe_name,
-            image_url=url_for("image_file", filename=safe_name),
-        )
+        return redirect(url_for("image_file", filename=safe_name))
 
     return app
 
@@ -138,10 +124,6 @@ def _resolve_app_config(config: dict[str, Any] | None) -> AppConfig:
         return value
     env_path = config.get("IMAGEGEN_ENV_PATH", ".env") if config else ".env"
     return load_config(env_path)
-
-
-def _not_implemented_generate(prompt: str, app_config: AppConfig) -> None:
-    raise NotImplementedError
 
 
 def _safe_image_filename(filename: str) -> str | None:

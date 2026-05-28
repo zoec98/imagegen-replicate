@@ -1,0 +1,134 @@
+from dataclasses import dataclass
+
+import pytest
+
+from imagegen.config import AppConfig
+from imagegen.model_registry import MODEL_REGISTRY
+from imagegen.replicate_client import (
+    ReplicatePredictionError,
+    ReplicatePredictionTimeout,
+    build_prediction_input,
+    generate_image_urls,
+    normalize_output_urls,
+)
+
+
+@dataclass
+class FakePrediction:
+    id: str
+    status: str
+    output: object = None
+    error: str | None = None
+    logs: str | None = None
+
+
+class FakePredictionsApi:
+    def __init__(self, created, updates):
+        self.created = created
+        self.updates = list(updates)
+        self.create_calls = []
+        self.get_calls = []
+
+    def create(self, *, model, input):
+        self.create_calls.append({"model": model, "input": input})
+        return self.created
+
+    def get(self, id):
+        self.get_calls.append(id)
+        return self.updates.pop(0)
+
+
+def app_config(tmp_path):
+    return AppConfig(
+        replicate_api_token="test-token",
+        output_dir=tmp_path,
+        model_alias="seedream45",
+        model=MODEL_REGISTRY["seedream45"],
+        flask_secret_key="test-secret",
+        replicate_poll_seconds=1.0,
+        replicate_timeout_seconds=60.0,
+    )
+
+
+def test_build_prediction_input_includes_defaults_and_fixed_inputs():
+    payload = build_prediction_input("a red house", MODEL_REGISTRY["seedream45"])
+
+    assert payload["prompt"] == "a red house"
+    assert payload["size"] == "2K"
+    assert payload["aspect_ratio"] == "match_input_image"
+    assert payload["sequential_image_generation"] == "disabled"
+    assert payload["max_images"] == 1
+    assert payload["disable_safety_checker"] is True
+
+
+def test_generate_image_urls_creates_prediction_and_polls(tmp_path):
+    created = FakePrediction(id="abc123", status="processing")
+    completed = FakePrediction(
+        id="abc123",
+        status="succeeded",
+        output=["https://example.com/one.png"],
+        logs="done",
+    )
+    api = FakePredictionsApi(created, [completed])
+    sleeps = []
+
+    result = generate_image_urls(
+        "a red house",
+        app_config(tmp_path),
+        predictions_api=api,
+        sleep=sleeps.append,
+    )
+
+    assert result.prediction_id == "abc123"
+    assert result.output_urls == ["https://example.com/one.png"]
+    assert result.logs == "done"
+    assert sleeps == [1.0]
+    assert api.create_calls[0]["model"] == MODEL_REGISTRY["seedream45"].replicate_model
+    assert api.create_calls[0]["input"]["disable_safety_checker"] is True
+    assert api.get_calls == ["abc123"]
+
+
+def test_generate_image_urls_raises_on_failed_prediction(tmp_path):
+    api = FakePredictionsApi(
+        FakePrediction(id="abc123", status="processing"),
+        [FakePrediction(id="abc123", status="failed", error="bad prompt")],
+    )
+
+    with pytest.raises(ReplicatePredictionError, match="bad prompt"):
+        generate_image_urls(
+            "a red house",
+            app_config(tmp_path),
+            predictions_api=api,
+            sleep=lambda seconds: None,
+        )
+
+
+def test_generate_image_urls_times_out(tmp_path):
+    api = FakePredictionsApi(
+        FakePrediction(id="abc123", status="processing"),
+        [FakePrediction(id="abc123", status="processing")],
+    )
+    now = iter([0.0, 61.0])
+
+    with pytest.raises(ReplicatePredictionTimeout):
+        generate_image_urls(
+            "a red house",
+            app_config(tmp_path),
+            predictions_api=api,
+            sleep=lambda seconds: None,
+            clock=lambda: next(now),
+        )
+
+
+def test_normalize_output_urls_handles_common_shapes():
+    class UrlObject:
+        url = "https://example.com/file.webp"
+
+    assert normalize_output_urls(None) == []
+    assert normalize_output_urls("https://example.com/file.png") == [
+        "https://example.com/file.png"
+    ]
+    assert normalize_output_urls(["https://example.com/a.png", UrlObject()]) == [
+        "https://example.com/a.png",
+        "https://example.com/file.webp",
+    ]

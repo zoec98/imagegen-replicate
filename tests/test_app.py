@@ -10,6 +10,8 @@ def make_app(tmp_path, **config):
         model_alias="seedream45",
         model=MODEL_REGISTRY["seedream45"],
         flask_secret_key="test-secret",
+        replicate_poll_seconds=1.0,
+        replicate_timeout_seconds=60.0,
     )
     return create_app(
         {
@@ -53,9 +55,9 @@ def test_index_lists_existing_images(tmp_path):
 def test_generate_rejects_empty_prompt(tmp_path):
     client = make_app(tmp_path).test_client()
 
-    response = client.post("/generate", data={"prompt": "   "})
+    response = client.post("/generate", data={"prompt": "   "}, follow_redirects=True)
 
-    assert response.status_code == 400
+    assert response.status_code == 200
     assert b"Prompt is required." in response.data
 
 
@@ -64,6 +66,7 @@ def test_generate_calls_injected_generator_and_redirects(tmp_path):
 
     def fake_generate(prompt, app_config):
         calls.append((prompt, app_config.model_alias))
+        return type("Result", (), {"output_urls": ["https://example.com/out.png"]})()
 
     client = make_app(tmp_path, IMAGEGEN_GENERATE=fake_generate).test_client()
 
@@ -74,13 +77,20 @@ def test_generate_calls_injected_generator_and_redirects(tmp_path):
     assert calls == [("a small red house", "seedream45")]
 
 
-def test_default_generate_returns_not_implemented(tmp_path):
-    client = make_app(tmp_path).test_client()
+def test_generate_flashes_generator_errors(tmp_path):
+    def fake_generate(prompt, app_config):
+        raise RuntimeError("replicate failed")
 
-    response = client.post("/generate", data={"prompt": "a small red house"})
+    client = make_app(tmp_path, IMAGEGEN_GENERATE=fake_generate).test_client()
 
-    assert response.status_code == 501
-    assert b"Generation service is not implemented yet." in response.data
+    response = client.post(
+        "/generate",
+        data={"prompt": "a small red house"},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"replicate failed" in response.data
 
 
 def test_image_route_serves_stored_file(tmp_path):
@@ -107,6 +117,5 @@ def test_image_view_renders_full_image_page(tmp_path):
 
     response = client.get("/images/sample.png/view")
 
-    assert response.status_code == 200
-    assert b"/images/sample.png" in response.data
-    assert b"sample.png" in response.data
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/images/sample.png"
