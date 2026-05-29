@@ -8,13 +8,12 @@ worker without changing browser-facing route names.
 
 from __future__ import annotations
 
-import uuid
 from pathlib import Path
-from typing import Any
 
 from flask import Flask, jsonify, request, url_for
 
 from imagegen.gallery import GalleryImage, list_gallery_images
+from imagegen.request_store import RequestStore
 from imagegen.security import require_api_csrf
 
 
@@ -31,23 +30,15 @@ def register_api_routes(app: Flask) -> None:
         if not isinstance(parameters, dict):
             return jsonify({"error": "parameters must be an object."}), 400
 
-        request_id = uuid.uuid4().hex
-        record = {
-            "request_id": request_id,
-            "status": "queued",
-            "prompt": prompt,
-            "parameters": parameters,
-            "images": [],
-        }
-        _request_records(app)[request_id] = record
-        return jsonify(record), 202
+        record = _request_store(app).create(prompt=prompt, parameters=parameters)
+        return jsonify(record.to_json()), 202
 
     @app.get("/api/generation/<request_id>")
     def api_generation_status(request_id: str):
-        record = _request_records(app).get(request_id)
+        record = _request_store(app).get(request_id)
         if record is None:
             return jsonify({"error": "Generation request not found."}), 404
-        return jsonify(record)
+        return jsonify(record.to_json())
 
     @app.get("/api/images")
     def api_images():
@@ -65,8 +56,12 @@ def register_api_routes(app: Flask) -> None:
             return jsonify({"ok": True})
 
 
-def _request_records(app: Flask) -> dict[str, dict[str, Any]]:
-    return app.config.setdefault("IMAGEGEN_API_REQUESTS", {})
+def _request_store(app: Flask) -> RequestStore:
+    store = app.config["IMAGEGEN_REQUEST_STORE"]
+    if not isinstance(store, RequestStore):
+        msg = "IMAGEGEN_REQUEST_STORE must be a RequestStore instance."
+        raise TypeError(msg)
+    return store
 
 
 def _gallery_image_json(image: GalleryImage) -> dict[str, str | None]:
