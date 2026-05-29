@@ -1,3 +1,5 @@
+import os
+
 from imagegen.app import create_app
 
 
@@ -129,6 +131,121 @@ def test_image_view_renders_full_image_page(tmp_path, app_factory):
 
     assert response.status_code == 302
     assert response.headers["Location"] == "/images/sample.png"
+
+
+def test_api_generate_accepts_json_and_returns_request_id(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "prompt": "a small red house",
+            "parameters": {"size": "2K"},
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 202
+    assert response.json["request_id"]
+    assert response.json["status"] == "queued"
+    assert response.json["prompt"] == "a small red house"
+    assert response.json["parameters"] == {"size": "2K"}
+    assert response.json["images"] == []
+
+
+def test_api_generate_rejects_blank_prompt(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={"prompt": "  "},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Prompt is required."}
+
+
+def test_api_generate_rejects_non_object_parameters(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={"prompt": "a small red house", "parameters": ["size", "2K"]},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "parameters must be an object."}
+
+
+def test_api_generation_returns_known_request_status(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+    created = client.post(
+        "/api/generate",
+        json={"prompt": "a small red house"},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    response = client.get(f"/api/generation/{created.json['request_id']}")
+
+    assert response.status_code == 200
+    assert response.json == created.json
+
+
+def test_api_generation_unknown_request_id_returns_json_404(app_factory):
+    client = app_factory().test_client()
+
+    response = client.get("/api/generation/missing")
+
+    assert response.status_code == 404
+    assert response.json == {"error": "Generation request not found."}
+
+
+def test_api_images_returns_gallery_json_newest_first(tmp_path, app_factory):
+    older = tmp_path / "older.png"
+    newer = tmp_path / "newer.jpg"
+    ignored = tmp_path / "ignored.txt"
+    older.write_bytes(b"older")
+    newer.write_bytes(b"newer")
+    ignored.write_text("ignored", encoding="utf-8")
+    os.utime(older, (100, 100))
+    os.utime(newer, (200, 200))
+    client = app_factory().test_client()
+
+    response = client.get("/api/images")
+
+    assert response.status_code == 200
+    assert response.json == {
+        "images": [
+            {
+                "filename": "newer.jpg",
+                "url": "/images/newer.jpg",
+                "metadata_url": None,
+                "content_type": None,
+                "created_at": None,
+            },
+            {
+                "filename": "older.png",
+                "url": "/images/older.png",
+                "metadata_url": None,
+                "content_type": None,
+                "created_at": None,
+            },
+        ]
+    }
 
 
 def test_test_api_accepts_valid_csrf_json_request(app_factory):
