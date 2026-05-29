@@ -33,6 +33,7 @@ def register_routes(app: Flask) -> None:
                 image_url=lambda filename: url_for("image_file", filename=filename),
             ),
             model=app_config.model,
+            app_config=app_config,
             parameters=[
                 parameter
                 for parameter in sorted(

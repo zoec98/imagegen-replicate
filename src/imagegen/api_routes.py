@@ -13,7 +13,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request, url_for
 
 from imagegen.gallery import GalleryImage, list_gallery_images
-from imagegen.request_store import RequestStore
+from imagegen.request_store import GenerationRequest, RequestStore
 from imagegen.security import require_api_csrf
 from imagegen.validation import ValidationError, validate_generation_payload
 from imagegen.worker import GenerationWorker
@@ -37,14 +37,14 @@ def register_api_routes(app: Flask) -> None:
             parameters=validated.parameters,
         )
         _generation_worker(app).start(record)
-        return jsonify(record.to_json()), 202
+        return jsonify(_request_json(app, record)), 202
 
     @app.get("/api/generation/<request_id>")
     def api_generation_status(request_id: str):
         record = _request_store(app).get(request_id)
         if record is None:
             return jsonify({"error": "Generation request not found."}), 404
-        return jsonify(record.to_json())
+        return jsonify(_request_json(app, record))
 
     @app.get("/api/images")
     def api_images():
@@ -76,6 +76,16 @@ def _generation_worker(app: Flask) -> GenerationWorker:
         msg = "IMAGEGEN_WORKER must provide a start(request_record) method."
         raise TypeError(msg)
     return worker
+
+
+def _request_json(app: Flask, record: GenerationRequest) -> dict[str, object]:
+    payload = record.to_json()
+    payload["status_url"] = url_for(
+        "api_generation_status",
+        request_id=record.request_id,
+    )
+    payload["poll_seconds"] = app.config["IMAGEGEN_APP_CONFIG"].replicate_poll_seconds
+    return payload
 
 
 def _gallery_image_json(image: GalleryImage) -> dict[str, str | None]:

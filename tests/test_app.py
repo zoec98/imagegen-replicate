@@ -24,12 +24,11 @@ def test_index_renders_prompt_form(app_factory):
     assert response.status_code == 200
     assert b'name="csrf-token"' in response.data
     assert b'src="/static/app.js"' in response.data
-    assert (
-        b'<form class="prompt-form" data-api-generate-url="/api/generate">'
-        in response.data
-    )
+    assert b'<form\n        class="prompt-form"' in response.data
     assert b'action="/generate"' not in response.data
     assert b'data-api-generate-url="/api/generate"' in response.data
+    assert b'data-api-images-url="/api/images"' in response.data
+    assert b'data-poll-seconds="1.0"' in response.data
     assert b'class="messages" aria-live="polite"' in response.data
     assert b'name="prompt"' in response.data
     assert b'name="size"' in response.data
@@ -116,6 +115,10 @@ def test_api_generate_accepts_json_and_returns_request_id(app_factory):
 
     assert response.status_code == 202
     assert response.json["request_id"]
+    assert response.json["status_url"] == (
+        f"/api/generation/{response.json['request_id']}"
+    )
+    assert response.json["poll_seconds"] == 1.0
     assert response.json["status"] == "queued"
     assert response.json["prompt"] == "a small red house"
     assert response.json["parameters"] == {

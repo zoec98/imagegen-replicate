@@ -10,7 +10,12 @@
   </head>
   <body>
     <main class="workspace">
-      <form class="prompt-form" data-api-generate-url="{{ url_for('api_generate') }}">
+      <form
+        class="prompt-form"
+        data-api-generate-url="{{ url_for('api_generate') }}"
+        data-api-images-url="{{ url_for('api_images') }}"
+        data-poll-seconds="{{ app_config.replicate_poll_seconds }}"
+      >
         {% with messages = get_flashed_messages(with_categories=true) %}
           <div class="messages" aria-live="polite">
             {% if messages %}
