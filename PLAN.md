@@ -1,268 +1,284 @@
-# MVP Implementation Plan
+# App-Like MVP Implementation Plan
 
-This plan targets a basic end-to-end testable Flask MVP for submitting a text prompt to Replicate, downloading generated images, and browsing local image results.
+This plan moves the MVP from full-page form submissions toward a single-page Flask UI backed by `/api/*` routes. The page should normally not reload during generation. Prompt text, selected model parameters, and gallery state should remain visible while backend work runs.
 
-## Stage 1: Project Dependencies And Configuration
+## Ticket 1: CSRF And API Request Guard
 
-Add the runtime dependencies needed for the MVP:
+### Scope
 
-- `flask`
-- `replicate`
-- `python-dotenv`
-- `httpx` for downloading returned image URLs
+- Add a small security module for API route protection.
+- On `GET /`, create or reuse a per-session CSRF token.
+- Store the client IP from `request.remote_addr` in the session when the token is created.
+- Embed the CSRF token into the page, for example as a `<meta name="csrf-token">`.
+- Protect mutating `/api/*` routes with:
+  - `Content-Type: application/json`.
+  - `X-CSRF-Token` matching the session token.
+  - `request.remote_addr` matching the session client IP.
+- Do not enable CORS.
 
-Add development dependencies if missing:
+### Acceptance Criteria
 
-- `pytest`
-- `ruff`
+- The rendered page contains a CSRF token.
+- Mutating `/api/*` requests without the token are rejected.
+- Mutating `/api/*` requests with a mismatched token are rejected.
+- Mutating `/api/*` requests from a different client IP are rejected.
+- Mutating `/api/*` requests with non-JSON content are rejected.
+- Valid same-session JSON API requests with the token are accepted.
 
-Configuration behavior:
+### Suggested Tests
 
-- Load `.env` at app startup.
-  - We have an expected shape for the .env file: Each possible variable is present with a default and a comment.
-  - We check if the .env file is present, if not we create it.
-  - We check for each variable if it is present and has a value. If not, we use the default value and add the comment explaining the options.
-- Read `REPLICATE_API_TOKEN` from the environment.
-- Read optional app settings such as `IMAGEGEN_OUTPUT_DIR`, `IMAGEGEN_MODEL`, and `IMAGEGEN_FLASK_SECRET_KEY`.
-- Default generated image storage to `data/images/`.
-- Ensure `data/` remains ignored by git.
+- Unit tests for token creation and reuse.
+- Route tests for missing token, invalid token, wrong IP, wrong content type, and valid request.
+- Confirm no CORS headers are emitted for API responses.
 
-Missing information and parts:
+## Ticket 2: API Route Skeleton
 
-- Exact first Replicate model/version to use for the MVP.
-  - We use the currently most current version and pin it.
-- Whether model id should be configured as owner/model, owner/model:version, or a project-specific alias.
-  - We maintain a model registry. It is keyed with a model specific alias, for example "seedream45".
-  - For each model, the registry stores:
-    - The Replicate schema URL, here `https://replicate.com/bytedance/seedream-4.5/api/schema`.
-    - The Replicate model key, here `bytedance/seedream-4.5`.
-    - The pinned Replicate version id advertised by the schema page.
-    - An `edit_capable` boolean stored outside normal parameters. It is true for models that accept one or more source images.
-    - Fixed non-user-facing input values, including `disable_safety_checker: true` when the model supports it.
-    - The model input JSON parameters extracted from `components.schemas.Input`.
-    - The model output shape extracted from `components.schemas.Output`.
-    - For each parameter: name, description, type, default value, required flag, valid choices, numeric bounds, array item format, and `x-order`.
-  - Use `scripts/get_schema bytedance/seedream-4.5` to fetch the schema source.
-  - The current useful Seedream 4.5 input fields extracted from the schema page are:
-    - `prompt`: required string, order 0.
-    - `image_input`: array of URI strings, default `[]`, order 1.
-    - `size`: select, choices `2K` and `4K`, default `2K`, order 2.
-    - `aspect_ratio`: select, choices `match_input_image`, `1:1`, `4:3`, `3:4`, `16:9`, `9:16`, `3:2`, `2:3`, and `21:9`, default `match_input_image`, order 3.
-    - `sequential_image_generation`: select, choices `disabled` and `auto`, default `disabled`, order 4.
-    - `max_images`: integer, range 1-15, default 1, order 5.
-    - `disable_safety_checker`: boolean supported by Replicate, but not exposed as a normal parameter. Keep it in fixed inputs as `true`.
-    - Output: array of URI strings.
-  - The schema page can embed multiple schema/version objects. If they disagree, prefer the current/latest version shown by the page and document the ambiguity.
-  - Do not treat the Replicate schema as the complete Seedream 4.5 capability set across all suppliers. Other suppliers support and honor custom `width` and `height` values. The registry should be able to represent provider-specific and conditional parameters, such as `size: custom` plus `width` and `height` fields when that provider supports them.
-- Whether generated output metadata should be stored in sidecar JSON files in this stage.
-  - We want at this stage store a metadata JSON next to the downloaded image, with the full image name + ".json"
-- Whether `.env.example` should be committed with non-secret defaults.
-  - Yes, but even then we want the default generation mechanism.
+### Scope
 
-## Stage 2: Flask Application Skeleton
+- Split UI routes and API routes cleanly.
+- Keep `GET /` as the browser workspace page.
+- Add `/api/*` routes under a dedicated module, for example `api_routes.py`.
+- Initial API routes:
+  - `POST /api/generate`
+  - `GET /api/generation/<request_id>`
+  - `GET /api/images`
+- Keep direct image serving at `GET /images/<filename>`.
 
-Create a Flask application factory:
+### Acceptance Criteria
 
-- `src/imagegen/app.py`
-- `create_app(config: dict | None = None) -> Flask`
+- `app.py` remains an app factory and registration point only.
+- Browser UI route registration remains separate from API route registration.
+- `/api/generate` accepts JSON and returns JSON.
+- `/api/generation/<request_id>` returns JSON status for known requests.
+- `/api/images` returns JSON gallery data sorted newest first.
+- Existing direct image URLs keep working.
 
-Add routes:
+### Suggested Tests
 
-- `GET /`: render the main generation page.
-- `POST /generate`: accept prompt text, call the Replicate service, download result images, then redirect back to `/`.
-- `GET /images/<filename>`: serve local generated images.
-- `GET /images/<filename>/view`: render or redirect to a full-tab image view.
+- Route registration tests for all API endpoints.
+- JSON response shape tests for `/api/images`.
+- Unknown request id returns 404 JSON.
+- Existing `/images/<filename>` tests continue to pass.
 
-Use `url_for` for links and static assets.
+## Ticket 3: Request State Store
 
-Missing information and parts:
+### Scope
 
-- Final route naming convention.
-- Whether image full view should be a plain direct image response or an HTML page with the image centered.
-  - Full image view shows the plain image, no HTML.
-- Whether failed generations should redirect with flash messages or return an inline error response.
-  - Flash Message, shown without time limit. 
-- Whether the app should use sessions and Flask flash messages in the MVP.
-  - We will use sessions.
+- Add a lightweight local request state store.
+- Track generation request id, prompt, parameters, status, errors, prediction id, output URLs, stored image filenames, timestamps, and logs where available.
+- Keep the implementation local and simple for the MVP.
+- Prefer an in-memory store for the first pass, with clear boundaries so it can later move to SQLite or files.
 
-## Stage 3: Replicate Service Wrapper
+### Acceptance Criteria
 
-Create a small wrapper around Replicate:
+- A request can be created with prompt and model parameters.
+- A request can transition through `queued`, `running`, `succeeded`, `failed`, and `timeout`.
+- Request state can be fetched by id.
+- Completed requests include stored image filenames when available.
+- Failed requests preserve error detail without leaking credentials.
 
-- `src/imagegen/replicate_client.py`
-- Accept prompt text and model configuration.
-- Submit the request through the official `replicate` package.
-- Normalize output into a list of downloadable image URLs or file-like outputs.
-- Avoid direct Replicate calls outside this wrapper.
+### Suggested Tests
 
-For tests:
+- Unit tests for create/get/update request lifecycle.
+- Unknown request id returns `None` or a controlled not-found result.
+- Status transitions preserve prompt and parameters.
+- Error state stores a user-displayable message.
 
-- Provide a fake client or injectable callable.
-- Ensure unit tests never call the real Replicate API.
+## Ticket 4: Background Generation Worker
 
-Missing information and parts:
+### Scope
 
-- Exact Replicate API call shape for the chosen MVP model.
-  - The API call shape question is whether to use `replicate.run(...)` as a blocking convenience call or create a prediction and poll it.
-  - Use prediction creation plus polling: `replicate.Client(...).predictions.create(model=<model-key>, input=<payload>)`, followed by polling `predictions.get(prediction.id)`.
-  - Do not call `predictions.create(version=<schema-page-version>)` for Seedream 4.5. The version id extracted from Replicate's schema page is not accepted by the prediction API; the tested working shape is `model="bytedance/seedream-4.5"`.
-  - Do not use webhooks for the MVP because residential/NAT setups cannot reliably receive callbacks.
-  - Poll interval is configured by `IMAGEGEN_REPLICATE_POLL_SECONDS`, default `1.0`.
-- Expected Replicate output format for the chosen model.
-  - We store files as <model-alias>-<requestid>-<sequencenumber>.<type>
-- Timeout and retry policy for generation requests.
-  - No retry. Timeout is configured by `IMAGEGEN_REPLICATE_TIMEOUT_SECONDS`, default `60.0`.
-- Whether the MVP should support streaming/progress or only blocking generation.
-  - We do not use webhooks. Polling support belongs in the wrapper; the current route blocks until success/failure/timeout, and future UI work can display polling progress at 1-second intervals.
+- Move Replicate generation out of the HTTP request/response cycle.
+- `/api/generate` should enqueue or start a background task and return quickly with a local request id.
+- The background task should:
+  - Build the Replicate payload.
+  - Create the prediction with `predictions.create(model=<model-key>, input=<payload>)`.
+  - Poll `predictions.get(prediction.id)`.
+  - Respect `IMAGEGEN_REPLICATE_POLL_SECONDS`.
+  - Respect `IMAGEGEN_REPLICATE_TIMEOUT_SECONDS`.
+  - Persist generated images and sidecar metadata.
+  - Update request state throughout.
+- No webhooks.
+- No automatic retry.
 
-## Stage 4: Image Download And Local Gallery
+### Acceptance Criteria
 
-Implement image persistence:
+- `POST /api/generate` responds quickly with a local request id.
+- The browser can poll `/api/generation/<request_id>` while work continues.
+- The request eventually reaches a terminal state.
+- Successful requests include downloaded image records.
+- Failed or timed-out requests surface a clear error.
+- Prompt and selected parameters remain available in request state.
 
-- Download returned image URLs.
-- Validate successful response status.
-- Validate content type starts with `image/`.
-- Generate collision-resistant filenames.
-- Store images under `data/images/`.
-- List existing image files on page load.
-- Sort newest first.
+### Suggested Tests
 
-Supported file extensions for discovery:
+- Fake worker/generator tests that avoid real Replicate calls.
+- API test that `/api/generate` returns a request id without blocking on a fake long task.
+- Polling endpoint returns running status before completion.
+- Polling endpoint returns succeeded status with stored images.
+- Timeout path sets `timeout` state.
 
-- `.png`
-- `.jpg`
-- `.jpeg`
-- `.webp`
-- `.gif`
+## Ticket 5: Parameter Parsing And Validation
 
-Missing information and parts:
+### Scope
 
-- Maximum image download size.
-  - We will not accept files larger than a 24 bit BMP of the expected dimensions would be, plus 1 MiB for metadata/header overhead: expected width x height x 3 bytes per pixel + 1 MiB.
-  - This is a reasonable MVP guardrail; it is not a perfect compressed-image validity check.
-- Whether original output format should always be preserved.
-  - For now, yes. We will later implement PNG -> JPG conversion.
-- Whether generated images should have metadata sidecars.
-  - For now, yes. We will later implement EXIF metadata preservation.
-- Whether uploads and generated outputs should share a storage root later.
-  - Yes.
-- Whether old generated files need cleanup or retention limits.
-  - Out of scope for this MVP.
+- Parse model-specific parameters from API JSON.
+- Validate against model registry metadata.
+- Keep `disable_safety_checker: true` in fixed inputs, never in user-submitted parameters.
+- Preserve prompt and submitted parameters in request state.
+- For Seedream 4.5 MVP, support:
+  - `prompt`
+  - `size`
+  - `aspect_ratio`
+  - `sequential_image_generation`
+  - `max_images`
+- Leave source image upload and `image_input` for a later ticket.
 
-## Stage 5: Main UI
+### Acceptance Criteria
 
-Build a single responsive page:
+- Valid submitted parameters are used in the Replicate payload.
+- Missing optional parameters fall back to registry defaults.
+- Invalid select choices are rejected.
+- Invalid integer bounds are rejected.
+- `disable_safety_checker` submitted by the browser is ignored or rejected and is always set to `true` by fixed inputs.
+- Prompt has no artificial length limit, but blank prompt is rejected.
 
-- A large resizable prompt text area.
-- A Generate button at the top right of the prompt area.
-- A local image gallery below the prompt.
-- Each gallery item links to a new tab.
-- Selecting an image opens the full image in a new tab.
+### Suggested Tests
 
-Responsive gallery behavior:
+- Unit tests for valid payload construction.
+- Tests for default fallback.
+- Tests for invalid select choice and out-of-range `max_images`.
+- Test that user-supplied `disable_safety_checker: false` cannot disable the fixed `true` value.
+- API validation tests for JSON error responses.
 
-- Phone: 1 column.
-- iPad/tablet: 3 columns where space allows.
-- Desktop: 3 or more columns by default depending on window width.
+## Ticket 6: Browser-Side Generate Flow
 
-Implementation details:
+### Scope
 
-- Use server-rendered Jinja templates.
-- Keep CSS in `src/imagegen/static/`.
-- Use CSS grid with responsive media queries.
-- Make the textarea vertically resizable.
-- Preserve prompt text after failed submissions where practical.
+- Add client-side JavaScript for app-like form submission.
+- Prevent the normal form reload.
+- Read prompt and parameter controls from the page.
+- Send `POST /api/generate` with JSON and `X-CSRF-Token`.
+- Disable the Generate button during an active request.
+- Change button text or state to show generation is running.
+- Preserve the textarea and selected controls while the request is active and after it completes.
+- Show persistent status/error messages on the page.
 
-Missing information and parts:
+### Acceptance Criteria
 
-- Desired visual style beyond a functional MVP.
-  - "Modern flat UI"
-- Whether the gallery should use square thumbnails or natural image aspect ratios.
-- - Natural image aspect ratios in square placeholders so we get a proper grid, I presume?
-- Whether the image should open via direct file URL or a dedicated full-view route.
-  - Image direct open, no full view. We want easy downloads.
-- Whether the prompt field needs a minimum/maximum length.
-  - No limits on prompt length.
-- Whether keyboard shortcuts are desired for generate.
-  - Not now.
+- Pressing Generate does not reload the page.
+- Prompt content remains in the textarea after submission.
+- Parameter control values remain selected after submission.
+- Generate button is disabled while one request is active.
+- Double-submit is prevented.
+- Missing/blank prompt shows an error without reload.
+- API errors are shown without reload.
 
-## Stage 6: Local Tests
+### Suggested Tests
 
-Add tests for the MVP behavior:
+- Browser or DOM-level test that submit prevents default navigation.
+- Route-level tests for JSON validation.
+- Manual browser verification on desktop and mobile widths.
+- Test or manual check that button disables and re-enables.
 
-- App factory creates a Flask app.
-- `GET /` returns the prompt form and gallery.
-- Gallery lists discovered image files.
-- `POST /generate` rejects empty prompts.
-- `POST /generate` calls an injected fake Replicate service for valid prompts.
-- Download helper writes image files for valid image responses.
-- Download helper rejects non-image responses.
-- Image route serves stored files and blocks unsafe paths.
+## Ticket 7: Browser Polling And Progress Display
 
-Use temporary directories for all tests.
+### Scope
 
-Commands:
+- Poll `/api/generation/<request_id>` from the browser while a request is running.
+- Poll interval should use the configured server value exposed to the page or a server-provided hint.
+- Display status such as `queued`, `running`, `succeeded`, `failed`, or `timeout`.
+- If Replicate logs/progress are available, show a concise progress message.
+- Stop polling at terminal states.
+- Refresh the gallery when generation succeeds.
 
-```bash
-uv run pytest
-uv run ruff format src tests
-uv run ruff check --fix src tests
-```
+### Acceptance Criteria
 
-Missing information and parts:
+- Browser polls only while at least one request is active.
+- Polling stops on terminal status.
+- Running status is visible to the user.
+- Failed and timeout states are visible to the user.
+- Gallery updates after success without full page reload.
+- Prompt and parameter values remain unchanged after gallery refresh.
 
-- Whether browser-level tests are required for this MVP or deferred.
-- Whether test fixtures should include tiny local image files.
-- Whether integration tests against Replicate should exist but be skipped by default.
-- Whether CI configuration is in scope.
+### Suggested Tests
 
-## Stage 7: Manual End-To-End Verification
+- JS/unit test or browser test for polling lifecycle if practical.
+- API tests for status response shape.
+- Manual browser verification with fake slow generation.
+- Manual browser verification with a real Replicate request.
 
-Run the Flask app locally:
+## Ticket 8: Gallery API And Client Refresh
 
-```bash
-scripts/run-dev.sh
-```
+### Scope
 
-Manual verification flow:
+- Return gallery data from `/api/images`.
+- Include filename, direct image URL, metadata URL if exposed later, content type if known, and creation time if available.
+- Update the client gallery without reloading the page.
+- Keep direct image links opening the image file in a new tab for easy downloads.
+- Keep square gallery slots with contained natural-aspect images.
 
-1. Open `http://127.0.0.1:5002`.
-2. Enter a prompt in the resizable textarea.
-3. Press Generate.
-4. Confirm the request is sent to Replicate.
-5. Confirm returned image files are downloaded into `data/images/`.
-6. Confirm the gallery updates and shows the generated image.
-7. Open an image in a new tab.
-8. Confirm mobile, iPad, and desktop widths use appropriate gallery columns.
+### Acceptance Criteria
 
-Missing information and parts:
+- `/api/images` returns newest-first image data.
+- Gallery refresh renders all current images.
+- Gallery image links point directly to `/images/<filename>`.
+- Captions show filenames.
+- Empty gallery state is shown when no images exist.
 
-- Availability of a valid `REPLICATE_API_TOKEN` for manual testing.
-- Expected generation latency for the selected model.
-- Whether local manual testing should use a fake Replicate mode.
-- Whether generated images should be visually inspected or only existence-checked.
+### Suggested Tests
 
-## Stage 8: MVP Definition Of Done
+- API test for empty gallery.
+- API test for newest-first ordering.
+- API test excludes metadata JSON and non-image files.
+- Browser/manual test for direct link opening.
 
-The MVP is complete when:
+## Ticket 9: Image Upload Preparation For Edit-Capable Models
 
-- `uv sync` installs all dependencies.
-- `.env` configuration is loaded.
-- The Flask app starts locally.
-- The main page has a resizable prompt textarea and top-right Generate button.
-- Submitting a prompt calls Replicate through a wrapper.
-- Returned image results are downloaded locally.
-- The main page displays local image files in a responsive gallery.
-- Gallery images open in a new browser tab at full size.
-- Unit tests cover the app factory, routes, gallery discovery, request dispatch, and download behavior.
-- `uv run pytest` passes.
-- `uv run ruff format src tests` has been run.
-- `uv run ruff check --fix src tests` passes.
+### Scope
 
-Missing information and parts:
+- Prepare the architecture for source images without fully implementing image-edit UI if out of MVP scope.
+- Keep `edit_capable` in model metadata.
+- Decide upload storage location under the same local storage root as generated outputs.
+- Add a future-safe API shape for source images, but do not expose incomplete controls.
 
-- Final MVP model choice.
-- Final output directory naming.
-- Final error-message copy.
-- Whether a committed `.env.example` is required.
-- Whether README should be updated during the same implementation pass.
+### Acceptance Criteria
+
+- Model metadata clearly identifies edit-capable models.
+- Upload and output storage roots can share a parent.
+- No broken image-edit controls appear in the MVP UI.
+- Future `image_input` support has an obvious route/module boundary.
+
+### Suggested Tests
+
+- Existing model registry tests for `edit_capable`.
+- No UI controls for source upload until implemented.
+- Documentation notes the planned upload boundary.
+
+## Ticket 10: Documentation And Developer Guardrails
+
+### Scope
+
+- Update `README.md` for the app-like generate flow.
+- Update `AGENTS.md` with API route rules:
+  - Mutating `/api/*` routes require CSRF.
+  - Mutating `/api/*` routes require JSON.
+  - Mutating `/api/*` routes require same session client IP.
+  - Do not enable CORS.
+  - Do not expose `disable_safety_checker`.
+- Document direct image links and local metadata sidecars.
+- Keep `scripts/get_schema` as the schema inspection helper.
+
+### Acceptance Criteria
+
+- README describes install, run, and normal usage accurately.
+- AGENTS contains clear backend/API security guardrails.
+- PLAN stays current with implementation decisions.
+- No docs imply page reload is required for generation.
+
+### Suggested Tests
+
+- Documentation review.
+- Run `uv run pytest`.
+- Run `uv run ruff format src tests`.
+- Run `uv run ruff check --fix src tests`.
