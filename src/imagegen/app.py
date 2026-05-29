@@ -17,17 +17,24 @@ from imagegen.replicate_client import generate_image_urls
 from imagegen.request_store import RequestStore
 from imagegen.routes import register_routes
 from imagegen.security import no_cors_response
+from imagegen.worker import ThreadedGenerationWorker
 
 
 def create_app(config: dict[str, Any] | None = None) -> Flask:
     app_config = _resolve_app_config(config)
+    request_store = RequestStore()
     app = Flask(__name__)
     app.secret_key = app_config.flask_secret_key
     app.config.update(
         IMAGEGEN_APP_CONFIG=app_config,
         IMAGEGEN_GENERATE=generate_image_urls,
         IMAGEGEN_OUTPUT_DIR=app_config.output_dir,
-        IMAGEGEN_REQUEST_STORE=RequestStore(),
+        IMAGEGEN_REQUEST_STORE=request_store,
+        IMAGEGEN_WORKER=ThreadedGenerationWorker(
+            store=request_store,
+            app_config=app_config,
+            generate=generate_image_urls,
+        ),
     )
     if config:
         app.config.update(config)

@@ -15,6 +15,7 @@ from flask import Flask, jsonify, request, url_for
 from imagegen.gallery import GalleryImage, list_gallery_images
 from imagegen.request_store import RequestStore
 from imagegen.security import require_api_csrf
+from imagegen.worker import GenerationWorker
 
 
 def register_api_routes(app: Flask) -> None:
@@ -31,6 +32,7 @@ def register_api_routes(app: Flask) -> None:
             return jsonify({"error": "parameters must be an object."}), 400
 
         record = _request_store(app).create(prompt=prompt, parameters=parameters)
+        _generation_worker(app).start(record)
         return jsonify(record.to_json()), 202
 
     @app.get("/api/generation/<request_id>")
@@ -62,6 +64,14 @@ def _request_store(app: Flask) -> RequestStore:
         msg = "IMAGEGEN_REQUEST_STORE must be a RequestStore instance."
         raise TypeError(msg)
     return store
+
+
+def _generation_worker(app: Flask) -> GenerationWorker:
+    worker = app.config["IMAGEGEN_WORKER"]
+    if not hasattr(worker, "start"):
+        msg = "IMAGEGEN_WORKER must provide a start(request_record) method."
+        raise TypeError(msg)
+    return worker
 
 
 def _gallery_image_json(image: GalleryImage) -> dict[str, str | None]:

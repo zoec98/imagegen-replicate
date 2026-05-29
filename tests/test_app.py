@@ -156,6 +156,32 @@ def test_api_generate_accepts_json_and_returns_request_id(app_factory):
     assert response.json["images"] == []
 
 
+def test_api_generate_starts_configured_worker(app_factory):
+    class RecordingWorker:
+        def __init__(self):
+            self.records = []
+
+        def start(self, request_record):
+            self.records.append(request_record)
+
+    worker = RecordingWorker()
+    client = app_factory(IMAGEGEN_WORKER=worker).test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={"prompt": "a small red house"},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 202
+    assert [record.request_id for record in worker.records] == [
+        response.json["request_id"]
+    ]
+
+
 def test_api_generate_rejects_blank_prompt(app_factory):
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
