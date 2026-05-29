@@ -63,13 +63,18 @@ def generate_image_urls(
     prompt: str,
     app_config: AppConfig,
     *,
+    parameters: dict[str, object] | None = None,
     predictions_api: PredictionsApi | None = None,
     sleep: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
     persist_images: PersistImages = persist_generated_images,
 ) -> ReplicateResult:
     predictions = predictions_api or _replicate_predictions(app_config)
-    prediction_input = build_prediction_input(prompt, app_config.model)
+    prediction_input = build_prediction_input(
+        prompt,
+        app_config.model,
+        parameters=parameters,
+    )
     prediction = predictions.create(
         model=app_config.model.replicate_model,
         input=prediction_input,
@@ -99,13 +104,20 @@ def generate_image_urls(
     )
 
 
-def build_prediction_input(prompt: str, model: ReplicateModel) -> dict[str, object]:
+def build_prediction_input(
+    prompt: str,
+    model: ReplicateModel,
+    *,
+    parameters: dict[str, object] | None = None,
+) -> dict[str, object]:
     prediction_input: dict[str, object] = {}
     for parameter in model.parameters:
         if parameter.name == "prompt":
             prediction_input[parameter.name] = prompt
         elif parameter.default != "":
             prediction_input[parameter.name] = parameter.default
+    if parameters:
+        prediction_input.update(parameters)
     prediction_input.update(model.fixed_inputs)
     return prediction_input
 

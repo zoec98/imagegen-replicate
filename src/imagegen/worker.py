@@ -22,7 +22,7 @@ from imagegen.replicate_client import (
 from imagegen.request_store import GenerationRequest, RequestStore
 
 
-GenerateImage = Callable[[str, AppConfig], ReplicateResult]
+GenerateImage = Callable[..., ReplicateResult]
 
 
 class GenerationWorker(Protocol):
@@ -64,7 +64,11 @@ def run_generation_request(
 ) -> None:
     store.update(request_record.request_id, status="running")
     try:
-        result = generate(request_record.prompt, app_config)
+        result = generate(
+            request_record.prompt,
+            app_config,
+            parameters=request_record.parameters,
+        )
     except ReplicatePredictionTimeout as error:
         store.update(request_record.request_id, status="timeout", error=str(error))
         return

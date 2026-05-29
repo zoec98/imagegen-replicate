@@ -61,6 +61,36 @@ def test_build_prediction_input_includes_defaults_and_fixed_inputs():
     assert payload["disable_safety_checker"] is True
 
 
+def test_build_prediction_input_applies_validated_parameters():
+    payload = build_prediction_input(
+        "a red house",
+        MODEL_REGISTRY["seedream45"],
+        parameters={
+            "size": "4K",
+            "aspect_ratio": "1:1",
+            "sequential_image_generation": "auto",
+            "max_images": 3,
+        },
+    )
+
+    assert payload["prompt"] == "a red house"
+    assert payload["size"] == "4K"
+    assert payload["aspect_ratio"] == "1:1"
+    assert payload["sequential_image_generation"] == "auto"
+    assert payload["max_images"] == 3
+    assert payload["disable_safety_checker"] is True
+
+
+def test_build_prediction_input_fixed_inputs_override_parameters():
+    payload = build_prediction_input(
+        "a red house",
+        MODEL_REGISTRY["seedream45"],
+        parameters={"disable_safety_checker": False},
+    )
+
+    assert payload["disable_safety_checker"] is True
+
+
 def test_generate_image_urls_creates_prediction_and_polls(tmp_path):
     created = FakePrediction(id="abc123", status="processing")
     completed = FakePrediction(
@@ -80,6 +110,7 @@ def test_generate_image_urls_creates_prediction_and_polls(tmp_path):
     result = generate_image_urls(
         "a red house",
         app_config(tmp_path),
+        parameters={"size": "4K"},
         predictions_api=api,
         sleep=sleeps.append,
         persist_images=fake_persist,
@@ -91,6 +122,7 @@ def test_generate_image_urls_creates_prediction_and_polls(tmp_path):
     assert result.logs == "done"
     assert sleeps == [1.0]
     assert api.create_calls[0]["model"] == MODEL_REGISTRY["seedream45"].replicate_model
+    assert api.create_calls[0]["input"]["size"] == "4K"
     assert api.create_calls[0]["input"]["disable_safety_checker"] is True
     assert api.get_calls == ["abc123"]
     assert stored[0][0] == ["https://example.com/one.png"]

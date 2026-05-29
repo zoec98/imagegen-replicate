@@ -11,9 +11,10 @@ def test_run_generation_request_succeeded_updates_request(app_config):
     store = RequestStore()
     record = store.create(prompt="a red house", parameters={"size": "2K"})
 
-    def fake_generate(prompt, config):
+    def fake_generate(prompt, config, *, parameters):
         assert prompt == "a red house"
         assert config is app_config
+        assert parameters == {"size": "2K"}
         return ReplicateResult(
             prediction_id="prediction-123",
             output_urls=["https://example.test/image.png"],
@@ -35,7 +36,7 @@ def test_run_generation_request_failed_updates_error(app_config):
     store = RequestStore()
     record = store.create(prompt="a red house", parameters={})
 
-    def fake_generate(prompt, config):
+    def fake_generate(prompt, config, *, parameters):
         raise RuntimeError("Replicate failed.")
 
     run_generation_request(store, record, app_config, fake_generate)
@@ -48,7 +49,7 @@ def test_run_generation_request_timeout_updates_timeout(app_config):
     store = RequestStore()
     record = store.create(prompt="a red house", parameters={})
 
-    def fake_generate(prompt, config):
+    def fake_generate(prompt, config, *, parameters):
         raise ReplicatePredictionTimeout("Timed out.")
 
     run_generation_request(store, record, app_config, fake_generate)
@@ -63,7 +64,7 @@ def test_threaded_worker_start_returns_before_generation_completes(app_config):
     started = Event()
     release = Event()
 
-    def fake_generate(prompt, config):
+    def fake_generate(prompt, config, *, parameters):
         started.set()
         release.wait(timeout=1.0)
         return ReplicateResult(

@@ -152,7 +152,12 @@ def test_api_generate_accepts_json_and_returns_request_id(app_factory):
     assert response.json["request_id"]
     assert response.json["status"] == "queued"
     assert response.json["prompt"] == "a small red house"
-    assert response.json["parameters"] == {"size": "2K"}
+    assert response.json["parameters"] == {
+        "aspect_ratio": "match_input_image",
+        "max_images": 1,
+        "sequential_image_generation": "disabled",
+        "size": "2K",
+    }
     assert response.json["images"] == []
 
 
@@ -212,6 +217,63 @@ def test_api_generate_rejects_non_object_parameters(app_factory):
 
     assert response.status_code == 400
     assert response.json == {"error": "parameters must be an object."}
+
+
+def test_api_generate_rejects_invalid_select_choice(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "prompt": "a small red house",
+            "parameters": {"size": "custom"},
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "size must be one of: 2K, 4K."}
+
+
+def test_api_generate_rejects_out_of_range_integer(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "prompt": "a small red house",
+            "parameters": {"max_images": 99},
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "max_images must be at most 15."}
+
+
+def test_api_generate_rejects_disable_safety_checker_override(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "prompt": "a small red house",
+            "parameters": {"disable_safety_checker": False},
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "disable_safety_checker is fixed by the server."}
 
 
 def test_api_generation_returns_known_request_status(app_factory):

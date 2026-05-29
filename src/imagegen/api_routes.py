@@ -15,6 +15,7 @@ from flask import Flask, jsonify, request, url_for
 from imagegen.gallery import GalleryImage, list_gallery_images
 from imagegen.request_store import RequestStore
 from imagegen.security import require_api_csrf
+from imagegen.validation import ValidationError, validate_generation_payload
 from imagegen.worker import GenerationWorker
 
 
@@ -23,15 +24,18 @@ def register_api_routes(app: Flask) -> None:
     @require_api_csrf
     def api_generate():
         payload = request.get_json(silent=True) or {}
-        prompt = str(payload.get("prompt", "")).strip()
-        if not prompt:
-            return jsonify({"error": "Prompt is required."}), 400
+        try:
+            validated = validate_generation_payload(
+                payload,
+                model=app.config["IMAGEGEN_APP_CONFIG"].model,
+            )
+        except ValidationError as error:
+            return jsonify({"error": str(error)}), 400
 
-        parameters = payload.get("parameters", {})
-        if not isinstance(parameters, dict):
-            return jsonify({"error": "parameters must be an object."}), 400
-
-        record = _request_store(app).create(prompt=prompt, parameters=parameters)
+        record = _request_store(app).create(
+            prompt=validated.prompt,
+            parameters=validated.parameters,
+        )
         _generation_worker(app).start(record)
         return jsonify(record.to_json()), 202
 
