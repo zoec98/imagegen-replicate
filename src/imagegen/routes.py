@@ -12,6 +12,7 @@ from flask import (
     Flask,
     abort,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -21,9 +22,12 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 from imagegen.gallery import IMAGE_EXTENSIONS, list_gallery_images
+from imagegen.security import ensure_csrf_token, no_cors_response, require_api_csrf
 
 
 def register_routes(app: Flask) -> None:
+    app.after_request(no_cors_response)
+
     @app.get("/")
     def index():
         app_config = app.config["IMAGEGEN_APP_CONFIG"]
@@ -43,6 +47,7 @@ def register_routes(app: Flask) -> None:
                 if parameter.name not in {"prompt", "image_input"}
             ],
             prompt="",
+            csrf_token=ensure_csrf_token(),
         )
 
     @app.post("/generate")
@@ -80,6 +85,13 @@ def register_routes(app: Flask) -> None:
         if safe_name is None:
             abort(404)
         return redirect(url_for("image_file", filename=safe_name))
+
+    if app.config.get("IMAGEGEN_ENABLE_TEST_API"):
+
+        @app.post("/api/_test")
+        @require_api_csrf
+        def api_test():
+            return jsonify({"ok": True})
 
 
 def safe_image_filename(filename: str) -> str | None:
