@@ -8,10 +8,11 @@ from imagegen.validation import (
 )
 
 
-def test_validate_generation_payload_accepts_defaults():
+def test_validate_generation_payload_accepts_defaults(tmp_path):
     result = validate_generation_payload(
         {"prompt": "a small red house"},
         model=MODEL_REGISTRY["seedream45"],
+        output_dir=tmp_path,
     )
 
     assert result.prompt == "a small red house"
@@ -21,23 +22,72 @@ def test_validate_generation_payload_accepts_defaults():
         "sequential_image_generation": "disabled",
         "size": "2K",
     }
+    assert result.source_images == []
 
 
-def test_validate_generation_payload_preserves_prompt_without_length_limit():
+def test_validate_generation_payload_preserves_prompt_without_length_limit(tmp_path):
     prompt = "x" * 10_000
 
     result = validate_generation_payload(
         {"prompt": prompt},
         model=MODEL_REGISTRY["seedream45"],
+        output_dir=tmp_path,
     )
 
     assert result.prompt == prompt
 
 
-def test_validate_generation_payload_rejects_blank_prompt():
+def test_validate_generation_payload_rejects_blank_prompt(tmp_path):
     with pytest.raises(ValidationError, match="Prompt is required."):
         validate_generation_payload(
-            {"prompt": "   "}, model=MODEL_REGISTRY["seedream45"]
+            {"prompt": "   "},
+            model=MODEL_REGISTRY["seedream45"],
+            output_dir=tmp_path,
+        )
+
+
+def test_validate_generation_payload_accepts_existing_source_images(tmp_path):
+    (tmp_path / "source.png").write_bytes(b"image")
+
+    result = validate_generation_payload(
+        {
+            "prompt": "edit this",
+            "source_images": ["source.png"],
+        },
+        model=MODEL_REGISTRY["seedream45"],
+        output_dir=tmp_path,
+    )
+
+    assert result.source_images == ["source.png"]
+
+
+def test_validate_generation_payload_rejects_non_array_source_images(tmp_path):
+    with pytest.raises(ValidationError, match="source_images must be an array."):
+        validate_generation_payload(
+            {"prompt": "edit this", "source_images": "source.png"},
+            model=MODEL_REGISTRY["seedream45"],
+            output_dir=tmp_path,
+        )
+
+
+def test_validate_generation_payload_rejects_missing_source_image(tmp_path):
+    with pytest.raises(ValidationError, match="Source image not found: missing.png."):
+        validate_generation_payload(
+            {"prompt": "edit this", "source_images": ["missing.png"]},
+            model=MODEL_REGISTRY["seedream45"],
+            output_dir=tmp_path,
+        )
+
+
+def test_validate_generation_payload_rejects_unsafe_source_image(tmp_path):
+    with pytest.raises(
+        ValidationError,
+        match=r"Invalid source image filename: ../sample.png.",
+    ):
+        validate_generation_payload(
+            {"prompt": "edit this", "source_images": ["../sample.png"]},
+            model=MODEL_REGISTRY["seedream45"],
+            output_dir=tmp_path,
         )
 
 

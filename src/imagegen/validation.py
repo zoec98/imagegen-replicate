@@ -8,9 +8,11 @@ is the authoritative request boundary before background work is queued.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from imagegen.model_registry import ModelParameter, ReplicateModel
+from imagegen.source_images import SourceImageError, validate_source_images
 
 
 MVP_PARAMETER_NAMES = {
@@ -25,6 +27,7 @@ MVP_PARAMETER_NAMES = {
 class ValidatedGenerationRequest:
     prompt: str
     parameters: dict[str, object]
+    source_images: list[str]
 
 
 class ValidationError(ValueError):
@@ -35,6 +38,7 @@ def validate_generation_payload(
     payload: dict[str, Any],
     *,
     model: ReplicateModel,
+    output_dir: Path,
 ) -> ValidatedGenerationRequest:
     prompt = str(payload.get("prompt", "")).strip()
     if not prompt:
@@ -46,8 +50,21 @@ def validate_generation_payload(
     if not isinstance(raw_parameters, dict):
         raise ValidationError("parameters must be an object.")
 
+    try:
+        source_images = validate_source_images(
+            payload.get("source_images"),
+            model=model,
+            output_dir=output_dir,
+        )
+    except SourceImageError as error:
+        raise ValidationError(str(error)) from error
+
     parameters = validate_model_parameters(raw_parameters, model=model)
-    return ValidatedGenerationRequest(prompt=prompt, parameters=parameters)
+    return ValidatedGenerationRequest(
+        prompt=prompt,
+        parameters=parameters,
+        source_images=source_images,
+    )
 
 
 def validate_model_parameters(

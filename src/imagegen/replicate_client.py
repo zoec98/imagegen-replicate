@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, BinaryIO, Protocol
 
 import replicate
 
@@ -64,20 +64,42 @@ def generate_image_urls(
     app_config: AppConfig,
     *,
     parameters: dict[str, object] | None = None,
+    source_image_paths: list[Path] | None = None,
     predictions_api: PredictionsApi | None = None,
     sleep: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
     persist_images: PersistImages = persist_generated_images,
 ) -> ReplicateResult:
     predictions = predictions_api or _replicate_predictions(app_config)
+    source_image_files: list[BinaryIO] = []
     prediction_input = build_prediction_input(
         prompt,
         app_config.model,
         parameters=parameters,
+        source_image_inputs=source_image_files,
     )
-    prediction = predictions.create(
-        model=app_config.model.replicate_model,
-        input=prediction_input,
+    if source_image_paths:
+        source_image_files = [path.open("rb") for path in source_image_paths]
+        prediction_input = build_prediction_input(
+            prompt,
+            app_config.model,
+            parameters=parameters,
+            source_image_inputs=source_image_files,
+        )
+    try:
+        prediction = predictions.create(
+            model=app_config.model.replicate_model,
+            input=prediction_input,
+        )
+    finally:
+        for source_image_file in source_image_files:
+            source_image_file.close()
+
+    prediction_metadata_input = build_prediction_input(
+        prompt,
+        app_config.model,
+        parameters=parameters,
+        source_image_inputs=[path.name for path in source_image_paths or []],
     )
     prediction = wait_for_prediction(
         predictions,
@@ -94,7 +116,7 @@ def generate_image_urls(
         model=app_config.model,
         prompt=prompt,
         prediction_id=prediction.id,
-        prediction_input=prediction_input,
+        prediction_input=prediction_metadata_input,
     )
     return ReplicateResult(
         prediction_id=prediction.id,
@@ -109,6 +131,7 @@ def build_prediction_input(
     model: ReplicateModel,
     *,
     parameters: dict[str, object] | None = None,
+    source_image_inputs: list[object] | None = None,
 ) -> dict[str, object]:
     prediction_input: dict[str, object] = {}
     for parameter in model.parameters:
@@ -118,6 +141,8 @@ def build_prediction_input(
             prediction_input[parameter.name] = parameter.default
     if parameters:
         prediction_input.update(parameters)
+    if source_image_inputs:
+        prediction_input["image_input"] = source_image_inputs
     prediction_input.update(model.fixed_inputs)
     return prediction_input
 

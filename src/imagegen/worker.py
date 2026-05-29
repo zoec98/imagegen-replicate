@@ -20,6 +20,7 @@ from imagegen.replicate_client import (
     generate_image_urls,
 )
 from imagegen.request_store import GenerationRequest, RequestStore
+from imagegen.source_images import source_image_paths
 
 
 GenerateImage = Callable[..., ReplicateResult]
@@ -68,6 +69,10 @@ def run_generation_request(
             request_record.prompt,
             app_config,
             parameters=request_record.parameters,
+            source_image_paths=source_image_paths(
+                request_record.source_images,
+                output_dir=Path(app_config.output_dir),
+            ),
         )
     except ReplicatePredictionTimeout as error:
         store.update(request_record.request_id, status="timeout", error=str(error))

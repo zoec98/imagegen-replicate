@@ -28,6 +28,7 @@ def register_api_routes(app: Flask) -> None:
             validated = validate_generation_payload(
                 payload,
                 model=app.config["IMAGEGEN_APP_CONFIG"].model,
+                output_dir=Path(app.config["IMAGEGEN_OUTPUT_DIR"]),
             )
         except ValidationError as error:
             return jsonify({"error": str(error)}), 400
@@ -35,6 +36,7 @@ def register_api_routes(app: Flask) -> None:
         record = _request_store(app).create(
             prompt=validated.prompt,
             parameters=validated.parameters,
+            source_images=validated.source_images,
         )
         _generation_worker(app).start(record)
         return jsonify(_request_json(app, record)), 202

@@ -149,6 +149,7 @@ def test_api_generate_accepts_json_and_returns_request_id(app_factory):
     assert response.json["poll_seconds"] == 1.0
     assert response.json["status"] == "queued"
     assert response.json["prompt"] == "a small red house"
+    assert response.json["source_images"] == []
     assert response.json["parameters"] == {
         "aspect_ratio": "match_input_image",
         "max_images": 1,
@@ -182,6 +183,45 @@ def test_api_generate_starts_configured_worker(app_factory):
     assert [record.request_id for record in worker.records] == [
         response.json["request_id"]
     ]
+
+
+def test_api_generate_accepts_existing_source_images(tmp_path, app_factory):
+    (tmp_path / "source.png").write_bytes(b"image")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "prompt": "edit this",
+            "source_images": ["source.png"],
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 202
+    assert response.json["source_images"] == ["source.png"]
+
+
+def test_api_generate_rejects_missing_source_image(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "prompt": "edit this",
+            "source_images": ["missing.png"],
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Source image not found: missing.png."}
 
 
 def test_api_generate_rejects_blank_prompt(app_factory):

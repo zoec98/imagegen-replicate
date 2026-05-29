@@ -13,6 +13,7 @@ def test_request_store_creates_and_gets_queued_request():
     assert record.status == "queued"
     assert record.prompt == "a small red house"
     assert record.parameters == {"size": "2K"}
+    assert record.source_images == []
     assert record.error is None
     assert record.prediction_id is None
     assert record.output_urls == []
@@ -29,7 +30,11 @@ def test_request_store_unknown_request_returns_none():
 
 def test_request_store_status_transition_preserves_submission_data():
     store = RequestStore()
-    record = store.create(prompt="prompt", parameters={"max_images": 1})
+    record = store.create(
+        prompt="prompt",
+        parameters={"max_images": 1},
+        source_images=["source.png"],
+    )
 
     updated = store.update(
         record.request_id,
@@ -42,6 +47,7 @@ def test_request_store_status_transition_preserves_submission_data():
     assert record.status == "running"
     assert record.prompt == "prompt"
     assert record.parameters == {"max_images": 1}
+    assert record.source_images == ["source.png"]
     assert record.prediction_id == "prediction-123"
     assert record.logs == ["prediction created"]
     assert record.updated_at >= record.created_at
@@ -94,6 +100,7 @@ def test_request_store_json_contains_lifecycle_fields():
     assert payload["status"] == "running"
     assert payload["prompt"] == "prompt"
     assert payload["parameters"] == {"size": "2K"}
+    assert payload["source_images"] == []
     assert payload["error"] is None
     assert payload["prediction_id"] == "prediction-123"
     assert payload["output_urls"] == []

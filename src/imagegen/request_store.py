@@ -23,6 +23,7 @@ class GenerationRequest:
     request_id: str
     prompt: str
     parameters: dict[str, object]
+    source_images: list[str]
     status: RequestStatus
     created_at: datetime
     updated_at: datetime
@@ -38,6 +39,7 @@ class GenerationRequest:
             "status": self.status,
             "prompt": self.prompt,
             "parameters": self.parameters,
+            "source_images": self.source_images,
             "error": self.error,
             "prediction_id": self.prediction_id,
             "output_urls": self.output_urls,
@@ -56,13 +58,18 @@ class RequestStore:
         self._lock = Lock()
 
     def create(
-        self, *, prompt: str, parameters: dict[str, object]
+        self,
+        *,
+        prompt: str,
+        parameters: dict[str, object],
+        source_images: list[str] | None = None,
     ) -> GenerationRequest:
         now = datetime.now(UTC)
         request_record = GenerationRequest(
             request_id=uuid.uuid4().hex,
             prompt=prompt,
             parameters=dict(parameters),
+            source_images=list(source_images or []),
             status="queued",
             created_at=now,
             updated_at=now,

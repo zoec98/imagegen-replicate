@@ -81,6 +81,18 @@ def test_build_prediction_input_applies_validated_parameters():
     assert payload["disable_safety_checker"] is True
 
 
+def test_build_prediction_input_applies_source_image_inputs():
+    payload = build_prediction_input(
+        "edit this",
+        MODEL_REGISTRY["seedream45"],
+        source_image_inputs=["source.png"],
+    )
+
+    assert payload["prompt"] == "edit this"
+    assert payload["image_input"] == ["source.png"]
+    assert payload["disable_safety_checker"] is True
+
+
 def test_build_prediction_input_fixed_inputs_override_parameters():
     payload = build_prediction_input(
         "a red house",
@@ -127,6 +139,32 @@ def test_generate_image_urls_creates_prediction_and_polls(tmp_path):
     assert api.get_calls == ["abc123"]
     assert stored[0][0] == ["https://example.com/one.png"]
     assert stored[0][1]["prediction_id"] == "abc123"
+
+
+def test_generate_image_urls_passes_source_image_files_and_metadata(tmp_path):
+    source_path = tmp_path / "source.png"
+    source_path.write_bytes(b"source-bytes")
+    created = FakePrediction(id="abc123", status="succeeded", output=[])
+    api = FakePredictionsApi(created, [])
+    stored = []
+
+    def fake_persist(urls, **kwargs):
+        stored.append((urls, kwargs))
+        return []
+
+    generate_image_urls(
+        "edit this",
+        app_config(tmp_path),
+        source_image_paths=[source_path],
+        predictions_api=api,
+        persist_images=fake_persist,
+    )
+
+    image_input = api.create_calls[0]["input"]["image_input"]
+    assert len(image_input) == 1
+    assert image_input[0].name == str(source_path)
+    assert image_input[0].closed is True
+    assert stored[0][1]["prediction_input"]["image_input"] == ["source.png"]
 
 
 def test_generate_image_urls_raises_on_failed_prediction(tmp_path):
