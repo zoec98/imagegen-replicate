@@ -23,7 +23,14 @@ def test_index_renders_prompt_form(app_factory):
 
     assert response.status_code == 200
     assert b'name="csrf-token"' in response.data
-    assert b'<form class="prompt-form"' in response.data
+    assert b'src="/static/app.js"' in response.data
+    assert (
+        b'<form class="prompt-form" data-api-generate-url="/api/generate">'
+        in response.data
+    )
+    assert b'action="/generate"' not in response.data
+    assert b'data-api-generate-url="/api/generate"' in response.data
+    assert b'class="messages" aria-live="polite"' in response.data
     assert b'name="prompt"' in response.data
     assert b'name="size"' in response.data
     assert b'name="aspect_ratio"' in response.data
@@ -43,47 +50,6 @@ def test_index_lists_existing_images(tmp_path, app_factory):
     assert b"first.png" in response.data
     assert b'href="/images/first.png"' in response.data
     assert b"ignore.txt" not in response.data
-
-
-def test_generate_rejects_empty_prompt(app_factory):
-    client = app_factory().test_client()
-
-    response = client.post("/generate", data={"prompt": "   "}, follow_redirects=True)
-
-    assert response.status_code == 200
-    assert b"Prompt is required." in response.data
-
-
-def test_generate_calls_injected_generator_and_redirects(tmp_path, app_factory):
-    calls = []
-
-    def fake_generate(prompt, app_config):
-        calls.append((prompt, app_config.model_alias))
-        return type("Result", (), {"stored_images": [tmp_path / "out.png"]})()
-
-    client = app_factory(IMAGEGEN_GENERATE=fake_generate).test_client()
-
-    response = client.post("/generate", data={"prompt": "a small red house"})
-
-    assert response.status_code == 302
-    assert response.headers["Location"] == "/"
-    assert calls == [("a small red house", "seedream45")]
-
-
-def test_generate_flashes_generator_errors(app_factory):
-    def fake_generate(prompt, app_config):
-        raise RuntimeError("replicate failed")
-
-    client = app_factory(IMAGEGEN_GENERATE=fake_generate).test_client()
-
-    response = client.post(
-        "/generate",
-        data={"prompt": "a small red house"},
-        follow_redirects=True,
-    )
-
-    assert response.status_code == 200
-    assert b"replicate failed" in response.data
 
 
 def test_image_route_serves_stored_file(tmp_path, app_factory):

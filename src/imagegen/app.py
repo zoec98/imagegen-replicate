@@ -27,7 +27,6 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     app.secret_key = app_config.flask_secret_key
     app.config.update(
         IMAGEGEN_APP_CONFIG=app_config,
-        IMAGEGEN_GENERATE=generate_image_urls,
         IMAGEGEN_OUTPUT_DIR=app_config.output_dir,
         IMAGEGEN_REQUEST_STORE=request_store,
         IMAGEGEN_WORKER=ThreadedGenerationWorker(

@@ -11,10 +11,8 @@ from pathlib import Path
 from flask import (
     Flask,
     abort,
-    flash,
     redirect,
     render_template,
-    request,
     send_from_directory,
     url_for,
 )
@@ -46,28 +44,6 @@ def register_routes(app: Flask) -> None:
             prompt="",
             csrf_token=ensure_csrf_token(),
         )
-
-    @app.post("/generate")
-    def generate():
-        prompt = request.form.get("prompt", "").strip()
-        if not prompt:
-            flash("Prompt is required.", "error")
-            return redirect(url_for("index"))
-
-        app_config = app.config["IMAGEGEN_APP_CONFIG"]
-        generator = app.config["IMAGEGEN_GENERATE"]
-        try:
-            result = generator(prompt, app_config)
-        except Exception as error:
-            flash(str(error), "error")
-            return redirect(url_for("index"))
-
-        output_count = len(getattr(result, "stored_images", []))
-        flash(
-            f"Generation finished and saved {output_count} image(s).",
-            "success",
-        )
-        return redirect(url_for("index"))
 
     @app.get("/images/<path:filename>")
     def image_file(filename: str):
