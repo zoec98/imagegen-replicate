@@ -51,6 +51,11 @@ def register_api_routes(app: Flask) -> None:
         images = list_gallery_images(
             Path(app.config["IMAGEGEN_OUTPUT_DIR"]),
             image_url=lambda filename: url_for("image_file", filename=filename),
+            metadata_url=lambda filename: url_for(
+                "image_metadata",
+                filename=filename,
+            ),
+            metadata_provider=app.config["IMAGEGEN_METADATA_PROVIDER"],
         )
         return jsonify({"images": [_gallery_image_json(image) for image in images]})
 
@@ -92,7 +97,7 @@ def _gallery_image_json(image: GalleryImage) -> dict[str, str | None]:
     return {
         "filename": image.filename,
         "url": image.url,
-        "metadata_url": None,
-        "content_type": None,
-        "created_at": None,
+        "metadata_url": image.metadata_url,
+        "content_type": image.content_type,
+        "created_at": image.created_at,
     }

@@ -1,3 +1,4 @@
+import json
 import os
 
 from imagegen.app import create_app
@@ -96,6 +97,33 @@ def test_image_view_renders_full_image_page(tmp_path, app_factory):
 
     assert response.status_code == 302
     assert response.headers["Location"] == "/images/sample.png"
+
+
+def test_image_metadata_route_serves_sidecar_json(tmp_path, app_factory):
+    (tmp_path / "sample.png").write_bytes(b"image-bytes")
+    metadata = {
+        "content_type": "image/png",
+        "created_at": "2026-05-29T12:00:00+00:00",
+    }
+    (tmp_path / "sample.png.json").write_text(
+        json.dumps(metadata),
+        encoding="utf-8",
+    )
+    client = app_factory().test_client()
+
+    response = client.get("/images/sample.png/metadata")
+
+    assert response.status_code == 200
+    assert response.json == metadata
+
+
+def test_image_metadata_route_404s_for_missing_sidecar(tmp_path, app_factory):
+    (tmp_path / "sample.png").write_bytes(b"image-bytes")
+    client = app_factory().test_client()
+
+    response = client.get("/images/sample.png/metadata")
+
+    assert response.status_code == 404
 
 
 def test_api_generate_accepts_json_and_returns_request_id(app_factory):
@@ -301,6 +329,45 @@ def test_api_images_returns_gallery_json_newest_first(tmp_path, app_factory):
                 "content_type": None,
                 "created_at": None,
             },
+        ]
+    }
+
+
+def test_api_images_returns_empty_gallery(app_factory):
+    client = app_factory().test_client()
+
+    response = client.get("/api/images")
+
+    assert response.status_code == 200
+    assert response.json == {"images": []}
+
+
+def test_api_images_includes_sidecar_metadata(tmp_path, app_factory):
+    (tmp_path / "sample.png").write_bytes(b"image-bytes")
+    (tmp_path / "sample.png.json").write_text(
+        json.dumps(
+            {
+                "content_type": "image/png",
+                "created_at": "2026-05-29T12:00:00+00:00",
+                "ignored": "not in gallery API",
+            }
+        ),
+        encoding="utf-8",
+    )
+    client = app_factory().test_client()
+
+    response = client.get("/api/images")
+
+    assert response.status_code == 200
+    assert response.json == {
+        "images": [
+            {
+                "filename": "sample.png",
+                "url": "/images/sample.png",
+                "metadata_url": "/images/sample.png/metadata",
+                "content_type": "image/png",
+                "created_at": "2026-05-29T12:00:00+00:00",
+            }
         ]
     }
 

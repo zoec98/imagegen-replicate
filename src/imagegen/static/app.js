@@ -76,6 +76,15 @@
   function imageFigure(image) {
     const figure = document.createElement("figure");
     figure.className = "gallery-item";
+    if (image.metadata_url) {
+      figure.dataset.metadataUrl = image.metadata_url;
+    }
+    if (image.content_type) {
+      figure.dataset.contentType = image.content_type;
+    }
+    if (image.created_at) {
+      figure.dataset.createdAt = image.created_at;
+    }
 
     const link = document.createElement("a");
     link.href = image.url;
