@@ -2,7 +2,7 @@
 
 `imagegen` is a Flask web application for creating image generation requests and running them through Replicate. It is intended to support text-to-image and image-edit workflows, multiple Replicate models, model-specific parameters, reusable style palettes, reusable character palettes, and local access to downloaded image results.
 
-This project is currently an early scaffold. Developer and agent contribution guidance lives in [AGENTS.md](AGENTS.md).
+Developer and agent contribution guidance lives in [AGENTS.md](AGENTS.md).
 
 ## Requirements
 
@@ -53,24 +53,24 @@ Then open:
 http://127.0.0.1:5002
 ```
 
-The Flask app submits Replicate predictions, polls for completion, downloads returned images, and stores local metadata sidecars.
+The Flask app submits Replicate predictions through JSON API routes, polls for completion from the browser, downloads returned images, and stores local metadata for gallery use.
 
 ## Usage
 
-The planned UI flow is:
+The MVP UI flow is:
 
-1. Choose a Replicate model.
-2. Pick text-to-image or image-edit mode when the model supports it.
-3. Enter the prompt.
-4. Insert optional style palette snippets.
-5. Insert optional character palette snippets.
-6. Set model-specific parameters such as image size, guidance, seed, or number of outputs.
-7. Upload an input image for image-edit models.
-8. Press Generate.
-9. Preview the returned image results.
-10. Download or reuse the generated files from the local results area.
+1. Enter the prompt.
+2. Set the currently exposed Seedream 4.5 parameters.
+3. Press Generate.
+4. Keep the page open while the browser polls request status.
+5. Preview the returned image results in the gallery.
+6. Open generated files directly from the gallery in a new tab.
 
-Generated files are downloaded from Replicate into `data/images/` by default. Each image has a sidecar metadata file named `<image-filename>.json` with the model, prompt, parameters, source URL, creation time, content type, and byte size.
+The page requires JavaScript for generation. It does not reload for normal generation requests, so the prompt and selected parameter controls remain visible while work runs.
+
+Generated files are downloaded from Replicate into `data/images/` by default. Gallery links point directly to `/images/<filename>`. The current metadata provider reads sidecar files named `<image-filename>.json` with model, prompt, parameters, source URL, creation time, content type, and byte size; metadata access is modular because this is expected to move into image EXIF later.
+
+Image-edit source images are prepared at the API layer but do not yet have UI selection controls. Source images are expected to live in the same `data/images/` directory as generated images so generated results can be re-used for later edits.
 
 ## Development
 
