@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -39,32 +38,13 @@ class ImageMetadataProvider(Protocol):
 
 
 class EmbeddedImageMetadataProvider:
-    def __init__(self, fallback: ImageMetadataProvider | None = None) -> None:
-        self._fallback = fallback
-
     def get(self, image_path: Path) -> ImageMetadata:
         value = read_embedded_metadata(image_path)
         if isinstance(value, dict):
             metadata = image_metadata_from_dict(value)
             if metadata.exists:
                 return metadata
-        if self._fallback is not None:
-            return self._fallback.get(image_path)
         return ImageMetadata()
-
-
-class SidecarImageMetadataProvider:
-    def get(self, image_path: Path) -> ImageMetadata:
-        metadata_path = sidecar_metadata_path(image_path)
-        if not metadata_path.is_file():
-            return ImageMetadata()
-        try:
-            value = json.loads(metadata_path.read_text(encoding="utf-8"))
-        except OSError, json.JSONDecodeError:
-            return ImageMetadata()
-        if not isinstance(value, dict):
-            return ImageMetadata()
-        return image_metadata_from_dict(value)
 
 
 def image_metadata_from_dict(metadata: dict[str, object]) -> ImageMetadata:
@@ -74,10 +54,6 @@ def image_metadata_from_dict(metadata: dict[str, object]) -> ImageMetadata:
         created_at=_metadata_string(metadata, "created_at"),
         parameters=parameters if isinstance(parameters, dict) else None,
     )
-
-
-def sidecar_metadata_path(image_path: Path) -> Path:
-    return image_path.with_name(image_path.name + ".json")
 
 
 def _metadata_string(metadata: dict[str, object], key: str) -> str | None:

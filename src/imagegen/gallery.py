@@ -11,7 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from imagegen.metadata import ImageMetadataProvider, SidecarImageMetadataProvider
+from imagegen.metadata import EmbeddedImageMetadataProvider, ImageMetadataProvider
 
 
 IMAGE_EXTENSIONS = {".jpeg", ".jpg", ".png", ".webp"}
@@ -47,7 +47,7 @@ def list_gallery_images(
             path,
             image_url=image_url,
             metadata_url=metadata_url,
-            metadata_provider=metadata_provider or SidecarImageMetadataProvider(),
+            metadata_provider=metadata_provider or EmbeddedImageMetadataProvider(),
         )
         for path in files
     ]

@@ -116,7 +116,7 @@ The current app-like `/api/*` generation flow remains the baseline.
 - Store generated-image metadata in the image file instead of writing JSON sidecars.
 - Specifically store the previous metadata `parameters` key in embedded metadata.
 - Preserve or expose the current metadata provider boundary:
-  - Replace `SidecarImageMetadataProvider` with an embedded-metadata-backed provider.
+  - Use an embedded-metadata-backed provider.
   - Keep route/gallery code using the provider interface.
 - Decide the metadata tag contract before implementation:
   - Prefer a namespaced XMP field for structured app JSON if `pyexiv2` handles it cleanly across JPEG, PNG, and WebP.
@@ -124,7 +124,7 @@ The current app-like `/api/*` generation flow remains the baseline.
   - Use standard date fields for creation time where practical.
   - Keep `ImageDescription` short and human-readable if used.
 - Do not write new `<image-filename>.json` sidecars for newly generated images.
-- Do not delete existing JSON sidecars in this ticket.
+- Do not read JSON sidecars as metadata.
 - Take care of charset encoding and decoding issues in the data.
 - If `pyexiv2` is used from background worker code, serialize metadata read/write calls with a process-local lock because the library documents global-state thread-safety limits.
 
@@ -133,6 +133,7 @@ The current app-like `/api/*` generation flow remains the baseline.
 - Generated JPEG, PNG, and WebP images have embedded metadata written after download, or unsupported formats fail explicitly before this ticket is accepted.
 - The `parameters` payload can be read back through the provider API.
 - New generated images do not create JSON sidecars.
+- JSON sidecars are not read as metadata.
 - Existing gallery metadata access still works through the provider boundary.
 - The selected dependency and metadata storage contract are documented in this plan or follow-up docs.
 - If a supported output format cannot reliably store embedded metadata, the limitation is explicit and tested.
@@ -160,7 +161,7 @@ The current app-like `/api/*` generation flow remains the baseline.
   - Human-readable description: generated image summary stored in EXIF
     `ImageDescription` for JPEG/WebP, and mirrored to PNG text description keys.
 - The embedded JSON currently stores the full generation metadata payload,
-  including the previous sidecar `parameters` key. SQLite can later become the
+  including the previous metadata `parameters` key. SQLite can later become the
   durable canonical history without requiring this embedded payload to shrink.
 
 ## Ticket 4: SQLite Generation Log
@@ -417,7 +418,6 @@ The current app-like `/api/*` generation flow remains the baseline.
   - replace current model/settings with the image metadata parameters where supported;
   - surface a clear error if metadata is missing or incompatible with the current registry.
 - The delete action calls a protected API route that unlinks the image file.
-- Deleting should also remove associated metadata sidecars only for legacy files if sidecars still exist.
 - Deletion must not allow path traversal or deleting outside the configured image directory.
 - Refresh the gallery after deletion without reloading the page.
 

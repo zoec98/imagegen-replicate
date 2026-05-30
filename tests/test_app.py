@@ -1,9 +1,11 @@
-import json
 import os
 from urllib.parse import parse_qs, urlparse
 
+from PIL import Image
+
 from imagegen.app import create_app
 from imagegen.app_version import app_checksum
+from imagegen.metadata_embed import write_embedded_metadata
 
 
 def extract_csrf_token(response):
@@ -168,16 +170,19 @@ def test_image_view_renders_full_image_page(tmp_path, app_factory):
     assert response.headers["Location"] == "/images/sample.png"
 
 
-def test_image_metadata_route_serves_sidecar_json(tmp_path, app_factory):
-    (tmp_path / "sample.png").write_bytes(b"image-bytes")
+def write_sample_png(path):
+    Image.new("RGB", (8, 8), (255, 0, 0)).save(path, "PNG")
+
+
+def test_image_metadata_route_serves_embedded_metadata(tmp_path, app_factory):
+    image_path = tmp_path / "sample.png"
+    write_sample_png(image_path)
     metadata = {
         "content_type": "image/png",
         "created_at": "2026-05-29T12:00:00+00:00",
+        "parameters": {"size": "2K"},
     }
-    (tmp_path / "sample.png.json").write_text(
-        json.dumps(metadata),
-        encoding="utf-8",
-    )
+    write_embedded_metadata(image_path, metadata)
     client = app_factory().test_client()
 
     response = client.get("/images/sample.png/metadata")
@@ -186,8 +191,8 @@ def test_image_metadata_route_serves_sidecar_json(tmp_path, app_factory):
     assert response.json == metadata
 
 
-def test_image_metadata_route_404s_for_missing_sidecar(tmp_path, app_factory):
-    (tmp_path / "sample.png").write_bytes(b"image-bytes")
+def test_image_metadata_route_404s_for_missing_embedded_metadata(tmp_path, app_factory):
+    write_sample_png(tmp_path / "sample.png")
     client = app_factory().test_client()
 
     response = client.get("/images/sample.png/metadata")
@@ -474,17 +479,16 @@ def test_api_images_returns_empty_gallery(app_factory):
     assert response.json == {"images": []}
 
 
-def test_api_images_includes_sidecar_metadata(tmp_path, app_factory):
-    (tmp_path / "sample.png").write_bytes(b"image-bytes")
-    (tmp_path / "sample.png.json").write_text(
-        json.dumps(
-            {
-                "content_type": "image/png",
-                "created_at": "2026-05-29T12:00:00+00:00",
-                "ignored": "not in gallery API",
-            }
-        ),
-        encoding="utf-8",
+def test_api_images_includes_embedded_metadata(tmp_path, app_factory):
+    image_path = tmp_path / "sample.png"
+    write_sample_png(image_path)
+    write_embedded_metadata(
+        image_path,
+        {
+            "content_type": "image/png",
+            "created_at": "2026-05-29T12:00:00+00:00",
+            "parameters": {"size": "2K"},
+        },
     )
     client = app_factory().test_client()
 
