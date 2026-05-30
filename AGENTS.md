@@ -48,6 +48,7 @@ Preferred structure as the app grows:
 - `src/imagegen/replicate_client.py`: wrapper around Replicate API calls, downloads, and error handling.
 - `src/imagegen/generation_log.py`: SQLite generation request and result history.
 - `src/imagegen/metadata_embed.py`: embedded image metadata read/write helpers.
+- `src/imagegen/metadata.py`: image metadata provider boundary used by routes and gallery code.
 - `src/imagegen/models.py`: configured model metadata and parameter schemas.
 - `src/imagegen/palettes.py`: style and character palette loading and validation.
 - `src/imagegen/templates/`: Jinja templates.
@@ -77,8 +78,12 @@ For generated images:
 - Store downloaded files under an application-controlled output directory.
 - Generate collision-resistant filenames.
 - Preserve useful metadata, such as model name, prompt, parameters, source URL, and creation time.
-- Store generated image metadata in embedded image metadata, not JSON sidecars.
+- Store generated image metadata in embedded image metadata, not JSON sidecars. PNG uses an application text chunk; JPEG and WebP use EXIF fields.
+- Store a human-readable generated-image description for external tools, and parseable application metadata separately in the embedded payload.
 - Store durable generation request/result history in SQLite under `data/` by default.
+- Keep route and gallery code behind provider/repository boundaries. Do not read embedded metadata or SQLite tables directly from templates or JavaScript-facing route code.
+- Store source image references as local filenames, not image bytes or database blobs.
+- GIF files are unsupported for generated outputs and source images.
 
 ## Model Configuration
 
@@ -117,6 +122,8 @@ Do not assume the Replicate schema is a complete description of the underlying m
 
 Validate all submitted parameters server-side. The browser UI may help the user, but server validation is authoritative.
 
+Image-edit requests must submit selected source images through the top-level `source_images` field with `edit_mode: true`. Do not accept model source-image parameters through the generic `parameters` object.
+
 ## Prompt Palettes
 
 Style and character palettes are reusable prompt fragments. Store them in a form that is easy to test and review, such as JSON, TOML, YAML, or Python data structures.
@@ -144,6 +151,7 @@ The UI should provide:
 - Generate button with loading and error states.
 - Result preview gallery.
 - Download/open controls for generated files.
+- Gallery controls for loading embedded metadata into the workspace and deleting local images.
 
 Responsive behavior matters. Test layouts at mobile, tablet, and desktop widths. Controls should remain usable on touch devices, with adequate spacing and no text overlap.
 
@@ -186,6 +194,7 @@ Keep this file focused on contributors and agents.
 - Do not introduce network calls in unit tests unless they are explicitly marked integration tests and skipped by default.
 - Do not store uploaded files or generated outputs in source-controlled paths unless they are intentional fixtures.
 - Do not read or write JSON sidecars for generated-image metadata.
+- Do not bypass `ImageMetadataProvider` or `SQLiteGenerationLog` from route/gallery code.
 - Do not overwrite existing user prompts, palette files, or generated outputs without an explicit user action.
 - Do not add broad abstractions before at least two concrete model integrations prove the shape.
 - Do not skip `uv run pytest` and `uv run ruff check src tests` after code changes unless the reason is documented in the final response.
@@ -193,4 +202,5 @@ Keep this file focused on contributors and agents.
 - Do not make `disable_safety_checker` user-configurable when a model supports it; keep it set to `true` in generated Replicate payloads.
 - Do not hide Replicate errors behind generic messages in logs; preserve actionable details while avoiding credential leakage.
 - Do not trust browser-submitted parameters, filenames, MIME types, or output URLs.
+- Keep gallery deletion inside the configured output directory; validate filenames before unlinking and require CSRF protection.
 - Do not use destructive git commands or revert unrelated user changes.
