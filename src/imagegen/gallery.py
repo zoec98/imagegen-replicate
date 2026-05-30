@@ -14,7 +14,7 @@ from pathlib import Path
 from imagegen.metadata import ImageMetadataProvider, SidecarImageMetadataProvider
 
 
-IMAGE_EXTENSIONS = {".gif", ".jpeg", ".jpg", ".png", ".webp"}
+IMAGE_EXTENSIONS = {".jpeg", ".jpg", ".png", ".webp"}
 
 
 @dataclass(frozen=True)

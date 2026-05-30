@@ -99,6 +99,7 @@ def test_api_app_version_matches_rendered_checksum(app_factory):
 
 def test_index_lists_existing_images(tmp_path, app_factory):
     (tmp_path / "first.png").write_bytes(b"not really an image")
+    (tmp_path / "animated.gif").write_bytes(b"gif")
     (tmp_path / "ignore.txt").write_text("ignore", encoding="utf-8")
     client = app_factory().test_client()
 
@@ -107,6 +108,7 @@ def test_index_lists_existing_images(tmp_path, app_factory):
     assert response.status_code == 200
     assert b"first.png" in response.data
     assert b'href="/images/first.png"' in response.data
+    assert b"animated.gif" not in response.data
     assert b"ignore.txt" not in response.data
 
 
@@ -143,6 +145,15 @@ def test_image_route_blocks_unsafe_paths(app_factory):
     client = app_factory().test_client()
 
     response = client.get("/images/../pyproject.toml")
+
+    assert response.status_code == 404
+
+
+def test_image_route_blocks_gif_files(tmp_path, app_factory):
+    (tmp_path / "animated.gif").write_bytes(b"gif")
+    client = app_factory().test_client()
+
+    response = client.get("/images/animated.gif")
 
     assert response.status_code == 404
 
@@ -282,6 +293,26 @@ def test_api_generate_rejects_missing_source_image(app_factory):
     assert response.json == {"error": "Source image not found: missing.png."}
 
 
+def test_api_generate_rejects_gif_source_image(tmp_path, app_factory):
+    (tmp_path / "source.gif").write_bytes(b"gif")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "prompt": "edit this",
+            "source_images": ["source.gif"],
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Invalid source image filename: source.gif."}
+
+
 def test_api_generate_rejects_blank_prompt(app_factory):
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
@@ -400,12 +431,15 @@ def test_api_generation_unknown_request_id_returns_json_404(app_factory):
 def test_api_images_returns_gallery_json_newest_first(tmp_path, app_factory):
     older = tmp_path / "older.png"
     newer = tmp_path / "newer.jpg"
+    gif = tmp_path / "animated.gif"
     ignored = tmp_path / "ignored.txt"
     older.write_bytes(b"older")
     newer.write_bytes(b"newer")
+    gif.write_bytes(b"gif")
     ignored.write_text("ignored", encoding="utf-8")
     os.utime(older, (100, 100))
     os.utime(newer, (200, 200))
+    os.utime(gif, (300, 300))
     client = app_factory().test_client()
 
     response = client.get("/api/images")

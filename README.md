@@ -69,6 +69,9 @@ The planned UI flow is:
 
 Generated files should be downloaded from Replicate and stored locally by the application with useful metadata, including the model, prompt, parameters, source URL, and creation time.
 
+Supported local image formats are PNG, JPEG, and WebP. GIF files are not accepted
+as source images or stored generation results.
+
 ## Development
 
 Use `uv` for all project commands:

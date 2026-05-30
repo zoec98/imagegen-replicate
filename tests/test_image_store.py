@@ -92,6 +92,27 @@ def test_download_image_rejects_non_image_response(tmp_path):
         )
 
 
+def test_download_image_rejects_gif_response(tmp_path):
+    response = httpx.Response(
+        200,
+        headers={"content-type": "image/gif"},
+        content=b"gif-data",
+        request=httpx.Request("GET", "https://example.com/out.gif"),
+    )
+
+    with pytest.raises(ImageDownloadError, match="GIF image outputs are not supported"):
+        download_image(
+            "https://example.com/out.gif",
+            output_dir=tmp_path,
+            model=MODEL_REGISTRY["seedream45"],
+            prompt="a cookie",
+            prediction_id="abc123",
+            sequence=1,
+            prediction_input={},
+            client=response_client(response),
+        )
+
+
 def test_download_image_rejects_oversized_response(tmp_path):
     model = MODEL_REGISTRY["seedream45"]
     response = httpx.Response(

@@ -18,7 +18,6 @@ from imagegen.model_registry import ReplicateModel
 
 
 CONTENT_TYPE_EXTENSIONS = {
-    "image/gif": ".gif",
     "image/jpeg": ".jpg",
     "image/png": ".png",
     "image/webp": ".webp",
@@ -86,6 +85,9 @@ def download_image(
     response.raise_for_status()
 
     content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
+    if content_type == "image/gif":
+        msg = f"GIF image outputs are not supported from {url}."
+        raise ImageDownloadError(msg)
     if not content_type.startswith("image/"):
         msg = f"Expected image content from {url}, got {content_type or 'unknown'}."
         raise ImageDownloadError(msg)
@@ -132,6 +134,6 @@ def _extension_for(content_type: str, url: str) -> str:
     if content_type in CONTENT_TYPE_EXTENSIONS:
         return CONTENT_TYPE_EXTENSIONS[content_type]
     suffix = Path(urlparse(url).path).suffix.lower()
-    if suffix in {".gif", ".jpeg", ".jpg", ".png", ".webp"}:
+    if suffix in {".jpeg", ".jpg", ".png", ".webp"}:
         return suffix
     return ".img"

@@ -79,6 +79,17 @@ def test_validate_generation_payload_rejects_missing_source_image(tmp_path):
         )
 
 
+def test_validate_generation_payload_rejects_gif_source_image(tmp_path):
+    (tmp_path / "source.gif").write_bytes(b"image")
+
+    with pytest.raises(ValidationError, match="Invalid source image filename"):
+        validate_generation_payload(
+            {"prompt": "edit this", "source_images": ["source.gif"]},
+            model=MODEL_REGISTRY["seedream45"],
+            output_dir=tmp_path,
+        )
+
+
 def test_validate_generation_payload_rejects_unsafe_source_image(tmp_path):
     with pytest.raises(
         ValidationError,
