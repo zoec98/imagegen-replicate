@@ -17,6 +17,7 @@ from imagegen.gallery import GalleryImage, list_gallery_images
 from imagegen.generation_log import GenerationLog
 from imagegen.immich_client import ImmichClient, ImmichUploadError
 from imagegen.model_registry import MODEL_REGISTRY, ReplicateModel
+from imagegen.prompt_annotations import strip_prompt_annotations
 from imagegen.replicate_client import build_prediction_input
 from imagegen.request_store import GenerationRequest, RequestStore
 from imagegen.security import require_api_csrf
@@ -61,7 +62,7 @@ def register_api_routes(app: Flask) -> None:
             model_alias=selected_model.alias,
             model=selected_model.replicate_model,
             replicate_input=build_prediction_input(
-                validated.prompt,
+                strip_prompt_annotations(validated.prompt),
                 selected_model,
                 parameters=validated.parameters,
                 source_image_inputs=validated.source_images,

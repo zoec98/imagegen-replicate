@@ -18,6 +18,7 @@ import replicate
 from imagegen.config import AppConfig
 from imagegen.image_store import StoredImage, persist_generated_images
 from imagegen.model_registry import ReplicateModel
+from imagegen.prompt_annotations import strip_prompt_annotations
 
 
 TERMINAL_STATUSES = {"succeeded", "failed", "canceled"}
@@ -71,9 +72,10 @@ def generate_image_urls(
     persist_images: PersistImages = persist_generated_images,
 ) -> ReplicateResult:
     predictions = predictions_api or _replicate_predictions(app_config)
+    provider_prompt = strip_prompt_annotations(prompt)
     source_image_files: list[BinaryIO] = []
     prediction_input = build_prediction_input(
-        prompt,
+        provider_prompt,
         app_config.model,
         parameters=parameters,
         source_image_inputs=source_image_files,
@@ -81,7 +83,7 @@ def generate_image_urls(
     if source_image_paths:
         source_image_files = [path.open("rb") for path in source_image_paths]
         prediction_input = build_prediction_input(
-            prompt,
+            provider_prompt,
             app_config.model,
             parameters=parameters,
             source_image_inputs=source_image_files,
@@ -96,7 +98,7 @@ def generate_image_urls(
             source_image_file.close()
 
     prediction_metadata_input = build_prediction_input(
-        prompt,
+        provider_prompt,
         app_config.model,
         parameters=parameters,
         source_image_inputs=[path.name for path in source_image_paths or []],

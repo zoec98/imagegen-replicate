@@ -61,9 +61,10 @@ class SQLiteGenerationLog:
             connection.execute(
                 """
                 INSERT INTO schema_version (id, version)
-                VALUES (1, 1)
+                VALUES (1, ?)
                 ON CONFLICT (id) DO UPDATE SET version = excluded.version
-                """
+                """,
+                (SCHEMA_VERSION,),
             )
 
     def create_request(
@@ -82,17 +83,19 @@ class SQLiteGenerationLog:
                     sent_at,
                     model_alias,
                     model,
+                    prompt,
                     request_sent_json,
                     parameters_json,
                     source_image_filenames_json
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.request_id,
                     record.created_at.isoformat(),
                     model_alias,
                     model,
+                    record.prompt,
                     _json(replicate_input),
                     _json(record.parameters),
                     _json(record.source_images),
@@ -231,7 +234,7 @@ class SQLiteGenerationLog:
         return connection
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -244,6 +247,7 @@ CREATE TABLE IF NOT EXISTS generation_requests (
     sent_at TEXT NOT NULL,
     model_alias TEXT NOT NULL,
     model TEXT NOT NULL,
+    prompt TEXT NOT NULL,
     request_sent_json TEXT NOT NULL,
     parameters_json TEXT NOT NULL,
     source_image_filenames_json TEXT NOT NULL
@@ -296,6 +300,9 @@ def _prepare_schema(connection: sqlite3.Connection) -> None:
     version = _schema_version(connection)
     if version == SCHEMA_VERSION:
         return
+    if version == 1:
+        _migrate_schema_v1_to_v2(connection)
+        return
     if version is not None:
         msg = f"Unsupported generation log schema version: {version}."
         raise RuntimeError(msg)
@@ -327,6 +334,26 @@ def _has_unversioned_lab_schema(connection: sqlite3.Connection) -> bool:
 def _drop_application_tables(connection: sqlite3.Connection) -> None:
     for table in APPLICATION_TABLES:
         connection.execute(f"DROP TABLE IF EXISTS {table}")
+
+
+def _migrate_schema_v1_to_v2(connection: sqlite3.Connection) -> None:
+    columns = _table_columns(connection, "generation_requests")
+    if "prompt" not in columns:
+        connection.execute(
+            "ALTER TABLE generation_requests ADD COLUMN prompt TEXT NOT NULL DEFAULT ''"
+        )
+    connection.execute(
+        """
+        INSERT INTO schema_version (id, version)
+        VALUES (1, ?)
+        ON CONFLICT (id) DO UPDATE SET version = excluded.version
+        """,
+        (SCHEMA_VERSION,),
+    )
+
+
+def _table_columns(connection: sqlite3.Connection, table: str) -> set[str]:
+    return {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
 
 
 def _table_exists(connection: sqlite3.Connection, table: str) -> bool:

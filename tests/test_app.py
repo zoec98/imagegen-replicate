@@ -606,6 +606,7 @@ def test_api_generate_logs_recreatable_request_payload(app_factory):
     assert result["status"] == "queued"
     assert row["model_alias"] == "seedream45"
     assert row["model"] == "bytedance/seedream-4.5"
+    assert row["prompt"] == "a small red house"
     assert json.loads(row["request_sent_json"]) == {
         "aspect_ratio": "match_input_image",
         "disable_safety_checker": True,
@@ -614,6 +615,28 @@ def test_api_generate_logs_recreatable_request_payload(app_factory):
         "sequential_image_generation": "disabled",
         "size": "2K",
     }
+
+
+def test_api_generate_logs_annotated_prompt_and_stripped_provider_payload(app_factory):
+    app = app_factory()
+    client = app.test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+    prompt = "portrait of (character: zoe blue hair)"
+
+    response = client.post(
+        "/api/generate",
+        json={"prompt": prompt, "parameters": {"size": "2K"}},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 202
+    assert response.json["prompt"] == prompt
+    row = app.config["IMAGEGEN_GENERATION_LOG"].get_request(response.json["request_id"])
+    assert row is not None
+    assert row["prompt"] == prompt
+    assert json.loads(row["request_sent_json"])["prompt"] == "portrait of blue hair"
 
 
 def test_api_generate_starts_configured_worker(app_factory):

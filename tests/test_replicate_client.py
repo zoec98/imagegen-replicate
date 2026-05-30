@@ -203,6 +203,30 @@ def test_generate_image_urls_creates_prediction_and_polls(tmp_path):
     assert stored[0][1]["prediction_id"] == "abc123"
 
 
+def test_generate_image_urls_strips_provider_prompt_but_persists_annotated_prompt(
+    tmp_path,
+):
+    created = FakePrediction(id="abc123", status="succeeded", output=[])
+    api = FakePredictionsApi(created, [])
+    stored = []
+    prompt = "portrait of (character: zoe blue hair)"
+
+    def fake_persist(urls, **kwargs):
+        stored.append((urls, kwargs))
+        return []
+
+    generate_image_urls(
+        prompt,
+        app_config(tmp_path),
+        predictions_api=api,
+        persist_images=fake_persist,
+    )
+
+    assert api.create_calls[0]["input"]["prompt"] == "portrait of blue hair"
+    assert stored[0][1]["prompt"] == prompt
+    assert stored[0][1]["prediction_input"]["prompt"] == "portrait of blue hair"
+
+
 def test_generate_image_urls_passes_source_image_files_and_metadata(tmp_path):
     source_path = tmp_path / "source.png"
     source_path.write_bytes(b"source-bytes")

@@ -25,7 +25,45 @@ def test_initialize_creates_schema_idempotently(tmp_path):
     assert "schema_version" in tables
     with sqlite3.connect(log.path) as connection:
         version = connection.execute("SELECT version FROM schema_version").fetchone()[0]
-    assert version == 1
+    assert version == 2
+
+
+def test_initialize_migrates_v1_schema(tmp_path):
+    log = SQLiteGenerationLog(tmp_path / "imagegen.sqlite3")
+    log.path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(log.path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE schema_version (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                version INTEGER NOT NULL
+            );
+            INSERT INTO schema_version VALUES (1, 1);
+            CREATE TABLE generation_requests (
+                id TEXT PRIMARY KEY,
+                sent_at TEXT NOT NULL,
+                model_alias TEXT NOT NULL,
+                model TEXT NOT NULL,
+                request_sent_json TEXT NOT NULL,
+                parameters_json TEXT NOT NULL,
+                source_image_filenames_json TEXT NOT NULL
+            );
+            INSERT INTO generation_requests
+            VALUES ('old', '2026-05-30T12:00:00+00:00',
+                'seedream45', 'bytedance/seedream-4.5', '{}', '{}', '[]');
+            """
+        )
+
+    log.initialize()
+
+    with sqlite3.connect(log.path) as connection:
+        connection.row_factory = sqlite3.Row
+        version = connection.execute("SELECT version FROM schema_version").fetchone()[0]
+        row = connection.execute(
+            "SELECT prompt FROM generation_requests WHERE id = 'old'"
+        ).fetchone()
+    assert version == 2
+    assert row["prompt"] == ""
 
 
 def test_initialize_rebuilds_unversioned_lab_schema(tmp_path):
@@ -66,6 +104,7 @@ def test_initialize_rebuilds_unversioned_lab_schema(tmp_path):
         "sent_at",
         "model_alias",
         "model",
+        "prompt",
         "request_sent_json",
         "parameters_json",
         "source_image_filenames_json",
@@ -103,6 +142,7 @@ def test_create_request_persists_recreatable_payload(tmp_path):
     assert json.loads(result["logs_json"]) == []
     assert row["model_alias"] == "seedream45"
     assert row["model"] == "bytedance/seedream-4.5"
+    assert row["prompt"] == "edit this"
     assert json.loads(row["request_sent_json"]) == replicate_input
     assert json.loads(row["parameters_json"]) == {"size": "2K"}
     assert json.loads(row["source_image_filenames_json"]) == ["source.png"]
