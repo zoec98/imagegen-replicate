@@ -204,7 +204,8 @@ def test_index_exposes_gallery_filenames_for_source_selection(tmp_path, app_fact
     response = client.get("/")
 
     assert response.status_code == 200
-    assert b'class="gallery-item" data-filename="source.png"' in response.data
+    assert b'data-filename="source.png"' in response.data
+    assert b'data-delete-url="/api/images/source.png/delete"' in response.data
     assert b'aria-label="Select source.png as source image"' in response.data
 
 
@@ -274,6 +275,9 @@ def test_image_metadata_route_serves_embedded_metadata(tmp_path, app_factory):
     metadata = {
         "content_type": "image/png",
         "created_at": "2026-05-29T12:00:00+00:00",
+        "model_alias": "seedream45",
+        "model": "bytedance/seedream-4.5",
+        "prompt": "a red house",
         "parameters": {"size": "2K"},
     }
     write_embedded_metadata(image_path, metadata)
@@ -792,6 +796,7 @@ def test_api_images_returns_gallery_json_newest_first(tmp_path, app_factory):
     assert response.json == {
         "images": [
             {
+                "delete_url": "/api/images/newer.jpg/delete",
                 "filename": "newer.jpg",
                 "url": "/images/newer.jpg",
                 "metadata_url": None,
@@ -799,6 +804,7 @@ def test_api_images_returns_gallery_json_newest_first(tmp_path, app_factory):
                 "created_at": None,
             },
             {
+                "delete_url": "/api/images/older.png/delete",
                 "filename": "older.png",
                 "url": "/images/older.png",
                 "metadata_url": None,
@@ -826,6 +832,9 @@ def test_api_images_includes_embedded_metadata(tmp_path, app_factory):
         {
             "content_type": "image/png",
             "created_at": "2026-05-29T12:00:00+00:00",
+            "model_alias": "seedream45",
+            "model": "bytedance/seedream-4.5",
+            "prompt": "a red house",
             "parameters": {"size": "2K"},
         },
     )
@@ -837,6 +846,7 @@ def test_api_images_includes_embedded_metadata(tmp_path, app_factory):
     assert response.json == {
         "images": [
             {
+                "delete_url": "/api/images/sample.png/delete",
                 "filename": "sample.png",
                 "url": "/images/sample.png",
                 "metadata_url": "/images/sample.png/metadata",
@@ -845,6 +855,77 @@ def test_api_images_includes_embedded_metadata(tmp_path, app_factory):
             }
         ]
     }
+
+
+def test_api_delete_image_removes_valid_image(tmp_path, app_factory):
+    image_path = tmp_path / "sample.png"
+    image_path.write_bytes(b"image")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/delete",
+        json={},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 200
+    assert response.json == {"deleted": "sample.png"}
+    assert not image_path.exists()
+
+
+def test_api_delete_image_rejects_path_traversal(tmp_path, app_factory):
+    image_path = tmp_path / "sample.png"
+    image_path.write_bytes(b"image")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/../sample.png/delete",
+        json={},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 404
+    assert response.json == {"error": "Image not found."}
+    assert image_path.exists()
+
+
+def test_api_delete_image_rejects_missing_image(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/missing.png/delete",
+        json={},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 404
+    assert response.json == {"error": "Image not found."}
+
+
+def test_api_delete_image_requires_csrf(tmp_path, app_factory):
+    image_path = tmp_path / "sample.png"
+    image_path.write_bytes(b"image")
+    client = app_factory().test_client()
+    client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+
+    response = client.post(
+        "/api/images/sample.png/delete",
+        json={},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 403
+    assert response.json == {"error": "Invalid CSRF token."}
+    assert image_path.exists()
 
 
 def test_test_api_accepts_valid_csrf_json_request(app_factory):

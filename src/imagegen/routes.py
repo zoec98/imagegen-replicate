@@ -104,6 +104,7 @@ def _model_json(model: ReplicateModel) -> dict[str, object]:
     return {
         "alias": model.alias,
         "display_name": model.display_name,
+        "replicate_model": model.replicate_model,
         "edit_capable": model.edit_capable,
         "source_image_parameter": model.source_image_parameter,
         "source_image_max": model.source_image_max,

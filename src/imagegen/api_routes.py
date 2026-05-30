@@ -21,6 +21,7 @@ from imagegen.request_store import GenerationRequest, RequestStore
 from imagegen.security import require_api_csrf
 from imagegen.validation import ValidationError, validate_generation_payload
 from imagegen.worker import GenerationWorker
+from imagegen.routes import safe_image_filename
 
 
 def register_api_routes(app: Flask) -> None:
@@ -88,6 +89,18 @@ def register_api_routes(app: Flask) -> None:
         )
         return jsonify({"images": [_gallery_image_json(image) for image in images]})
 
+    @app.post("/api/images/<path:filename>/delete")
+    @require_api_csrf
+    def api_delete_image(filename: str):
+        safe_name = safe_image_filename(filename)
+        if safe_name is None:
+            return jsonify({"error": "Image not found."}), 404
+        image_path = Path(app.config["IMAGEGEN_OUTPUT_DIR"]) / safe_name
+        if not image_path.is_file():
+            return jsonify({"error": "Image not found."}), 404
+        image_path.unlink()
+        return jsonify({"deleted": safe_name})
+
     if app.config.get("IMAGEGEN_ENABLE_TEST_API"):
 
         @app.post("/api/_test")
@@ -147,6 +160,7 @@ def _gallery_image_json(image: GalleryImage) -> dict[str, str | None]:
     return {
         "filename": image.filename,
         "url": image.url,
+        "delete_url": url_for("api_delete_image", filename=image.filename),
         "metadata_url": image.metadata_url,
         "content_type": image.content_type,
         "created_at": image.created_at,

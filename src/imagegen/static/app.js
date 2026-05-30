@@ -397,6 +397,166 @@
     });
   }
 
+  function modelForMetadata(metadata) {
+    if (metadata.model_alias) {
+      return modelRegistry.find((model) => model.alias === metadata.model_alias) || null;
+    }
+    if (metadata.model) {
+      return (
+        modelRegistry.find((model) => model.replicate_model === metadata.model) || null
+      );
+    }
+    return null;
+  }
+
+  function parametersForModel(metadataParameters, model) {
+    const sourceParameter = model.source_image_parameter;
+    const supported = {};
+    model.parameters.forEach((parameter) => {
+      if (
+        parameter.name === "prompt" ||
+        parameter.name === sourceParameter ||
+        Object.prototype.hasOwnProperty.call(model.fixed_inputs || {}, parameter.name)
+      ) {
+        return;
+      }
+      if (Object.prototype.hasOwnProperty.call(metadataParameters, parameter.name)) {
+        supported[parameter.name] = metadataParameters[parameter.name];
+      }
+    });
+    return supported;
+  }
+
+  function applyImageMetadata(metadata) {
+    if (!metadata || typeof metadata !== "object") {
+      throw new Error("Image metadata is missing.");
+    }
+    const model = modelForMetadata(metadata);
+    if (!model) {
+      throw new Error("Image metadata references an unknown model.");
+    }
+    if (typeof metadata.prompt !== "string" || !metadata.prompt.trim()) {
+      throw new Error("Image metadata does not include a prompt.");
+    }
+    if (!metadata.parameters || typeof metadata.parameters !== "object") {
+      throw new Error("Image metadata does not include model settings.");
+    }
+
+    const nextParameters = parametersForModel(metadata.parameters, model);
+    promptInput.value = metadata.prompt;
+    modelSelector.value = model.alias;
+    selectedSourceImages.clear();
+    editModeEnabled = false;
+    Object.keys(parameterState).forEach((name) => {
+      delete parameterState[name];
+    });
+    Object.assign(parameterState, nextParameters);
+    renderPricing(model);
+    renderParameters(model);
+    updateSourceSelectionUi();
+  }
+
+  async function loadGalleryMetadata(figure) {
+    const metadataUrl = figure?.dataset.metadataUrl;
+    if (!metadataUrl) {
+      showMessage("This image has no embedded metadata to load.", "error");
+      return;
+    }
+    const response = await fetch(metadataUrl, {
+      credentials: "same-origin",
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Image metadata could not be loaded.");
+    }
+    applyImageMetadata(data);
+    showMessage("Image metadata loaded.", "success");
+  }
+
+  async function deleteGalleryImage(figure) {
+    const deleteUrl = figure?.dataset.deleteUrl;
+    const filename = figure?.dataset.filename || "image";
+    if (!deleteUrl) {
+      showMessage("This image cannot be deleted.", "error");
+      return;
+    }
+    if (!csrfToken) {
+      showMessage("Missing CSRF token.", "error");
+      return;
+    }
+    const response = await fetch(deleteUrl, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+      },
+      body: JSON.stringify({}),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || `Could not delete ${filename}.`);
+    }
+    selectedSourceImages.delete(filename);
+    showMessage(`${filename} deleted.`, "success");
+    await refreshGallery();
+  }
+
+  async function metadataForInfo(figure) {
+    if (!figure?.dataset.metadataUrl) {
+      return null;
+    }
+    if (figure.dataset.infoMetadata) {
+      return JSON.parse(figure.dataset.infoMetadata);
+    }
+    const response = await fetch(figure.dataset.metadataUrl, {
+      credentials: "same-origin",
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const metadata = await response.json();
+    figure.dataset.infoMetadata = JSON.stringify(metadata);
+    return metadata;
+  }
+
+  function imageDimensions(figure) {
+    const image = figure?.querySelector("img");
+    if (!image?.naturalWidth || !image?.naturalHeight) {
+      return "Dimensions unavailable";
+    }
+    return `${image.naturalWidth} x ${image.naturalHeight}`;
+  }
+
+  function updateInfoTooltip(figure, metadata) {
+    const tooltip = figure?.querySelector(".image-info-tooltip");
+    if (!figure || !tooltip) {
+      return;
+    }
+    const model = metadata ? modelForMetadata(metadata) : null;
+    const lines = [
+      figure.dataset.filename || "Image",
+      model?.display_name || metadata?.model_alias || metadata?.model || "Model unavailable",
+      imageDimensions(figure),
+      metadata?.prompt || "Prompt unavailable",
+    ];
+    tooltip.replaceChildren(
+      ...lines.map((line) => {
+        const item = document.createElement("span");
+        item.className = "tooltip-line";
+        item.textContent = line;
+        return item;
+      }),
+    );
+  }
+
+  function refreshInfoTooltip(figure) {
+    updateInfoTooltip(figure, null);
+    metadataForInfo(figure)
+      .then((metadata) => updateInfoTooltip(figure, metadata))
+      .catch(() => updateInfoTooltip(figure, null));
+  }
+
   function statusMessage(data) {
     if (data.status === "failed" || data.status === "timeout") {
       return data.error || `Generation ${data.status}.`;
@@ -415,6 +575,9 @@
     const figure = document.createElement("figure");
     figure.className = "gallery-item";
     figure.dataset.filename = image.filename;
+    if (image.delete_url) {
+      figure.dataset.deleteUrl = image.delete_url;
+    }
     if (image.metadata_url) {
       figure.dataset.metadataUrl = image.metadata_url;
     }
@@ -435,9 +598,50 @@
     img.alt = image.filename;
 
     const caption = document.createElement("figcaption");
-    caption.textContent = image.filename;
 
     link.append(img);
+    const actions = document.createElement("div");
+    actions.className = "gallery-actions";
+    actions.setAttribute("aria-label", "Image actions");
+
+    const infoWrap = document.createElement("span");
+    infoWrap.className = "image-info-wrap";
+    const infoButton = iconButton(
+      "gallery-info",
+      `Image information for ${image.filename}`,
+      "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 8h2v7h-2zm0-3h2v2h-2z",
+    );
+    const tooltip = document.createElement("span");
+    tooltip.className = "image-info-tooltip";
+    tooltip.setAttribute("role", "tooltip");
+    const tooltipLine = document.createElement("span");
+    tooltipLine.className = "tooltip-line";
+    tooltipLine.textContent = image.filename;
+    tooltip.append(tooltipLine);
+    infoWrap.append(infoButton, tooltip);
+
+    const typeIndicator = document.createElement("span");
+    typeIndicator.className = "image-type";
+    const extension = image.filename.split(".").pop() || "";
+    typeIndicator.textContent = extension.toUpperCase();
+    typeIndicator.setAttribute(
+      "aria-label",
+      `${extension.toUpperCase()} image`,
+    );
+
+    const loadButton = iconButton(
+      "gallery-load",
+      `Load metadata from ${image.filename}`,
+      "M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2h6.5A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z",
+    );
+    loadButton.disabled = !image.metadata_url;
+    const deleteButton = iconButton(
+      "gallery-delete",
+      `Delete ${image.filename}`,
+      "M9 3h6l1 2h4v2H4V5h4zm-3 6h12l-.7 11H6.7z",
+    );
+    actions.append(infoWrap, typeIndicator, loadButton, deleteButton);
+
     const sourceButton = document.createElement("button");
     sourceButton.className = "source-select";
     sourceButton.type = "button";
@@ -446,8 +650,25 @@
       `Select ${image.filename} as source image`,
     );
 
+    caption.append(actions);
     figure.append(link, sourceButton, caption);
     return figure;
+  }
+
+  function iconButton(className, label, pathData) {
+    const button = document.createElement("button");
+    button.className = `gallery-action ${className}`;
+    button.type = "button";
+    button.setAttribute("aria-label", label);
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", pathData);
+    svg.append(path);
+    button.append(svg);
+    return button;
   }
 
   async function refreshGallery() {
@@ -596,12 +817,47 @@
     sourceStatus("");
   });
   gallery?.addEventListener("click", (event) => {
+    const infoButton = event.target.closest(".gallery-info");
+    if (infoButton) {
+      refreshInfoTooltip(infoButton.closest(".gallery-item"));
+      return;
+    }
+    const loadButton = event.target.closest(".gallery-load");
+    if (loadButton) {
+      const figure = loadButton.closest(".gallery-item");
+      loadGalleryMetadata(figure).catch((error) => {
+        showMessage(error.message || "Image metadata could not be loaded.", "error");
+      });
+      return;
+    }
+    const deleteButton = event.target.closest(".gallery-delete");
+    if (deleteButton) {
+      const figure = deleteButton.closest(".gallery-item");
+      deleteGalleryImage(figure).catch((error) => {
+        showMessage(error.message || "Image could not be deleted.", "error");
+      });
+      return;
+    }
     const button = event.target.closest(".source-select");
     if (!button) {
       return;
     }
     const figure = button.closest(".gallery-item");
     toggleSourceImage(figure?.dataset.filename || "");
+  });
+  gallery?.addEventListener("mouseover", (event) => {
+    const infoButton = event.target.closest(".gallery-info");
+    if (!infoButton) {
+      return;
+    }
+    refreshInfoTooltip(infoButton.closest(".gallery-item"));
+  });
+  gallery?.addEventListener("focusin", (event) => {
+    const infoButton = event.target.closest(".gallery-info");
+    if (!infoButton) {
+      return;
+    }
+    refreshInfoTooltip(infoButton.closest(".gallery-item"));
   });
   parameterGrid?.addEventListener("input", (event) => {
     const control = event.target;
