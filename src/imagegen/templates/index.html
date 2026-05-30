@@ -75,6 +75,21 @@
             </div>
           </div>
           <textarea id="prompt" name="prompt" rows="9">{{ prompt }}</textarea>
+          {% if palettes %}
+            <div class="palette-controls" aria-label="Prompt palettes">
+              {% for palette in palettes %}
+                <label class="palette-field" for="palette-{{ palette.name }}">
+                  <span>{{ palette.display_name }}</span>
+                  <select id="palette-{{ palette.name }}" data-palette-name="{{ palette.name }}">
+                    <option value="">Select {{ palette.display_name }}</option>
+                    {% for fragment in palette.fragments %}
+                      <option value="{{ fragment.name }}">{{ fragment.display_name }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+              {% endfor %}
+            </div>
+          {% endif %}
         </div>
 
         <div class="parameter-grid" aria-label="Model parameters">

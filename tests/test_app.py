@@ -178,6 +178,7 @@ def test_index_exposes_empty_palette_data_when_fragment_root_is_missing(app_fact
 
     assert response.status_code == 200
     assert extract_palette_data(response) == []
+    assert b'class="palette-controls"' not in response.data
 
 
 def test_index_exposes_palette_data(app_config, app_factory):
@@ -194,6 +195,11 @@ def test_index_exposes_palette_data(app_config, app_factory):
     palettes = extract_palette_data(response)
 
     assert response.status_code == 200
+    assert b'class="palette-controls" aria-label="Prompt palettes"' in response.data
+    assert b'id="palette-character" data-palette-name="character"' in response.data
+    assert b'<option value="">Select character</option>' in response.data
+    assert b'<option value="aoife">aoife</option>' in response.data
+    assert b'<option value="comic_lawrence">comic lawrence</option>' in response.data
     assert palettes == [
         {
             "name": "character",

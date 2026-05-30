@@ -9,6 +9,7 @@
   const pricingInfo = form.querySelector(".pricing-info");
   const pricingTooltip = form.querySelector(".pricing-tooltip");
   const parameterGrid = form.querySelector(".parameter-grid");
+  const paletteControls = form.querySelector(".palette-controls");
   const generateButton = form.querySelector(".generate-button");
   const editToggle = form.querySelector(".edit-toggle");
   const sourceCounter = form.querySelector(".source-counter");
@@ -30,8 +31,8 @@
   );
   let isPageStale = false;
 
-  function loadModelRegistry() {
-    const element = document.querySelector("#model-registry-data");
+  function loadJsonData(selector) {
+    const element = document.querySelector(selector);
     if (!element?.textContent) {
       return [];
     }
@@ -43,7 +44,8 @@
     }
   }
 
-  const modelRegistry = loadModelRegistry();
+  const modelRegistry = loadJsonData("#model-registry-data");
+  const paletteData = loadJsonData("#palette-data");
   const parameterState = {};
   const selectedSourceImages = new Set();
   let editModeEnabled = false;
@@ -69,6 +71,134 @@
     message.className = `message message-${category}`;
     message.textContent = text;
     messages.append(message);
+  }
+
+  function promptAnnotations(prompt) {
+    const annotations = [];
+    let index = 0;
+    while (index < prompt.length) {
+      if (prompt[index] !== "(") {
+        index += 1;
+        continue;
+      }
+      const match = prompt.slice(index).match(/^\(([A-Za-z][A-Za-z0-9_-]*):/);
+      if (!match) {
+        index += 1;
+        continue;
+      }
+      const annotation = readPromptAnnotation(prompt, index, match[1]);
+      annotations.push(annotation);
+      index = annotation.end;
+    }
+    return annotations;
+  }
+
+  function readPromptAnnotation(prompt, start, paletteName) {
+    let cursor = start + paletteName.length + 2;
+    cursor = requireAnnotationWhitespace(prompt, cursor);
+    const fragmentStart = cursor;
+    while (
+      cursor < prompt.length &&
+      !/\s/.test(prompt[cursor]) &&
+      prompt[cursor] !== ")"
+    ) {
+      cursor += 1;
+    }
+    const fragmentName = prompt.slice(fragmentStart, cursor);
+    if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(fragmentName)) {
+      throw new Error("Prompt annotation has an invalid fragment name.");
+    }
+    cursor = requireAnnotationWhitespace(prompt, cursor);
+    const contentStart = cursor;
+    while (cursor < prompt.length) {
+      if (prompt[cursor] === ")") {
+        if (cursor === contentStart) {
+          throw new Error("Prompt annotation content is required.");
+        }
+        return {
+          start,
+          end: cursor + 1,
+          paletteName,
+          fragmentName,
+          content: prompt.slice(contentStart, cursor),
+        };
+      }
+      if (prompt[cursor] === "(") {
+        throw new Error("Prompt annotations may not be nested.");
+      }
+      if (prompt[cursor] === ":") {
+        throw new Error("Prompt annotation content may not contain ':'.");
+      }
+      cursor += 1;
+    }
+    throw new Error("Prompt annotation is missing a closing ')'.");
+  }
+
+  function requireAnnotationWhitespace(prompt, cursor) {
+    if (cursor >= prompt.length || !/\s/.test(prompt[cursor])) {
+      throw new Error("Prompt annotation must use '(palette: fragment content)' syntax.");
+    }
+    while (cursor < prompt.length && /\s/.test(prompt[cursor])) {
+      cursor += 1;
+    }
+    return cursor;
+  }
+
+  function fragmentForPalette(paletteName, fragmentName) {
+    const palette = paletteData.find((item) => item.name === paletteName);
+    if (!palette || !Array.isArray(palette.fragments)) {
+      return null;
+    }
+    return palette.fragments.find((fragment) => fragment.name === fragmentName) || null;
+  }
+
+  function annotationText(paletteName, fragment) {
+    return `(${paletteName}: ${fragment.name} ${fragment.content})`;
+  }
+
+  function annotationAtCursor(annotations, cursor) {
+    return (
+      annotations.find(
+        (annotation) => cursor > annotation.start && cursor < annotation.end,
+      ) || null
+    );
+  }
+
+  function insertPaletteFragment(paletteName, fragmentName) {
+    if (!promptInput) {
+      return;
+    }
+    const fragment = fragmentForPalette(paletteName, fragmentName);
+    if (!fragment) {
+      showMessage("Palette fragment is unavailable.", "error");
+      return;
+    }
+
+    let annotations = [];
+    try {
+      annotations = promptAnnotations(promptInput.value);
+    } catch (error) {
+      showMessage(error.message || "Prompt annotations are invalid.", "error");
+      return;
+    }
+
+    const cursor = promptInput.selectionStart ?? promptInput.value.length;
+    const activeAnnotation = annotationAtCursor(annotations, cursor);
+    const nextText = annotationText(paletteName, fragment);
+    if (activeAnnotation && activeAnnotation.paletteName !== paletteName) {
+      showMessage(
+        `Move the cursor outside the ${activeAnnotation.paletteName} annotation first.`,
+        "error",
+      );
+      return;
+    }
+
+    promptInput.focus();
+    if (activeAnnotation) {
+      promptInput.setSelectionRange(activeAnnotation.start, activeAnnotation.end);
+    }
+    promptInput.setRangeText(nextText, promptInput.selectionStart, promptInput.selectionEnd, "end");
+    showMessage(`${fragment.display_name} inserted.`, "success");
   }
 
   function sourceImageLimit(model) {
@@ -878,6 +1008,14 @@
   sourceClear?.addEventListener("click", () => {
     clearSelectedSources();
     sourceStatus("");
+  });
+  paletteControls?.addEventListener("change", (event) => {
+    const control = event.target;
+    if (!control?.dataset?.paletteName || !control.value) {
+      return;
+    }
+    insertPaletteFragment(control.dataset.paletteName, control.value);
+    control.value = "";
   });
   gallery?.addEventListener("click", (event) => {
     const infoButton = event.target.closest(".gallery-info");
