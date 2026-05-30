@@ -140,18 +140,31 @@ Repository behavior:
 
 ### Scope
 
-- Add an `Edit` toggle button near the model controls.
-- Disable and visually gray out the toggle when the selected model has no edit variant/capability.
+- Add an `Edit` toggle button near the model controls. This ticket is UI state and source selection only; Ticket 9 wires selected sources into `/api/generate`.
+- Expose the browser metadata needed for the UI:
+  - model `edit_capable`;
+  - model `source_image_max`;
+  - each gallery image filename.
+- Disable and visually gray out the toggle when the selected model has no edit capability.
 - When edit mode is enabled:
   - allow gallery images to be selected and deselected as source images;
-  - show a blue dot overlay in the top-right corner of each selected image;
+  - show a clear blue top-right overlay indicator on each selected image;
   - show a selected-source-image counter next to the `Edit` toggle;
   - show a `Clear` button next to the counter that deselects all source images.
 - When edit mode is disabled:
   - source image selection controls are inactive;
-  - selected image state is either cleared or ignored according to a documented UI decision.
+  - selected image state is cleared immediately;
+  - selected overlays, counter, and clear button return to their empty state.
+- Switching to a different model clears selected images and disables edit mode if the new model is not edit-capable.
+- Enforce the selected model's `source_image_max` in the browser:
+  - prevent selecting more than the limit;
+  - show a visible, non-blocking error message when the user tries to exceed it.
 - Selection state should be local browser state until the user submits a generation request.
 - Source images are represented by local gallery filenames, never image bytes in JSON payloads.
+- Do not change server-side Replicate payload construction in this ticket.
+- Do not add image upload-from-device controls in this ticket.
+- Do not add destructive gallery actions or metadata-load actions in this ticket; those belong to Ticket 10.
+- Keep the existing gallery image open behavior available. Source selection must not make it impossible to open an image in a new tab.
 
 ### Acceptance Criteria
 
@@ -160,50 +173,80 @@ Repository behavior:
 - Selected images have a clear blue top-right overlay indicator.
 - The counter always matches the selected image count.
 - `Clear` removes all selected-source-image state and updates overlays/counter.
+- Disabling edit mode clears selected images.
+- Switching models clears selected images and updates the edit toggle state for the new model.
+- The UI prevents selecting more than `source_image_max` images and shows a clear message when the limit is reached.
 - The UI remains touch-friendly and does not interfere with opening images in a new tab.
+- Selection state is not submitted to `/api/generate` until Ticket 9.
 
 ### Suggested Tests
 
-- Template/API metadata test verifies edit capability is exposed to the browser.
+- Template/API metadata test verifies edit capability and source image limit are exposed to the browser.
+- Template/API images test verifies gallery image filenames are available to browser JavaScript without trusting image URLs as identifiers.
 - Browser/manual test verifies disabled and enabled edit toggle behavior per model.
 - JavaScript test or browser check verifies select/deselect/counter/clear behavior.
-- Validation test rejects source image filenames when the selected model is not edit-capable.
+- JavaScript test or browser check verifies model switching clears selected state.
+- JavaScript test or browser check verifies source image max enforcement and the visible error state.
 
 ### Open Decisions
 
-- Whether disabling edit mode clears selected images immediately or keeps them cached but ignored.
-- Maximum number of source images per model should come from registry metadata where the schema exposes it.
+- None for this ticket. The UI should clear selected images when edit mode is disabled or when the selected model changes.
 
 ## Ticket 9: Submit Edit Requests With Source Images
 
 ### Scope
 
+- This ticket wires Ticket 8's browser-local edit selection into the server request path.
 - Extend the `/api/generate` browser payload to include:
-  - selected model id;
   - edit mode flag;
   - selected source image filenames when edit mode is enabled.
+- Keep the existing selected model id payload behavior; do not introduce a second model identifier field.
+- Browser behavior:
+  - submit `source_images` only when edit mode is enabled and at least one image is selected;
+  - omit `source_images` for normal text-to-image requests;
+  - include `edit_mode: true` for edit submissions and `edit_mode: false` or no flag for text-to-image submissions.
 - Server-side validation must enforce:
-  - edit mode only for edit-capable models;
+  - `edit_mode` must be boolean if present;
+  - `source_images` must be absent or empty unless `edit_mode` is true;
+  - edit mode requires an edit-capable selected model;
+  - edit mode requires at least one selected source image;
   - source image filenames refer to existing supported local gallery images;
   - selected source image count is within model limits;
-  - source image parameters are mapped to the selected model's expected input field.
-- The Replicate payload should include source images only for edit requests.
-- SQLite logging should store source image filenames and the final Replicate input payload.
+  - source image parameters cannot be submitted through the generic `parameters` object;
+  - source image filenames are mapped to the selected model's expected input field.
+- Reuse the existing `source_images.py` validation and path-resolution boundary where practical.
+- The Replicate payload should include source images only for edit requests and should pass local files through the existing Replicate file handling path.
+- SQLite logging should store source image filenames and the final Replicate input payload, including fixed inputs and the model-specific source image field.
+- Do not add upload-from-device support in this ticket.
+- Do not change gallery selection UI beyond the submit payload wiring required by Ticket 8.
 
 ### Acceptance Criteria
 
 - Text-to-image requests still work without source images.
+- Text-to-image requests reject non-empty `source_images`.
 - Edit requests send selected local source images to Replicate through the existing source image upload/file handling path.
+- Edit requests require at least one selected source image.
 - Invalid source filenames are rejected before worker start.
 - Non-edit-capable models cannot receive source images.
+- Browser-submitted `parameters` cannot override the model's source image input field.
+- The generated Replicate input contains the model-specific source image field only for edit requests.
+- Source file handles are closed after prediction creation, including when prediction creation fails.
 - The generation log can later recreate the same request using the stored model id, parameters, prompt, and source image filenames.
 
 ### Suggested Tests
 
+- JavaScript/browser check verifies edit mode submissions include `edit_mode` and selected `source_images`.
+- JavaScript/browser check verifies text-to-image submissions omit source images.
 - API route test accepts a valid edit request with source image filenames.
+- API route test rejects `edit_mode` values that are not boolean.
+- API route test rejects `edit_mode: true` with no source images.
+- API route test rejects non-empty source images when edit mode is false or omitted.
 - API route test rejects edit requests for non-edit-capable models.
 - API route test rejects missing, unsupported, or path-traversal source image filenames.
+- API route test rejects model source-image fields inside `parameters`.
+- Validation test verifies source image count respects `source_image_max`.
 - Replicate client test verifies source files are mapped to the model's source image input field.
+- Replicate client test verifies source file handles close on success and prediction creation failure.
 - Generation log test verifies edit source filenames and final input payload are persisted.
 
 ## Ticket 10: Gallery Image Actions And Metadata Load
