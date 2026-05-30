@@ -53,7 +53,9 @@ class ImmichClient:
     ) -> ImmichUploadResult:
         stat = image_path.stat()
         timestamp = _timestamp(stat.st_mtime)
-        content_type = mimetypes.guess_type(image_path.name)[0] or "application/octet-stream"
+        content_type = (
+            mimetypes.guess_type(image_path.name)[0] or "application/octet-stream"
+        )
         with image_path.open("rb") as image_file:
             response = client.post(
                 f"{self.base_url}/api/assets",

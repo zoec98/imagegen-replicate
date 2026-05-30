@@ -384,3 +384,44 @@ def test_validate_flux_flex_source_images_use_model_limit(tmp_path):
             model=MODEL_REGISTRY["flux-flex"],
             output_dir=tmp_path,
         )
+
+
+def test_validate_single_source_image_model_uses_model_limit(tmp_path):
+    for filename in ("source-1.png", "source-2.png"):
+        (tmp_path / filename).write_bytes(b"image")
+
+    with pytest.raises(
+        ValidationError,
+        match="source_images cannot contain more than 1 files.",
+    ):
+        validate_generation_payload(
+            {
+                "prompt": "edit this",
+                "edit_mode": True,
+                "source_images": ["source-1.png", "source-2.png"],
+            },
+            model=MODEL_REGISTRY["qwen-2512"],
+            output_dir=tmp_path,
+        )
+
+
+def test_validate_qwen_rejects_source_parameter_in_parameters():
+    with pytest.raises(
+        ValidationError,
+        match="image must be submitted as source_images.",
+    ):
+        validate_model_parameters(
+            {"image": "source.png"},
+            model=MODEL_REGISTRY["qwen-2512"],
+        )
+
+
+def test_validate_qwen_custom_dimensions_require_width_and_height():
+    with pytest.raises(
+        ValidationError,
+        match="width is required when aspect_ratio is custom.",
+    ):
+        validate_model_parameters(
+            {"aspect_ratio": "custom"},
+            model=MODEL_REGISTRY["qwen-2512"],
+        )

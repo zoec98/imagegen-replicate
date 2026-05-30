@@ -103,7 +103,7 @@ def test_index_exposes_model_registry_metadata(app_factory):
     registry = extract_model_registry(response)
 
     aliases = {model["alias"] for model in registry}
-    assert aliases == {"flux-flex", "seedream45"}
+    assert aliases == set(MODEL_REGISTRY)
     seedream = next(model for model in registry if model["alias"] == "seedream45")
     assert seedream["edit_capable"] is True
     assert seedream["source_image_max"] == 14
@@ -462,8 +462,9 @@ def test_api_generate_rejects_unknown_model(app_factory):
     )
 
     assert response.status_code == 400
+    choices = ", ".join(sorted(MODEL_REGISTRY))
     assert response.json == {
-        "error": "Unknown model: unknown. Expected one of: flux-flex, seedream45."
+        "error": f"Unknown model: unknown. Expected one of: {choices}."
     }
 
 
@@ -790,8 +791,8 @@ def test_api_images_exposes_immich_upload_url_only_when_configured(
         immich_gallery_id="album-123",
         immich_api_key="immich-key",
     )
-    enabled = app_factory(IMAGEGEN_APP_CONFIG=immich_config).test_client().get(
-        "/api/images"
+    enabled = (
+        app_factory(IMAGEGEN_APP_CONFIG=immich_config).test_client().get("/api/images")
     )
 
     assert disabled.status_code == 200

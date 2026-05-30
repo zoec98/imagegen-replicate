@@ -1,6 +1,26 @@
 from imagegen.model_registry import MODEL_REGISTRY
 
 
+REQUESTED_MODEL_ALIASES = {
+    "flux-flex",
+    "gpt-image-2",
+    "gpt-image-15",
+    "grok-imagine",
+    "imagen-4",
+    "imagen-4-fast",
+    "imagen-4-ultra",
+    "nano-banana-2",
+    "nano-banana-pro",
+    "qwen-2512",
+    "seedream45",
+    "wan-27-pro",
+}
+
+
+def test_registry_contains_requested_models():
+    assert REQUESTED_MODEL_ALIASES <= set(MODEL_REGISTRY)
+
+
 def test_seedream45_registry_entry_identifies_replicate_model():
     model = MODEL_REGISTRY["seedream45"]
 
@@ -107,3 +127,50 @@ def test_flux_flex_registry_entry_has_schema_parameters():
     assert control.scale_parameter == "resolution"
     assert control.width_parameter == "width"
     assert control.height_parameter == "height"
+
+
+def test_requested_model_registry_entries_use_schema_metadata():
+    expected = {
+        "gpt-image-2": ("openai/gpt-image-2", True, "input_images", 10),
+        "gpt-image-15": ("openai/gpt-image-1.5", True, "input_images", 10),
+        "nano-banana-2": ("google/nano-banana-2", True, "image_input", 14),
+        "nano-banana-pro": ("google/nano-banana-pro", True, "image_input", 14),
+        "grok-imagine": ("xai/grok-imagine-image", True, "image", 1),
+        "imagen-4-ultra": ("google/imagen-4-ultra", False, None, 14),
+        "imagen-4": ("google/imagen-4", False, None, 14),
+        "imagen-4-fast": ("google/imagen-4-fast", False, None, 14),
+        "wan-27-pro": ("wan-video/wan-2.7-image-pro", True, "images", 9),
+        "qwen-2512": ("qwen/qwen-image-2512", True, "image", 1),
+    }
+
+    for alias, (
+        replicate_model,
+        edit_capable,
+        source_parameter,
+        source_max,
+    ) in expected.items():
+        model = MODEL_REGISTRY[alias]
+        assert model.replicate_model == replicate_model
+        assert (
+            model.documentation_url
+            == f"https://replicate.com/{replicate_model}/api/schema"
+        )
+        assert model.edit_capable is edit_capable
+        assert model.source_image_parameter == source_parameter
+        assert model.source_image_max == source_max
+        assert model.pricing
+        assert model.parameters[0].name == "prompt"
+
+
+def test_qwen_registry_entry_uses_fixed_safety_checker_and_custom_dimensions():
+    model = MODEL_REGISTRY["qwen-2512"]
+
+    assert model.fixed_inputs == {"disable_safety_checker": True}
+    assert "disable_safety_checker" not in {
+        parameter.name for parameter in model.parameters
+    }
+    assert model.custom_dimensions is not None
+    assert model.custom_dimensions.activation_parameter == "aspect_ratio"
+    assert model.custom_dimensions.activation_value == "custom"
+    assert model.custom_dimensions.width_parameter == "width"
+    assert model.custom_dimensions.height_parameter == "height"

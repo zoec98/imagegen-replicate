@@ -88,7 +88,9 @@ def register_api_routes(app: Flask) -> None:
             ),
             metadata_provider=app.config["IMAGEGEN_METADATA_PROVIDER"],
         )
-        return jsonify({"images": [_gallery_image_json(app, image) for image in images]})
+        return jsonify(
+            {"images": [_gallery_image_json(app, image) for image in images]}
+        )
 
     @app.post("/api/images/<path:filename>/immich-upload")
     @require_api_csrf

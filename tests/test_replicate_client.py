@@ -136,6 +136,17 @@ def test_build_prediction_input_uses_model_specific_source_image_field():
     assert "disable_safety_checker" not in payload
 
 
+def test_build_prediction_input_uses_single_source_image_field():
+    payload = build_prediction_input(
+        "edit this",
+        MODEL_REGISTRY["qwen-2512"],
+        source_image_inputs=["source.png"],
+    )
+
+    assert payload["image"] == "source.png"
+    assert payload["disable_safety_checker"] is True
+
+
 def test_build_prediction_input_omits_flux_resolution_for_custom_dimensions():
     payload = build_prediction_input(
         "edit this",

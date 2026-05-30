@@ -114,8 +114,7 @@ def test_load_config_disables_immich_unless_all_values_are_set(tmp_path, monkeyp
     monkeypatch.delenv("IMMICH_API_KEY", raising=False)
     env_path = tmp_path / ".env"
     env_path.write_text(
-        "IMMICH_URL=https://immich.example.test\n"
-        "IMMICH_API_KEY=immich-key\n",
+        "IMMICH_URL=https://immich.example.test\nIMMICH_API_KEY=immich-key\n",
         encoding="utf-8",
     )
 

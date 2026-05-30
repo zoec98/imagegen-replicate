@@ -159,9 +159,21 @@ def build_prediction_input(
     if use_custom_dimensions and custom_dimensions is not None:
         prediction_input.pop(custom_dimensions.scale_parameter, None)
     if source_image_inputs and model.source_image_parameter:
-        prediction_input[model.source_image_parameter] = source_image_inputs
+        prediction_input[model.source_image_parameter] = _source_image_input_value(
+            model,
+            source_image_inputs,
+        )
     prediction_input.update(model.fixed_inputs)
     return prediction_input
+
+
+def _source_image_input_value(
+    model: ReplicateModel,
+    source_image_inputs: list[object],
+) -> object:
+    if model.source_image_max == 1:
+        return source_image_inputs[0]
+    return source_image_inputs
 
 
 def wait_for_prediction(
