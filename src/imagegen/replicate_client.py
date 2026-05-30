@@ -133,16 +133,31 @@ def build_prediction_input(
     parameters: dict[str, object] | None = None,
     source_image_inputs: list[object] | None = None,
 ) -> dict[str, object]:
+    custom_dimensions = model.custom_dimensions
+    use_custom_dimensions = (
+        custom_dimensions is not None
+        and parameters is not None
+        and parameters.get(custom_dimensions.activation_parameter)
+        == custom_dimensions.activation_value
+    )
     prediction_input: dict[str, object] = {}
     for parameter in model.parameters:
         if parameter.name == "prompt":
             prediction_input[parameter.name] = prompt
         elif parameter.name == model.source_image_parameter:
             continue
+        elif (
+            use_custom_dimensions
+            and custom_dimensions is not None
+            and parameter.name == custom_dimensions.scale_parameter
+        ):
+            continue
         elif parameter.default != "":
             prediction_input[parameter.name] = parameter.default
     if parameters:
         prediction_input.update(parameters)
+    if use_custom_dimensions and custom_dimensions is not None:
+        prediction_input.pop(custom_dimensions.scale_parameter, None)
     if source_image_inputs and model.source_image_parameter:
         prediction_input[model.source_image_parameter] = source_image_inputs
     prediction_input.update(model.fixed_inputs)

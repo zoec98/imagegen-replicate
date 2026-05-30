@@ -6,6 +6,16 @@ from typing import Literal
 
 ParameterType = Literal["array", "boolean", "integer", "number", "select", "string"]
 ModelMode = Literal["text-to-image", "image-edit"]
+ParameterSemanticType = Literal["seed"]
+
+
+@dataclass(frozen=True)
+class CustomDimensionsControl:
+    activation_parameter: str
+    activation_value: object
+    scale_parameter: str
+    width_parameter: str
+    height_parameter: str
 
 
 @dataclass(frozen=True)
@@ -18,6 +28,7 @@ class ModelParameter:
     minimum: float | int | None = None
     maximum: float | int | None = None
     order: int | None = None
+    semantic_type: ParameterSemanticType | None = None
 
 
 @dataclass(frozen=True)
@@ -35,6 +46,7 @@ class ReplicateModel:
     parameters: tuple[ModelParameter, ...]
     source_image_parameter: str | None = None
     source_image_max: int = 14
+    custom_dimensions: CustomDimensionsControl | None = None
 
     @property
     def pinned_model(self) -> str:
@@ -225,6 +237,7 @@ FLUX_FLEX = ReplicateModel(
             type="integer",
             default="",
             order=7,
+            semantic_type="seed",
         ),
         ModelParameter(
             name="prompt_upsampling",
@@ -268,6 +281,13 @@ FLUX_FLEX = ReplicateModel(
             maximum=100,
             order=12,
         ),
+    ),
+    custom_dimensions=CustomDimensionsControl(
+        activation_parameter="aspect_ratio",
+        activation_value="custom",
+        scale_parameter="resolution",
+        width_parameter="width",
+        height_parameter="height",
     ),
 )
 

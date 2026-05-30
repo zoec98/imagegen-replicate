@@ -121,6 +121,23 @@ def test_build_prediction_input_uses_model_specific_source_image_field():
     assert "disable_safety_checker" not in payload
 
 
+def test_build_prediction_input_omits_flux_resolution_for_custom_dimensions():
+    payload = build_prediction_input(
+        "edit this",
+        MODEL_REGISTRY["flux-flex"],
+        parameters={
+            "aspect_ratio": "custom",
+            "width": 1024,
+            "height": 768,
+        },
+    )
+
+    assert payload["aspect_ratio"] == "custom"
+    assert payload["width"] == 1024
+    assert payload["height"] == 768
+    assert "resolution" not in payload
+
+
 def test_generate_image_urls_creates_prediction_and_polls(tmp_path):
     created = FakePrediction(id="abc123", status="processing")
     completed = FakePrediction(

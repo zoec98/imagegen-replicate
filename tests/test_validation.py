@@ -178,9 +178,6 @@ def test_validate_model_parameters_rejects_unknown_parameter():
 def test_validate_flux_flex_parameters_accepts_defaults_and_numbers():
     result = validate_model_parameters(
         {
-            "aspect_ratio": "custom",
-            "width": "1024",
-            "height": 768,
             "guidance": "5.5",
             "prompt_upsampling": False,
         },
@@ -188,10 +185,8 @@ def test_validate_flux_flex_parameters_accepts_defaults_and_numbers():
     )
 
     assert result == {
-        "aspect_ratio": "custom",
+        "aspect_ratio": "1:1",
         "resolution": "1 MP",
-        "width": 1024,
-        "height": 768,
         "safety_tolerance": 2,
         "prompt_upsampling": False,
         "steps": 30,
@@ -207,6 +202,61 @@ def test_validate_flux_flex_parameters_omits_optional_width_height_seed_by_defau
     assert "width" not in result
     assert "height" not in result
     assert "seed" not in result
+
+
+def test_validate_flux_flex_seed_omits_blank_value():
+    result = validate_model_parameters(
+        {"seed": ""},
+        model=MODEL_REGISTRY["flux-flex"],
+    )
+
+    assert "seed" not in result
+
+
+def test_validate_flux_flex_custom_dimensions_require_width_and_height():
+    with pytest.raises(
+        ValidationError,
+        match="width is required when aspect_ratio is custom.",
+    ):
+        validate_model_parameters(
+            {"aspect_ratio": "custom", "height": 768},
+            model=MODEL_REGISTRY["flux-flex"],
+        )
+
+
+def test_validate_flux_flex_custom_dimensions_omit_resolution():
+    result = validate_model_parameters(
+        {
+            "aspect_ratio": "custom",
+            "width": "1024",
+            "height": 768,
+            "resolution": "2 MP",
+        },
+        model=MODEL_REGISTRY["flux-flex"],
+    )
+
+    assert result == {
+        "aspect_ratio": "custom",
+        "width": 1024,
+        "height": 768,
+        "safety_tolerance": 2,
+        "prompt_upsampling": True,
+        "steps": 30,
+        "guidance": 4.5,
+        "output_format": "webp",
+        "output_quality": 80,
+    }
+
+
+def test_validate_flux_flex_rejects_width_height_without_custom_dimensions():
+    with pytest.raises(
+        ValidationError,
+        match="width and height are only allowed when aspect_ratio is custom.",
+    ):
+        validate_model_parameters(
+            {"width": 1024, "height": 768},
+            model=MODEL_REGISTRY["flux-flex"],
+        )
 
 
 def test_validate_flux_flex_rejects_seedream_only_parameter():

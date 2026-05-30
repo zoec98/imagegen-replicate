@@ -96,10 +96,19 @@ def test_index_exposes_model_registry_metadata(app_factory):
     flux = next(model for model in registry if model["alias"] == "flux-flex")
     assert flux["display_name"] == "Flux 2 Flex"
     assert flux["source_image_parameter"] == "input_images"
+    assert flux["custom_dimensions"] == {
+        "activation_parameter": "aspect_ratio",
+        "activation_value": "custom",
+        "scale_parameter": "resolution",
+        "width_parameter": "width",
+        "height_parameter": "height",
+    }
     assert {parameter["name"] for parameter in flux["parameters"]} >= {
         "guidance",
         "output_format",
     }
+    seed = next(parameter for parameter in flux["parameters"] if parameter["name"] == "seed")
+    assert seed["semantic_type"] == "seed"
     assert "prompt" not in {parameter["name"] for parameter in flux["parameters"]}
 
 
@@ -290,6 +299,64 @@ def test_api_generate_accepts_flux_flex_model_payload(app_factory):
         "guidance": 5.5,
         "output_format": "png",
         "output_quality": 80,
+    }
+
+
+def test_api_generate_accepts_flux_flex_custom_dimensions_and_blank_seed(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "model": "flux-flex",
+            "prompt": "a small red house",
+            "parameters": {
+                "aspect_ratio": "custom",
+                "width": "1024",
+                "height": "768",
+                "seed": "",
+            },
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 202
+    assert response.json["model"] == "flux-flex"
+    assert response.json["parameters"] == {
+        "aspect_ratio": "custom",
+        "width": 1024,
+        "height": 768,
+        "safety_tolerance": 2,
+        "prompt_upsampling": True,
+        "steps": 30,
+        "guidance": 4.5,
+        "output_format": "webp",
+        "output_quality": 80,
+    }
+
+
+def test_api_generate_rejects_flux_flex_dimensions_without_custom_aspect_ratio(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "model": "flux-flex",
+            "prompt": "a small red house",
+            "parameters": {"width": 1024, "height": 768},
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {
+        "error": "width and height are only allowed when aspect_ratio is custom."
     }
 
 

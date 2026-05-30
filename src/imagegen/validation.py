@@ -11,7 +11,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from imagegen.model_registry import ModelParameter, ReplicateModel
+from imagegen.model_registry import (
+    CustomDimensionsControl,
+    ModelParameter,
+    ReplicateModel,
+)
 from imagegen.source_images import SourceImageError, validate_source_images
 
 
@@ -88,13 +92,19 @@ def validate_model_parameters(
             continue
         if parameter.name in raw_parameters:
             raw_value = raw_parameters[parameter.name]
+            if _omit_blank_parameter(parameter, raw_value):
+                continue
         elif _has_default(parameter):
             raw_value = parameter.default
         else:
             continue
         validated[parameter.name] = _validate_parameter_value(parameter, raw_value)
 
-    return validated
+    return _normalize_model_parameters(
+        validated,
+        raw_parameters=raw_parameters,
+        model=model,
+    )
 
 
 def _validate_parameter_value(parameter: ModelParameter, value: Any) -> object:
@@ -122,6 +132,55 @@ def _validate_parameter_value(parameter: ModelParameter, value: Any) -> object:
 
 def _has_default(parameter: ModelParameter) -> bool:
     return parameter.default != "" and parameter.default != ()
+
+
+def _omit_blank_parameter(parameter: ModelParameter, value: Any) -> bool:
+    return parameter.semantic_type == "seed" and value == ""
+
+
+def _normalize_model_parameters(
+    validated: dict[str, object],
+    *,
+    raw_parameters: dict[str, Any],
+    model: ReplicateModel,
+) -> dict[str, object]:
+    control = model.custom_dimensions
+    if control is None:
+        return validated
+
+    is_custom_dimensions = (
+        validated.get(control.activation_parameter) == control.activation_value
+    )
+    width_sent = control.width_parameter in raw_parameters
+    height_sent = control.height_parameter in raw_parameters
+
+    if not is_custom_dimensions:
+        if width_sent or height_sent:
+            raise ValidationError(
+                f"{control.width_parameter} and {control.height_parameter} are only "
+                f"allowed when {control.activation_parameter} is "
+                f"{control.activation_value}.",
+            )
+        validated.pop(control.width_parameter, None)
+        validated.pop(control.height_parameter, None)
+        return validated
+
+    validated.pop(control.scale_parameter, None)
+    _require_custom_dimension(validated, control, control.width_parameter)
+    _require_custom_dimension(validated, control, control.height_parameter)
+    return validated
+
+
+def _require_custom_dimension(
+    validated: dict[str, object],
+    control: CustomDimensionsControl,
+    parameter_name: str,
+) -> None:
+    if parameter_name not in validated:
+        raise ValidationError(
+            f"{parameter_name} is required when {control.activation_parameter} is "
+            f"{control.activation_value}.",
+        )
 
 
 def _validate_select(parameter: ModelParameter, value: Any) -> object:

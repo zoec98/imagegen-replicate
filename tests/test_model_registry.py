@@ -54,6 +54,7 @@ def test_flux_flex_registry_entry_has_schema_parameters():
         parameter.name: parameter
         for parameter in MODEL_REGISTRY["flux-flex"].parameters
     }
+    control = MODEL_REGISTRY["flux-flex"].custom_dimensions
 
     assert {
         "prompt",
@@ -85,3 +86,10 @@ def test_flux_flex_registry_entry_has_schema_parameters():
     )
     assert parameters["guidance"].type == "number"
     assert parameters["guidance"].default == 4.5
+    assert parameters["seed"].semantic_type == "seed"
+    assert control is not None
+    assert control.activation_parameter == "aspect_ratio"
+    assert control.activation_value == "custom"
+    assert control.scale_parameter == "resolution"
+    assert control.width_parameter == "width"
+    assert control.height_parameter == "height"

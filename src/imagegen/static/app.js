@@ -38,6 +38,7 @@
   }
 
   const modelRegistry = loadModelRegistry();
+  const parameterState = {};
 
   function selectedModel() {
     const selectedAlias = modelSelector?.value;
@@ -60,6 +61,46 @@
     message.className = `message message-${category}`;
     message.textContent = text;
     messages.append(message);
+  }
+
+  function readControlValue(control) {
+    return control.type === "checkbox" ? control.checked : control.value;
+  }
+
+  function syncParameterStateFromDom() {
+    const controls = form.querySelectorAll(".parameter-grid input, .parameter-grid select");
+    controls.forEach((control) => {
+      if (!control.name) {
+        return;
+      }
+      parameterState[control.name] = readControlValue(control);
+    });
+  }
+
+  function parameterMetadata(model, name) {
+    if (!model || !Array.isArray(model.parameters)) {
+      return null;
+    }
+    return model.parameters.find((parameter) => parameter.name === name) || null;
+  }
+
+  function customDimensions(model) {
+    return model?.custom_dimensions || null;
+  }
+
+  function isCustomDimensionsActive(model) {
+    const control = customDimensions(model);
+    if (!control) {
+      return false;
+    }
+    const activationParameter = parameterMetadata(model, control.activation_parameter);
+    const activationValue = Object.prototype.hasOwnProperty.call(
+      parameterState,
+      control.activation_parameter,
+    )
+      ? parameterState[control.activation_parameter]
+      : activationParameter?.default;
+    return activationValue === control.activation_value;
   }
 
   function setGenerating(isGenerating) {
@@ -98,17 +139,37 @@
   }
 
   function collectParameters() {
+    syncParameterStateFromDom();
+    const model = selectedModel();
+    if (!model || !Array.isArray(model.parameters)) {
+      return {};
+    }
     const parameters = {};
-    const controls = form.querySelectorAll(".parameter-grid input, .parameter-grid select");
-    controls.forEach((control) => {
-      if (!control.name || control.disabled) {
+    const control = customDimensions(model);
+    const customActive = isCustomDimensionsActive(model);
+
+    model.parameters.forEach((parameter) => {
+      if (!parameter.name) {
         return;
       }
-      if (control.type === "checkbox") {
-        parameters[control.name] = control.checked;
+      const value = Object.prototype.hasOwnProperty.call(parameterState, parameter.name)
+        ? parameterState[parameter.name]
+        : parameter.default;
+      if (parameter.semantic_type === "seed" && value === "") {
         return;
       }
-      parameters[control.name] = control.value;
+      if (control) {
+        if (
+          !customActive &&
+          (parameter.name === control.width_parameter || parameter.name === control.height_parameter)
+        ) {
+          return;
+        }
+        if (customActive && parameter.name === control.scale_parameter) {
+          return;
+        }
+      }
+      parameters[parameter.name] = value;
     });
     return parameters;
   }
@@ -117,14 +178,25 @@
     return name.replaceAll("_", " ");
   }
 
+  function parameterValue(parameter) {
+    const current = Object.prototype.hasOwnProperty.call(parameterState, parameter.name)
+      ? parameterState[parameter.name]
+      : parameter.default;
+    if (Array.isArray(parameter.choices) && parameter.choices.length > 0) {
+      return parameter.choices.includes(current) ? current : parameter.default;
+    }
+    return current;
+  }
+
   function parameterInput(parameter) {
+    const value = parameterValue(parameter);
     if (Array.isArray(parameter.choices) && parameter.choices.length > 0) {
       const select = document.createElement("select");
       parameter.choices.forEach((choice) => {
         const option = document.createElement("option");
         option.value = String(choice);
         option.textContent = String(choice);
-        if (choice === parameter.default) {
+        if (choice === value) {
           option.selected = true;
         }
         select.append(option);
@@ -146,12 +218,15 @@
       }
     } else if (parameter.type === "boolean") {
       input.type = "checkbox";
-      input.checked = parameter.default === true;
+      input.checked = value === true;
     } else {
       input.type = "text";
     }
-    if (parameter.default !== null && parameter.default !== undefined && parameter.default !== "") {
-      input.value = String(parameter.default);
+    if (parameter.semantic_type === "seed") {
+      input.placeholder = "Random";
+    }
+    if (value !== null && value !== undefined && value !== "") {
+      input.value = String(value);
     }
     return input;
   }
@@ -164,7 +239,19 @@
     if (!Array.isArray(model.parameters)) {
       return;
     }
+    const dimensionControl = customDimensions(model);
+    const customActive = isCustomDimensionsActive(model);
     model.parameters.forEach((parameter) => {
+      if (
+        dimensionControl &&
+        !customActive &&
+        (parameter.name === dimensionControl.width_parameter || parameter.name === dimensionControl.height_parameter)
+      ) {
+        return;
+      }
+      if (dimensionControl && customActive && parameter.name === dimensionControl.scale_parameter) {
+        return;
+      }
       const id = `parameter-${parameter.name}`;
       const label = document.createElement("label");
       label.className = "field";
@@ -361,6 +448,23 @@
   });
   modelSelector?.addEventListener("change", () => {
     renderParameters(selectedModel());
+  });
+  parameterGrid?.addEventListener("input", (event) => {
+    const control = event.target;
+    if (!control?.name) {
+      return;
+    }
+    parameterState[control.name] = readControlValue(control);
+  });
+  parameterGrid?.addEventListener("change", (event) => {
+    const control = event.target;
+    if (!control?.name) {
+      return;
+    }
+    parameterState[control.name] = readControlValue(control);
+    if (control.name === customDimensions(selectedModel())?.activation_parameter) {
+      renderParameters(selectedModel());
+    }
   });
   renderParameters(selectedModel());
   form.addEventListener("submit", submitGeneration);

@@ -20,7 +20,12 @@ from werkzeug.utils import secure_filename
 
 from imagegen.app_version import app_checksum
 from imagegen.gallery import IMAGE_EXTENSIONS, list_gallery_images
-from imagegen.model_registry import MODEL_REGISTRY, ModelParameter, ReplicateModel
+from imagegen.model_registry import (
+    MODEL_REGISTRY,
+    CustomDimensionsControl,
+    ModelParameter,
+    ReplicateModel,
+)
 from imagegen.security import ensure_csrf_token
 
 
@@ -100,6 +105,7 @@ def _model_json(model: ReplicateModel) -> dict[str, object]:
         "display_name": model.display_name,
         "edit_capable": model.edit_capable,
         "source_image_parameter": model.source_image_parameter,
+        "custom_dimensions": _custom_dimensions_json(model.custom_dimensions),
         "parameters": [
             _parameter_json(parameter)
             for parameter in sorted(
@@ -121,4 +127,19 @@ def _parameter_json(parameter: ModelParameter) -> dict[str, object]:
         "minimum": parameter.minimum,
         "maximum": parameter.maximum,
         "order": parameter.order,
+        "semantic_type": parameter.semantic_type,
+    }
+
+
+def _custom_dimensions_json(
+    control: CustomDimensionsControl | None,
+) -> dict[str, object] | None:
+    if control is None:
+        return None
+    return {
+        "activation_parameter": control.activation_parameter,
+        "activation_value": control.activation_value,
+        "scale_parameter": control.scale_parameter,
+        "width_parameter": control.width_parameter,
+        "height_parameter": control.height_parameter,
     }
