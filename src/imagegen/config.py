@@ -34,6 +34,11 @@ ENV_SETTINGS: tuple[EnvSetting, ...] = (
         comment="Directory where downloaded generated images and metadata are stored.",
     ),
     EnvSetting(
+        name="IMAGEGEN_FRAGMENT_ROOT",
+        default="data/fragments",
+        comment="Directory where prompt palette fragment files are stored.",
+    ),
+    EnvSetting(
         name="IMAGEGEN_DB_PATH",
         default="data/imagegen.sqlite3",
         comment="SQLite database path for durable generation request history.",
@@ -83,6 +88,7 @@ ENV_SETTINGS: tuple[EnvSetting, ...] = (
 class AppConfig:
     replicate_api_token: str
     output_dir: Path
+    fragment_root: Path
     generation_log_path: Path
     immich_url: str
     immich_gallery_id: str
@@ -140,6 +146,11 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
     output_dir = Path(os.getenv("IMAGEGEN_OUTPUT_DIR", "data/images")).expanduser()
     if not output_dir.is_absolute():
         output_dir = env_file.parent / output_dir
+    fragment_root = Path(
+        os.getenv("IMAGEGEN_FRAGMENT_ROOT", "data/fragments")
+    ).expanduser()
+    if not fragment_root.is_absolute():
+        fragment_root = env_file.parent / fragment_root
     generation_log_path = Path(
         os.getenv("IMAGEGEN_DB_PATH", "data/imagegen.sqlite3")
     ).expanduser()
@@ -149,6 +160,7 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
     return AppConfig(
         replicate_api_token=os.getenv("REPLICATE_API_TOKEN", "").strip(),
         output_dir=output_dir,
+        fragment_root=fragment_root,
         generation_log_path=generation_log_path,
         immich_url=os.getenv("IMMICH_URL", "").strip().rstrip("/"),
         immich_gallery_id=os.getenv("IMMICH_GALLERY_ID", "").strip(),

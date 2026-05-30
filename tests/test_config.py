@@ -14,6 +14,7 @@ def test_ensure_env_file_creates_expected_defaults(tmp_path):
     content = env_path.read_text(encoding="utf-8")
     assert "REPLICATE_API_TOKEN=" in content
     assert "IMAGEGEN_OUTPUT_DIR=data/images" in content
+    assert "IMAGEGEN_FRAGMENT_ROOT=data/fragments" in content
     assert "IMAGEGEN_DB_PATH=data/imagegen.sqlite3" in content
     assert "IMMICH_URL=" in content
     assert "IMMICH_GALLERY_ID=" in content
@@ -51,6 +52,7 @@ def test_write_env_example_uses_non_secret_defaults(tmp_path):
 
     content = example_path.read_text(encoding="utf-8")
     assert "REPLICATE_API_TOKEN=" in content
+    assert "IMAGEGEN_FRAGMENT_ROOT=data/fragments" in content
     assert "IMAGEGEN_DB_PATH=data/imagegen.sqlite3" in content
     assert "IMMICH_URL=" in content
     assert "IMMICH_GALLERY_ID=" in content
@@ -61,6 +63,7 @@ def test_write_env_example_uses_non_secret_defaults(tmp_path):
 def test_load_config_reads_env_file(tmp_path, monkeypatch):
     monkeypatch.delenv("REPLICATE_API_TOKEN", raising=False)
     monkeypatch.delenv("IMAGEGEN_OUTPUT_DIR", raising=False)
+    monkeypatch.delenv("IMAGEGEN_FRAGMENT_ROOT", raising=False)
     monkeypatch.delenv("IMAGEGEN_MODEL", raising=False)
     monkeypatch.delenv("IMAGEGEN_DB_PATH", raising=False)
     monkeypatch.delenv("IMMICH_URL", raising=False)
@@ -73,6 +76,7 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     env_path.write_text(
         "REPLICATE_API_TOKEN=test-token\n"
         "IMAGEGEN_OUTPUT_DIR=custom/images\n"
+        "IMAGEGEN_FRAGMENT_ROOT=custom/fragments\n"
         "IMAGEGEN_DB_PATH=custom/imagegen.sqlite3\n"
         "IMMICH_URL=https://immich.example.test/\n"
         "IMMICH_GALLERY_ID=album-123\n"
@@ -88,6 +92,7 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
 
     assert config.replicate_api_token == "test-token"
     assert config.output_dir == tmp_path / "custom/images"
+    assert config.fragment_root == tmp_path / "custom/fragments"
     assert config.generation_log_path == tmp_path / "custom/imagegen.sqlite3"
     assert config.immich_url == "https://immich.example.test"
     assert config.immich_gallery_id == "album-123"
