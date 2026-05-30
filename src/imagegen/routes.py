@@ -106,6 +106,7 @@ def _model_json(model: ReplicateModel) -> dict[str, object]:
         "display_name": model.display_name,
         "edit_capable": model.edit_capable,
         "source_image_parameter": model.source_image_parameter,
+        "source_image_max": model.source_image_max,
         "custom_dimensions": _custom_dimensions_json(model.custom_dimensions),
         "pricing": [_pricing_json(pricing) for pricing in model.pricing],
         "parameters": [

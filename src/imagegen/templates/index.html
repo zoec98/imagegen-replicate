@@ -49,11 +49,24 @@
                   </span>
                 </span>
               </span>
-              <select id="model-selector" name="model">
-                {% for registry_model in model_registry %}
-                  <option value="{{ registry_model.alias }}" {% if registry_model.alias == model.alias %}selected{% endif %}>{{ registry_model.display_name }}</option>
-                {% endfor %}
-              </select>
+              <div class="model-control-row">
+                <select id="model-selector" name="model">
+                  {% for registry_model in model_registry %}
+                    <option value="{{ registry_model.alias }}" {% if registry_model.alias == model.alias %}selected{% endif %}>{{ registry_model.display_name }}</option>
+                  {% endfor %}
+                </select>
+                <div class="edit-controls">
+                  <button
+                    class="edit-toggle"
+                    type="button"
+                    aria-pressed="false"
+                    aria-describedby="source-selection-status"
+                  >Edit</button>
+                  <span class="source-counter" aria-live="polite">0 selected</span>
+                  <button class="source-clear" type="button" hidden>Clear</button>
+                  <span id="source-selection-status" class="source-selection-status" aria-live="polite"></span>
+                </div>
+              </div>
               <label for="prompt">Prompt</label>
             </div>
             <button class="generate-button" type="submit" data-default-label="Generate">Generate</button>
@@ -94,10 +107,15 @@
         </div>
         <div class="gallery">
         {% for image in images %}
-          <figure class="gallery-item">
+          <figure class="gallery-item" data-filename="{{ image.filename }}">
             <a href="{{ image.url }}" target="_blank" rel="noopener">
               <img src="{{ image.url }}" alt="{{ image.filename }}">
             </a>
+            <button
+              class="source-select"
+              type="button"
+              aria-label="Select {{ image.filename }} as source image"
+            ></button>
             <figcaption>{{ image.filename }}</figcaption>
           </figure>
         {% else %}

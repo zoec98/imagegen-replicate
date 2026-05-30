@@ -10,6 +10,10 @@
   const pricingTooltip = form.querySelector(".pricing-tooltip");
   const parameterGrid = form.querySelector(".parameter-grid");
   const generateButton = form.querySelector(".generate-button");
+  const editToggle = form.querySelector(".edit-toggle");
+  const sourceCounter = form.querySelector(".source-counter");
+  const sourceClear = form.querySelector(".source-clear");
+  const sourceSelectionStatus = form.querySelector(".source-selection-status");
   const messages = form.querySelector(".messages");
   const gallery = document.querySelector(".gallery");
   const csrfToken = document
@@ -41,6 +45,8 @@
 
   const modelRegistry = loadModelRegistry();
   const parameterState = {};
+  const selectedSourceImages = new Set();
+  let editModeEnabled = false;
 
   function selectedModel() {
     const selectedAlias = modelSelector?.value;
@@ -63,6 +69,89 @@
     message.className = `message message-${category}`;
     message.textContent = text;
     messages.append(message);
+  }
+
+  function sourceImageLimit(model) {
+    const limit = Number.parseInt(model?.source_image_max, 10);
+    return Number.isFinite(limit) && limit > 0 ? limit : 0;
+  }
+
+  function sourceStatus(text, isError = false) {
+    if (!sourceSelectionStatus) {
+      return;
+    }
+    sourceSelectionStatus.textContent = text || "";
+    sourceSelectionStatus.classList.toggle("source-selection-status-error", isError);
+  }
+
+  function clearSelectedSources() {
+    selectedSourceImages.clear();
+    updateSourceSelectionUi();
+  }
+
+  function setEditMode(enabled) {
+    const model = selectedModel();
+    editModeEnabled = Boolean(enabled && model?.edit_capable);
+    if (!editModeEnabled) {
+      selectedSourceImages.clear();
+      sourceStatus("");
+    }
+    updateSourceSelectionUi();
+  }
+
+  function updateSourceSelectionUi() {
+    const model = selectedModel();
+    const editCapable = Boolean(model?.edit_capable);
+    const count = selectedSourceImages.size;
+
+    if (editToggle) {
+      editToggle.disabled = !editCapable;
+      editToggle.setAttribute("aria-pressed", editModeEnabled ? "true" : "false");
+      editToggle.classList.toggle("edit-toggle-active", editModeEnabled);
+    }
+    if (sourceCounter) {
+      sourceCounter.textContent = `${count} selected`;
+    }
+    if (sourceClear) {
+      sourceClear.hidden = count === 0;
+      sourceClear.disabled = count === 0;
+    }
+    gallery?.classList.toggle("gallery-edit-active", editModeEnabled);
+    gallery?.querySelectorAll(".gallery-item").forEach((figure) => {
+      const filename = figure.dataset.filename;
+      const selected = Boolean(filename && selectedSourceImages.has(filename));
+      figure.classList.toggle("gallery-item-selected", selected);
+      const button = figure.querySelector(".source-select");
+      if (!button) {
+        return;
+      }
+      button.disabled = !editModeEnabled;
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
+      button.setAttribute(
+        "aria-label",
+        `${selected ? "Deselect" : "Select"} ${filename || "image"} as source image`,
+      );
+    });
+  }
+
+  function toggleSourceImage(filename) {
+    if (!editModeEnabled || !filename) {
+      return;
+    }
+    if (selectedSourceImages.has(filename)) {
+      selectedSourceImages.delete(filename);
+      sourceStatus("");
+      updateSourceSelectionUi();
+      return;
+    }
+    const limit = sourceImageLimit(selectedModel());
+    if (limit > 0 && selectedSourceImages.size >= limit) {
+      sourceStatus(`Select up to ${limit} source image${limit === 1 ? "" : "s"}.`, true);
+      return;
+    }
+    selectedSourceImages.add(filename);
+    sourceStatus("");
+    updateSourceSelectionUi();
   }
 
   function readControlValue(control) {
@@ -310,6 +399,7 @@
   function imageFigure(image) {
     const figure = document.createElement("figure");
     figure.className = "gallery-item";
+    figure.dataset.filename = image.filename;
     if (image.metadata_url) {
       figure.dataset.metadataUrl = image.metadata_url;
     }
@@ -333,7 +423,15 @@
     caption.textContent = image.filename;
 
     link.append(img);
-    figure.append(link, caption);
+    const sourceButton = document.createElement("button");
+    sourceButton.className = "source-select";
+    sourceButton.type = "button";
+    sourceButton.setAttribute(
+      "aria-label",
+      `Select ${image.filename} as source image`,
+    );
+
+    figure.append(link, sourceButton, caption);
     return figure;
   }
 
@@ -357,6 +455,7 @@
       return;
     }
     data.images.forEach((image) => gallery.append(imageFigure(image)));
+    updateSourceSelectionUi();
   }
 
   function finishGeneration(data) {
@@ -469,8 +568,29 @@
   });
   modelSelector?.addEventListener("change", () => {
     const model = selectedModel();
+    selectedSourceImages.clear();
+    if (!model?.edit_capable) {
+      editModeEnabled = false;
+    }
+    sourceStatus("");
     renderPricing(model);
     renderParameters(model);
+    updateSourceSelectionUi();
+  });
+  editToggle?.addEventListener("click", () => {
+    setEditMode(!editModeEnabled);
+  });
+  sourceClear?.addEventListener("click", () => {
+    clearSelectedSources();
+    sourceStatus("");
+  });
+  gallery?.addEventListener("click", (event) => {
+    const button = event.target.closest(".source-select");
+    if (!button) {
+      return;
+    }
+    const figure = button.closest(".gallery-item");
+    toggleSourceImage(figure?.dataset.filename || "");
   });
   parameterGrid?.addEventListener("input", (event) => {
     const control = event.target;
@@ -491,5 +611,6 @@
   });
   renderPricing(selectedModel());
   renderParameters(selectedModel());
+  updateSourceSelectionUi();
   form.addEventListener("submit", submitGeneration);
 })();

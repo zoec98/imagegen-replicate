@@ -46,6 +46,19 @@ body {
   gap: 0.375rem;
 }
 
+.model-control-row {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.model-control-row select {
+  flex: 0 0 auto;
+  max-width: 100%;
+  width: auto;
+}
+
 .model-selector-label {
   color: #5f6b7a;
   font-size: 0.8125rem;
@@ -186,6 +199,65 @@ select {
   width: 100%;
 }
 
+.edit-controls {
+  align-items: center;
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.edit-toggle,
+.source-clear {
+  border: 1px solid #8b98a8;
+  border-radius: 6px;
+  color: #334155;
+  font: inherit;
+  min-height: 2.5rem;
+  padding: 0 0.75rem;
+}
+
+.edit-toggle {
+  background: #ffffff;
+}
+
+.edit-toggle-active {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+
+.edit-toggle:disabled {
+  background: #edf0f4;
+  border-color: #d1d7df;
+  color: #8b98a8;
+  cursor: not-allowed;
+}
+
+.source-counter {
+  color: #435063;
+  font-size: 0.8125rem;
+}
+
+.source-clear {
+  background: #f8fafc;
+}
+
+.source-clear[hidden] {
+  display: none;
+}
+
+.source-selection-status {
+  color: #435063;
+  flex: 1 1 12rem;
+  font-size: 0.8125rem;
+  min-height: 1rem;
+}
+
+.source-selection-status-error {
+  color: #b00020;
+}
+
 .messages {
   display: grid;
   gap: 0.25rem;
@@ -240,6 +312,11 @@ select {
   border-radius: 8px;
   margin: 0;
   overflow: hidden;
+  position: relative;
+}
+
+.gallery-item-selected {
+  border-color: #1d4ed8;
 }
 
 .gallery-item a {
@@ -255,6 +332,53 @@ select {
   height: 100%;
   object-fit: contain;
   width: 100%;
+}
+
+.source-select {
+  align-items: center;
+  background: #ffffff;
+  border: 2px solid #1d4ed8;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 18%);
+  color: #1d4ed8;
+  display: none;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  height: 2.75rem;
+  justify-content: center;
+  padding: 0;
+  position: absolute;
+  right: 0.5rem;
+  top: 0.5rem;
+  width: 2.75rem;
+}
+
+.gallery-edit-active .source-select,
+.gallery-item-selected .source-select {
+  display: inline-flex;
+}
+
+.source-select::before {
+  content: "+";
+}
+
+.gallery-item-selected .source-select {
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+.gallery-item-selected .source-select::before {
+  border: solid currentColor;
+  border-width: 0 0.1875rem 0.1875rem 0;
+  content: "";
+  height: 0.75rem;
+  transform: rotate(45deg) translate(-0.0625rem, -0.125rem);
+  width: 0.375rem;
+}
+
+.source-select:disabled {
+  cursor: default;
 }
 
 .gallery-item figcaption {

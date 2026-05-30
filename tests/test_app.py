@@ -75,6 +75,9 @@ def test_index_renders_prompt_form(app_factory):
     assert b'data-poll-seconds="1.0"' in response.data
     assert b'class="messages" aria-live="polite"' in response.data
     assert b'id="model-selector"' in response.data
+    assert b'class="edit-toggle"' in response.data
+    assert b'class="source-counter" aria-live="polite">0 selected' in response.data
+    assert b'class="source-clear"' in response.data
     assert b'class="pricing-info"' in response.data
     assert b'aria-label="Pricing information"' in response.data
     assert b'class="pricing-tooltip"' in response.data
@@ -98,6 +101,8 @@ def test_index_exposes_model_registry_metadata(app_factory):
     aliases = {model["alias"] for model in registry}
     assert aliases == {"flux-flex", "seedream45"}
     seedream = next(model for model in registry if model["alias"] == "seedream45")
+    assert seedream["edit_capable"] is True
+    assert seedream["source_image_max"] == 14
     assert seedream["pricing"] == [
         {
             "price": "$0.04",
@@ -110,7 +115,9 @@ def test_index_exposes_model_registry_metadata(app_factory):
     ]
     flux = next(model for model in registry if model["alias"] == "flux-flex")
     assert flux["display_name"] == "Flux 2 Flex"
+    assert flux["edit_capable"] is True
     assert flux["source_image_parameter"] == "input_images"
+    assert flux["source_image_max"] == 10
     assert flux["pricing"] == [
         {
             "price": "$0.06",
@@ -185,6 +192,17 @@ def test_index_lists_existing_images(tmp_path, app_factory):
     assert b'href="/images/first.png"' in response.data
     assert b"animated.gif" not in response.data
     assert b"ignore.txt" not in response.data
+
+
+def test_index_exposes_gallery_filenames_for_source_selection(tmp_path, app_factory):
+    (tmp_path / "source.png").write_bytes(b"image")
+    client = app_factory().test_client()
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b'class="gallery-item" data-filename="source.png"' in response.data
+    assert b'aria-label="Select source.png as source image"' in response.data
 
 
 def test_image_route_serves_stored_file(tmp_path, app_factory):
