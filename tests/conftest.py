@@ -15,6 +15,7 @@ def app_config(tmp_path):
     return AppConfig(
         replicate_api_token="",
         output_dir=tmp_path,
+        generation_log_path=tmp_path / "imagegen.sqlite3",
         model_alias="seedream45",
         model=MODEL_REGISTRY["seedream45"],
         flask_secret_key="test-secret",

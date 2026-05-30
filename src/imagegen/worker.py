@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Protocol
 
 from imagegen.config import AppConfig
+from imagegen.generation_log import GenerationLog
 from imagegen.replicate_client import (
     ReplicatePredictionTimeout,
     ReplicateResult,
@@ -36,11 +37,13 @@ class ThreadedGenerationWorker:
         *,
         store: RequestStore,
         app_config: AppConfig,
+        generation_log: GenerationLog | None = None,
         generate: GenerateImage = generate_image_urls,
         executor: ThreadPoolExecutor | None = None,
     ) -> None:
         self._store = store
         self._app_config = app_config
+        self._generation_log = generation_log
         self._generate = generate
         self._executor = executor or ThreadPoolExecutor(
             max_workers=1,
@@ -54,6 +57,7 @@ class ThreadedGenerationWorker:
             request_record,
             self._app_config,
             self._generate,
+            self._generation_log,
         )
 
 
@@ -62,8 +66,11 @@ def run_generation_request(
     request_record: GenerationRequest,
     app_config: AppConfig,
     generate: GenerateImage = generate_image_urls,
+    generation_log: GenerationLog | None = None,
 ) -> None:
     store.update(request_record.request_id, status="running")
+    if generation_log is not None:
+        generation_log.mark_started(request_record.request_id)
     try:
         result = generate(
             request_record.prompt,
@@ -76,19 +83,47 @@ def run_generation_request(
         )
     except ReplicatePredictionTimeout as error:
         store.update(request_record.request_id, status="timeout", error=str(error))
+        if generation_log is not None:
+            generation_log.mark_finished(
+                request_record.request_id,
+                status="timeout",
+                error=str(error),
+            )
         return
     except Exception as error:
         store.update(request_record.request_id, status="failed", error=str(error))
+        if generation_log is not None:
+            generation_log.mark_finished(
+                request_record.request_id,
+                status="failed",
+                error=str(error),
+            )
         return
 
+    logs = result.logs.splitlines() if result.logs else []
     store.update(
         request_record.request_id,
         status="succeeded",
         prediction_id=result.prediction_id,
         output_urls=result.output_urls,
         images=[_stored_image_filename(image) for image in result.stored_images],
-        logs=result.logs.splitlines() if result.logs else [],
+        logs=logs,
     )
+    if generation_log is not None:
+        generation_log.mark_finished(
+            request_record.request_id,
+            status="succeeded",
+            prediction_id=result.prediction_id,
+            logs=logs,
+        )
+        for sequence, image in enumerate(result.stored_images, start=1):
+            if hasattr(image, "path"):
+                generation_log.add_result(
+                    request_record.request_id,
+                    sequence=sequence,
+                    image=image,
+                    logs=logs,
+                )
 
 
 def _stored_image_filename(image: object) -> str:

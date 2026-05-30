@@ -137,6 +137,8 @@ def build_prediction_input(
     for parameter in model.parameters:
         if parameter.name == "prompt":
             prediction_input[parameter.name] = prompt
+        elif parameter.name == "image_input":
+            continue
         elif parameter.default != "":
             prediction_input[parameter.name] = parameter.default
     if parameters:

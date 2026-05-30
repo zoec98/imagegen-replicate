@@ -30,7 +30,8 @@ Set your Replicate API token:
 export REPLICATE_API_TOKEN="your-token"
 ```
 
-For local development, you can place environment setup in your shell profile or a local `.env` file if the application adds dotenv support later. Do not commit secrets.
+For local development, you can place environment setup in your shell profile or
+a local `.env` file. Do not commit secrets.
 
 ## Running
 
@@ -67,7 +68,10 @@ The planned UI flow is:
 9. Preview the returned image results.
 10. Download or reuse the generated files from the local results area.
 
-Generated files should be downloaded from Replicate and stored locally by the application with embedded metadata, including the model, prompt, parameters, source URL, and creation time.
+Generated files are downloaded from Replicate into `data/images` by default.
+The app embeds image metadata in PNG, JPEG, and WebP files, including the model,
+prompt, parameters, source URL, and creation time. It also records durable
+generation history in SQLite at `data/imagegen.sqlite3` by default.
 
 Supported local image formats are PNG, JPEG, and WebP. GIF files are not accepted
 as source images or stored generation results.

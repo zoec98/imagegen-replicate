@@ -34,6 +34,11 @@ ENV_SETTINGS: tuple[EnvSetting, ...] = (
         comment="Directory where downloaded generated images and metadata are stored.",
     ),
     EnvSetting(
+        name="IMAGEGEN_DB_PATH",
+        default="data/imagegen.sqlite3",
+        comment="SQLite database path for durable generation request history.",
+    ),
+    EnvSetting(
         name="IMAGEGEN_MODEL",
         default=DEFAULT_MODEL_ALIAS,
         comment=f"Default model alias. Options: {', '.join(sorted(MODEL_REGISTRY))}.",
@@ -60,6 +65,7 @@ ENV_SETTINGS: tuple[EnvSetting, ...] = (
 class AppConfig:
     replicate_api_token: str
     output_dir: Path
+    generation_log_path: Path
     model_alias: str
     model: ReplicateModel
     flask_secret_key: str
@@ -105,10 +111,16 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
     output_dir = Path(os.getenv("IMAGEGEN_OUTPUT_DIR", "data/images")).expanduser()
     if not output_dir.is_absolute():
         output_dir = env_file.parent / output_dir
+    generation_log_path = Path(
+        os.getenv("IMAGEGEN_DB_PATH", "data/imagegen.sqlite3")
+    ).expanduser()
+    if not generation_log_path.is_absolute():
+        generation_log_path = env_file.parent / generation_log_path
 
     return AppConfig(
         replicate_api_token=os.getenv("REPLICATE_API_TOKEN", "").strip(),
         output_dir=output_dir,
+        generation_log_path=generation_log_path,
         model_alias=model_alias,
         model=model,
         flask_secret_key=os.getenv(

@@ -46,6 +46,8 @@ Preferred structure as the app grows:
 - `src/imagegen/`: application package.
 - `src/imagegen/app.py`: Flask application factory and route registration.
 - `src/imagegen/replicate_client.py`: wrapper around Replicate API calls, downloads, and error handling.
+- `src/imagegen/generation_log.py`: SQLite generation request and result history.
+- `src/imagegen/metadata_embed.py`: embedded image metadata read/write helpers.
 - `src/imagegen/models.py`: configured model metadata and parameter schemas.
 - `src/imagegen/palettes.py`: style and character palette loading and validation.
 - `src/imagegen/templates/`: Jinja templates.
@@ -75,6 +77,8 @@ For generated images:
 - Store downloaded files under an application-controlled output directory.
 - Generate collision-resistant filenames.
 - Preserve useful metadata, such as model name, prompt, parameters, source URL, and creation time.
+- Store generated image metadata in embedded image metadata, not JSON sidecars.
+- Store durable generation request/result history in SQLite under `data/` by default.
 
 ## Model Configuration
 
@@ -181,6 +185,7 @@ Keep this file focused on contributors and agents.
 - Do not make real Replicate API calls from tests.
 - Do not introduce network calls in unit tests unless they are explicitly marked integration tests and skipped by default.
 - Do not store uploaded files or generated outputs in source-controlled paths unless they are intentional fixtures.
+- Do not read or write JSON sidecars for generated-image metadata.
 - Do not overwrite existing user prompts, palette files, or generated outputs without an explicit user action.
 - Do not add broad abstractions before at least two concrete model integrations prove the shape.
 - Do not skip `uv run pytest` and `uv run ruff check src tests` after code changes unless the reason is documented in the final response.

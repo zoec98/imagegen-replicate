@@ -13,6 +13,7 @@ from flask import Flask
 
 from imagegen.api_routes import register_api_routes
 from imagegen.config import AppConfig, load_config
+from imagegen.generation_log import SQLiteGenerationLog
 from imagegen.metadata import EmbeddedImageMetadataProvider
 from imagegen.replicate_client import generate_image_urls
 from imagegen.request_store import RequestStore
@@ -23,22 +24,30 @@ from imagegen.worker import ThreadedGenerationWorker
 
 def create_app(config: dict[str, Any] | None = None) -> Flask:
     app_config = _resolve_app_config(config)
-    request_store = RequestStore()
     app = Flask(__name__)
     app.secret_key = app_config.flask_secret_key
     app.config.update(
         IMAGEGEN_APP_CONFIG=app_config,
         IMAGEGEN_METADATA_PROVIDER=EmbeddedImageMetadataProvider(),
         IMAGEGEN_OUTPUT_DIR=app_config.output_dir,
-        IMAGEGEN_REQUEST_STORE=request_store,
-        IMAGEGEN_WORKER=ThreadedGenerationWorker(
-            store=request_store,
-            app_config=app_config,
-            generate=generate_image_urls,
-        ),
     )
     if config:
         app.config.update(config)
+    request_store = app.config.setdefault("IMAGEGEN_REQUEST_STORE", RequestStore())
+    generation_log = app.config.setdefault(
+        "IMAGEGEN_GENERATION_LOG",
+        SQLiteGenerationLog(app_config.generation_log_path),
+    )
+    generation_log.initialize()
+    app.config.setdefault(
+        "IMAGEGEN_WORKER",
+        ThreadedGenerationWorker(
+            store=request_store,
+            app_config=app_config,
+            generation_log=generation_log,
+            generate=generate_image_urls,
+        ),
+    )
     app.after_request(no_cors_response)
     register_routes(app)
     register_api_routes(app)

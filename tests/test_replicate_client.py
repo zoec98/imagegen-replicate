@@ -42,6 +42,7 @@ def app_config(tmp_path):
     return AppConfig(
         replicate_api_token="test-token",
         output_dir=tmp_path,
+        generation_log_path=tmp_path / "imagegen.sqlite3",
         model_alias="seedream45",
         model=MODEL_REGISTRY["seedream45"],
         flask_secret_key="test-secret",
@@ -59,6 +60,7 @@ def test_build_prediction_input_includes_defaults_and_fixed_inputs():
     assert payload["sequential_image_generation"] == "disabled"
     assert payload["max_images"] == 1
     assert payload["disable_safety_checker"] is True
+    assert "image_input" not in payload
 
 
 def test_build_prediction_input_applies_validated_parameters():

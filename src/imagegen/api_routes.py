@@ -14,6 +14,8 @@ from flask import Flask, jsonify, request, url_for
 
 from imagegen.app_version import app_checksum
 from imagegen.gallery import GalleryImage, list_gallery_images
+from imagegen.generation_log import GenerationLog
+from imagegen.replicate_client import build_prediction_input
 from imagegen.request_store import GenerationRequest, RequestStore
 from imagegen.security import require_api_csrf
 from imagegen.validation import ValidationError, validate_generation_payload
@@ -38,10 +40,22 @@ def register_api_routes(app: Flask) -> None:
         except ValidationError as error:
             return jsonify({"error": str(error)}), 400
 
+        app_config = app.config["IMAGEGEN_APP_CONFIG"]
         record = _request_store(app).create(
             prompt=validated.prompt,
             parameters=validated.parameters,
             source_images=validated.source_images,
+        )
+        _generation_log(app).create_request(
+            record,
+            model_alias=app_config.model_alias,
+            model=app_config.model.replicate_model,
+            replicate_input=build_prediction_input(
+                validated.prompt,
+                app_config.model,
+                parameters=validated.parameters,
+                source_image_inputs=validated.source_images,
+            ),
         )
         _generation_worker(app).start(record)
         return jsonify(_request_json(app, record)), 202
@@ -88,6 +102,14 @@ def _generation_worker(app: Flask) -> GenerationWorker:
         msg = "IMAGEGEN_WORKER must provide a start(request_record) method."
         raise TypeError(msg)
     return worker
+
+
+def _generation_log(app: Flask) -> GenerationLog:
+    generation_log = app.config["IMAGEGEN_GENERATION_LOG"]
+    if not hasattr(generation_log, "create_request"):
+        msg = "IMAGEGEN_GENERATION_LOG must provide generation log methods."
+        raise TypeError(msg)
+    return generation_log
 
 
 def _request_json(app: Flask, record: GenerationRequest) -> dict[str, object]:
