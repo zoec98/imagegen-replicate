@@ -6,6 +6,8 @@
 
   const promptInput = form.querySelector("#prompt");
   const modelSelector = form.querySelector("#model-selector");
+  const pricingInfo = form.querySelector(".pricing-info");
+  const pricingTooltip = form.querySelector(".pricing-tooltip");
   const parameterGrid = form.querySelector(".parameter-grid");
   const generateButton = form.querySelector(".generate-button");
   const messages = form.querySelector(".messages");
@@ -272,6 +274,25 @@
     });
   }
 
+  function renderPricing(model) {
+    if (!pricingInfo || !pricingTooltip) {
+      return;
+    }
+    pricingTooltip.replaceChildren();
+    const pricing = Array.isArray(model?.pricing) ? model.pricing : [];
+    pricingInfo.hidden = pricing.length === 0;
+    if (pricing.length === 0) {
+      return;
+    }
+    pricing.forEach((item) => {
+      const line = document.createElement("span");
+      line.textContent = `${item.price} ${item.title}${
+        item.description ? ` ${item.description}` : ""
+      }`;
+      pricingTooltip.append(line);
+    });
+  }
+
   function statusMessage(data) {
     if (data.status === "failed" || data.status === "timeout") {
       return data.error || `Generation ${data.status}.`;
@@ -447,7 +468,9 @@
     showMessage(error.message || "App version check failed.", "error");
   });
   modelSelector?.addEventListener("change", () => {
-    renderParameters(selectedModel());
+    const model = selectedModel();
+    renderPricing(model);
+    renderParameters(model);
   });
   parameterGrid?.addEventListener("input", (event) => {
     const control = event.target;
@@ -466,6 +489,7 @@
       renderParameters(selectedModel());
     }
   });
+  renderPricing(selectedModel());
   renderParameters(selectedModel());
   form.addEventListener("submit", submitGeneration);
 })();

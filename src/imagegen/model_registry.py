@@ -10,6 +10,16 @@ ParameterSemanticType = Literal["seed"]
 
 
 @dataclass(frozen=True)
+class ModelPricing:
+    price: str
+    title: str
+    description: str
+    type: str
+    metric: str
+    metric_count: int
+
+
+@dataclass(frozen=True)
 class CustomDimensionsControl:
     activation_parameter: str
     activation_value: object
@@ -46,6 +56,7 @@ class ReplicateModel:
     source_image_parameter: str | None = None
     source_image_max: int = 14
     custom_dimensions: CustomDimensionsControl | None = None
+    pricing: tuple[ModelPricing, ...] = ()
 
 
 SEEDREAM45 = ReplicateModel(
@@ -59,6 +70,16 @@ SEEDREAM45 = ReplicateModel(
     default_height=2048,
     modes=("text-to-image", "image-edit"),
     source_image_parameter="image_input",
+    pricing=(
+        ModelPricing(
+            price="$0.04",
+            title="per output image",
+            description="or 25 images for $1",
+            type="per-unit",
+            metric="image_output_count",
+            metric_count=1,
+        ),
+    ),
     parameters=(
         ModelParameter(
             name="prompt",
@@ -148,6 +169,24 @@ FLUX_FLEX = ReplicateModel(
     modes=("text-to-image", "image-edit"),
     source_image_parameter="input_images",
     source_image_max=10,
+    pricing=(
+        ModelPricing(
+            price="$0.06",
+            title="per input image megapixel",
+            description="or around 16 megapixels for $1",
+            type="per-unit",
+            metric="image_input_megapixel_count",
+            metric_count=1,
+        ),
+        ModelPricing(
+            price="$0.06",
+            title="per output image megapixel",
+            description="or around 16 megapixels for $1",
+            type="per-unit",
+            metric="image_output_megapixel_count",
+            metric_count=1,
+        ),
+    ),
     parameters=(
         ModelParameter(
             name="prompt",

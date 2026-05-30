@@ -10,6 +10,17 @@ def test_seedream45_registry_entry_identifies_replicate_model():
     assert model.documentation_url.endswith("/api/schema")
 
 
+def test_seedream45_registry_entry_has_pricing():
+    model = MODEL_REGISTRY["seedream45"]
+
+    assert model.pricing[0].price == "$0.04"
+    assert model.pricing[0].title == "per output image"
+    assert model.pricing[0].description == "or 25 images for $1"
+    assert model.pricing[0].type == "per-unit"
+    assert model.pricing[0].metric == "image_output_count"
+    assert model.pricing[0].metric_count == 1
+
+
 def test_seedream45_registry_entry_has_mvp_parameters():
     parameter_names = {
         parameter.name for parameter in MODEL_REGISTRY["seedream45"].parameters
@@ -38,6 +49,18 @@ def test_flux_flex_registry_entry_identifies_replicate_model():
     assert model.source_image_parameter == "input_images"
     assert model.source_image_max == 10
     assert model.fixed_inputs == {}
+
+
+def test_flux_flex_registry_entry_has_pricing():
+    model = MODEL_REGISTRY["flux-flex"]
+
+    assert [pricing.metric for pricing in model.pricing] == [
+        "image_input_megapixel_count",
+        "image_output_megapixel_count",
+    ]
+    assert all(pricing.price == "$0.06" for pricing in model.pricing)
+    assert model.pricing[0].title == "per input image megapixel"
+    assert model.pricing[1].title == "per output image megapixel"
 
 
 def test_flux_flex_registry_entry_has_schema_parameters():

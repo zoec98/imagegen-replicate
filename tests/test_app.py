@@ -75,6 +75,10 @@ def test_index_renders_prompt_form(app_factory):
     assert b'data-poll-seconds="1.0"' in response.data
     assert b'class="messages" aria-live="polite"' in response.data
     assert b'id="model-selector"' in response.data
+    assert b'class="pricing-info"' in response.data
+    assert b'aria-label="Pricing information"' in response.data
+    assert b'class="pricing-tooltip"' in response.data
+    assert b"$0.04 per output image or 25 images for $1" in response.data
     assert b'value="flux-flex"' in response.data
     assert b'value="seedream45" selected' in response.data
     assert b'name="prompt"' in response.data
@@ -93,9 +97,38 @@ def test_index_exposes_model_registry_metadata(app_factory):
 
     aliases = {model["alias"] for model in registry}
     assert aliases == {"flux-flex", "seedream45"}
+    seedream = next(model for model in registry if model["alias"] == "seedream45")
+    assert seedream["pricing"] == [
+        {
+            "price": "$0.04",
+            "title": "per output image",
+            "description": "or 25 images for $1",
+            "type": "per-unit",
+            "metric": "image_output_count",
+            "metric_count": 1,
+        }
+    ]
     flux = next(model for model in registry if model["alias"] == "flux-flex")
     assert flux["display_name"] == "Flux 2 Flex"
     assert flux["source_image_parameter"] == "input_images"
+    assert flux["pricing"] == [
+        {
+            "price": "$0.06",
+            "title": "per input image megapixel",
+            "description": "or around 16 megapixels for $1",
+            "type": "per-unit",
+            "metric": "image_input_megapixel_count",
+            "metric_count": 1,
+        },
+        {
+            "price": "$0.06",
+            "title": "per output image megapixel",
+            "description": "or around 16 megapixels for $1",
+            "type": "per-unit",
+            "metric": "image_output_megapixel_count",
+            "metric_count": 1,
+        },
+    ]
     assert flux["custom_dimensions"] == {
         "activation_parameter": "aspect_ratio",
         "activation_value": "custom",
@@ -107,7 +140,9 @@ def test_index_exposes_model_registry_metadata(app_factory):
         "guidance",
         "output_format",
     }
-    seed = next(parameter for parameter in flux["parameters"] if parameter["name"] == "seed")
+    seed = next(
+        parameter for parameter in flux["parameters"] if parameter["name"] == "seed"
+    )
     assert seed["semantic_type"] == "seed"
     assert "prompt" not in {parameter["name"] for parameter in flux["parameters"]}
 
@@ -338,7 +373,9 @@ def test_api_generate_accepts_flux_flex_custom_dimensions_and_blank_seed(app_fac
     }
 
 
-def test_api_generate_rejects_flux_flex_dimensions_without_custom_aspect_ratio(app_factory):
+def test_api_generate_rejects_flux_flex_dimensions_without_custom_aspect_ratio(
+    app_factory,
+):
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
     token = extract_csrf_token(index)

@@ -32,7 +32,23 @@
         <div class="prompt-panel">
           <div class="prompt-bar">
             <div class="model-heading">
-              <label class="model-selector-label" for="model-selector">Model</label>
+              <span class="model-label-row">
+                <label class="model-selector-label" for="model-selector">Model</label>
+                <span class="pricing-popover">
+                  <button
+                    class="pricing-info"
+                    type="button"
+                    aria-label="Pricing information"
+                    aria-describedby="model-pricing-tooltip"
+                    {% if not model.pricing %}hidden{% endif %}
+                  >i</button>
+                  <span id="model-pricing-tooltip" class="pricing-tooltip" role="tooltip">
+                    {% for pricing in model.pricing %}
+                      <span>{{ pricing.price }} {{ pricing.title }}{% if pricing.description %} {{ pricing.description }}{% endif %}</span>
+                    {% endfor %}
+                  </span>
+                </span>
+              </span>
               <select id="model-selector" name="model">
                 {% for registry_model in model_registry %}
                   <option value="{{ registry_model.alias }}" {% if registry_model.alias == model.alias %}selected{% endif %}>{{ registry_model.display_name }}</option>

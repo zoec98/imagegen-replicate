@@ -25,6 +25,8 @@ class SchemaCandidate:
     version_id: str | None
     created_at: str | None
     schema: dict[str, Any]
+    billing_config: dict[str, Any] | None = None
+    model_name: str | None = None
 
 
 def main() -> int:
@@ -104,36 +106,74 @@ def find_schema_candidates(page: str) -> list[SchemaCandidate]:
             data = json.loads(html.unescape(script_body))
         except json.JSONDecodeError:
             continue
+        billing_config = data.get("billingConfig") if isinstance(data, dict) else None
+        if isinstance(data, dict) and isinstance(billing_config, dict):
+            version = data.get("version")
+            if isinstance(version, dict):
+                candidate = schema_candidate_from_node(
+                    version,
+                    billing_config=billing_config,
+                )
+                if candidate is not None:
+                    candidates.append(candidate)
         for node in walk(data):
             if not isinstance(node, dict):
                 continue
-            extras = node.get("_extras")
-            if not isinstance(extras, dict):
-                continue
-            schema = extras.get("dereferenced_openapi_schema")
-            if not isinstance(schema, dict):
-                continue
-            version_id = node.get("id")
-            created_at = node.get("created_at")
-            candidates.append(
-                SchemaCandidate(
-                    version_id=version_id if isinstance(version_id, str) else None,
-                    created_at=created_at if isinstance(created_at, str) else None,
-                    schema=schema,
-                )
-            )
+            candidate = schema_candidate_from_node(node)
+            if candidate is not None:
+                candidates.append(candidate)
     return candidates
 
 
+def schema_candidate_from_node(
+    node: dict[str, Any],
+    *,
+    billing_config: dict[str, Any] | None = None,
+) -> SchemaCandidate | None:
+    extras = node.get("_extras")
+    if not isinstance(extras, dict):
+        return None
+    schema = extras.get("dereferenced_openapi_schema")
+    if not isinstance(schema, dict):
+        return None
+    version_id = node.get("id")
+    created_at = node.get("created_at")
+    return SchemaCandidate(
+        version_id=version_id if isinstance(version_id, str) else None,
+        created_at=created_at if isinstance(created_at, str) else None,
+        schema=schema,
+        billing_config=billing_config,
+        model_name=model_name_from_extras(extras),
+    )
+
+
+def model_name_from_extras(extras: dict[str, Any]) -> str | None:
+    model = extras.get("model")
+    if not isinstance(model, dict):
+        return None
+    model_extras = model.get("_extras")
+    if isinstance(model_extras, dict) and isinstance(model_extras.get("name"), str):
+        return model_extras["name"]
+    owner = model.get("owner")
+    name = model.get("name")
+    if isinstance(owner, str) and isinstance(name, str):
+        return f"{owner}/{name}"
+    return None
+
+
 def dedupe_candidates(candidates: list[SchemaCandidate]) -> list[SchemaCandidate]:
-    seen: set[tuple[str | None, str]] = set()
+    seen: dict[tuple[str | None, str], int] = {}
     deduped: list[SchemaCandidate] = []
     for candidate in candidates:
         schema_key = json.dumps(candidate.schema, sort_keys=True, separators=(",", ":"))
         key = (candidate.version_id, schema_key)
-        if key in seen:
+        previous_index = seen.get(key)
+        if previous_index is not None:
+            previous = deduped[previous_index]
+            if previous.billing_config is None and candidate.billing_config is not None:
+                deduped[previous_index] = candidate
             continue
-        seen.add(key)
+        seen[key] = len(deduped)
         deduped.append(candidate)
     return deduped
 
@@ -163,6 +203,9 @@ def choose_candidate(
     candidates: list[SchemaCandidate],
     latest_version: str | None,
 ) -> SchemaCandidate:
+    for candidate in candidates:
+        if candidate.billing_config is not None:
+            return candidate
     if latest_version:
         for candidate in candidates:
             if candidate.version_id == latest_version:
@@ -182,6 +225,10 @@ def print_candidate_summary(candidate: SchemaCandidate, *, preferred: bool) -> N
         print(f"- Created at: `{candidate.created_at}`")
     else:
         print("- Created at: not embedded with this schema")
+    if candidate.model_name:
+        print(f"- Embedded model: `{candidate.model_name}`")
+    if candidate.billing_config is not None:
+        print("- Pricing: associated with this embedded schema")
     print()
 
     input_schema = schema_component(candidate.schema, "Input")
@@ -214,6 +261,15 @@ def print_candidate_summary(candidate: SchemaCandidate, *, preferred: bool) -> N
             print(f"- Items: {schema_type(output_schema['items'])}")
         print()
 
+    if candidate.billing_config is not None:
+        print("### Pricing")
+        print()
+        print("| Price | Title | Description | Type | Metric | Metric Count |")
+        print("| --- | --- | --- | --- | --- | ---: |")
+        for price in iter_prices(candidate.billing_config):
+            print(pricing_row(price))
+        print()
+
     print("### Registry Hints")
     print()
     if input_schema:
@@ -232,6 +288,21 @@ def print_candidate_summary(candidate: SchemaCandidate, *, preferred: bool) -> N
             }
             compact = {key: value for key, value in hints.items() if value not in (None, [], "")}
             print(f"- `{name}`: `{json.dumps(compact, ensure_ascii=False)}`")
+    if candidate.billing_config is not None:
+        print()
+        print("#### Pricing")
+        print()
+        for price in iter_prices(candidate.billing_config):
+            hints = {
+                "price": price.get("price", ""),
+                "title": price.get("title", ""),
+                "description": price.get("description", ""),
+                "type": price.get("type", ""),
+                "metric": price.get("metric", ""),
+                "metric_count": price.get("metric_count", 1),
+            }
+            compact = {key: value for key, value in hints.items() if value not in (None, "", [])}
+            print(f"- `{json.dumps(compact, ensure_ascii=False)}`")
     print()
 
 
@@ -253,6 +324,28 @@ def parameter_row(name: str, prop: dict[str, Any], required: list[str]) -> str:
     return f"| {order} | {label} | {type_name} | {default} | {choices} | {bounds} | {description} |"
 
 
+def iter_prices(billing_config: dict[str, Any]) -> list[dict[str, Any]]:
+    prices: list[dict[str, Any]] = []
+    for tier in billing_config.get("current_tiers", []):
+        if not isinstance(tier, dict):
+            continue
+        for price in tier.get("prices", []):
+            if isinstance(price, dict):
+                prices.append(price)
+    return prices
+
+
+def pricing_row(price: dict[str, Any]) -> str:
+    return (
+        f"| {markdown_value(price.get('price', ''))} "
+        f"| {markdown_value(price.get('title', ''))} "
+        f"| {markdown_value(price.get('description', ''))} "
+        f"| {markdown_value(price.get('type', ''))} "
+        f"| {markdown_value(price.get('metric', ''))} "
+        f"| {markdown_value(price.get('metric_count', 1))} |"
+    )
+
+
 def schema_type(prop: dict[str, Any]) -> str:
     type_name = prop.get("type", "unknown")
     item_schema = prop.get("items")
@@ -268,7 +361,7 @@ def registry_type(prop: dict[str, Any]) -> str:
     if prop.get("enum"):
         return "select"
     type_name = prop.get("type")
-    if type_name in {"array", "boolean", "integer", "string"}:
+    if type_name in {"array", "boolean", "integer", "number", "string"}:
         return str(type_name)
     return "string"
 

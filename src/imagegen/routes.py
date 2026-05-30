@@ -23,6 +23,7 @@ from imagegen.gallery import IMAGE_EXTENSIONS, list_gallery_images
 from imagegen.model_registry import (
     MODEL_REGISTRY,
     CustomDimensionsControl,
+    ModelPricing,
     ModelParameter,
     ReplicateModel,
 )
@@ -106,6 +107,7 @@ def _model_json(model: ReplicateModel) -> dict[str, object]:
         "edit_capable": model.edit_capable,
         "source_image_parameter": model.source_image_parameter,
         "custom_dimensions": _custom_dimensions_json(model.custom_dimensions),
+        "pricing": [_pricing_json(pricing) for pricing in model.pricing],
         "parameters": [
             _parameter_json(parameter)
             for parameter in sorted(
@@ -114,6 +116,17 @@ def _model_json(model: ReplicateModel) -> dict[str, object]:
             )
             if parameter.name not in {"prompt", model.source_image_parameter}
         ],
+    }
+
+
+def _pricing_json(pricing: ModelPricing) -> dict[str, object]:
+    return {
+        "price": pricing.price,
+        "title": pricing.title,
+        "description": pricing.description,
+        "type": pricing.type,
+        "metric": pricing.metric,
+        "metric_count": pricing.metric_count,
     }
 
 
