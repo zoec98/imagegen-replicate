@@ -18,71 +18,117 @@ Several completed tickets have been removed.
 
 - Existing SQLite database under `data/`:
   - `data/imagegen.sqlite3`
-- For these changes, the old database does not need preservation, no migration. There is only lab data in it.
-- Existing code in `src/imagegen/generation_log.py` as the database/repository boundary.
-- We initialize schema at app startup.
-- Main idea: Log generation request lifecycle transitions and results.
+- For these changes, the old database does not need preservation. There is only lab data in it.
+- Implement the change inside `src/imagegen/generation_log.py`, keeping it as the database/repository boundary.
+- Keep the public call sites roughly the same:
+  - `/api/generate` creates the accepted request row.
+  - `ThreadedGenerationWorker` marks start/terminal state and adds generated assets.
+  - The in-memory `RequestStore` remains the active polling store.
+- Initialize the SQLite schema at app startup.
+- Main idea: split immutable request facts, prediction lifecycle state, and produced assets into separate durable records.
 - We do not update SQLite every polling interval or every second. Polling remains an in-memory/UI concern; the durable log is updated only when the request is accepted, starts, reaches a terminal state, or produces result/error records.
 - Store enough request data to recreate the original Replicate request later:
   - selected model alias and model key;
   - full input payload sent to Replicate, including fixed inputs such as `disable_safety_checker`;
   - user-adjustable parameters as submitted and validated;
   - source image references as local filenames, not image bytes or copied database blobs.
+- Do not build a history UI in this ticket.
+- Do not add migrations for preserving old lab data. If an existing local database is incompatible, the implementation may rebuild the known application tables after confirming this is the unversioned lab schema.
 
 ### Tables and Changes
- 
-Currently the schema is unversioned. We need a table `schema_version` with a single column `version` to track schema version.
- the schema version as an integer.
 
+Currently the schema is unversioned. Add a `schema_version` table with one row containing the integer schema version. This ticket should create version `1`.
+
+Target request table:
 
 ```sqlite
 CREATE TABLE generation_requests (
-    id TEXT PRIMARY KEY,  -- keep (request_id is used a lot inside the app)
-    created_at TEXT NOT NULL, -- rename to "sent_at"
-    started_at TEXT, -- move to `generation_results`
-    completed_at TEXT, -- move to `generation_results`
-    status TEXT NOT NULL,  -- move to `generation_results`
-    model_alias TEXT NOT NULL, -- keep
-    model TEXT NOT NULL,  -- keep
-    replicate_input_json TEXT NOT NULL, -- rename to request_sent, full JSON of the request we sent
-    prompt TEXT NOT NULL, -- drop
-    parameters_json TEXT NOT NULL, -- drop
-    source_image_filenames_json TEXT NOT NULL, -- keep
-    prediction_id TEXT, -- move to `generation_results`
-    logs_json TEXT, -- move to `generation_results`
-    error TEXT,  -- move to `generation_results`
-    elapsed_seconds REAL -- move to `generation_results`
+    id TEXT PRIMARY KEY,
+    sent_at TEXT NOT NULL,
+    model_alias TEXT NOT NULL,
+    model TEXT NOT NULL,
+    request_sent_json TEXT NOT NULL,
+    parameters_json TEXT NOT NULL,
+    source_image_filenames_json TEXT NOT NULL
 );
 ```
 
-We want one table `generation_results` for the request results,
-and then another table `generation_assets`, with one entry for each generated asset (image).
-
-
+Target lifecycle/result table. One accepted request should have at most one row here, because one app request maps to one Replicate prediction attempt.
 
 ```sqlite
 CREATE TABLE generation_results (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, -- keep
-    request_id TEXT NOT NULL REFERENCES generation_requests(id), -- keep
-    sequence INTEGER NOT NULL, -- move to `generation_assets`
-    filename TEXT NOT NULL,  -- move to `generation_assets`
-    source_url TEXT NOT NULL, -- move to `generation_assets` (hardly worth keeping, they are expired quickly)
-    content_type TEXT NOT NULL, -- move to `generaton_assets`
-    size_bytes INTEGER NOT NULL, -- move to `generation_assets`
-    created_at TEXT NOT NULL,  -- keep, unify with `started_at` sent here from `generation_requests`
-    elapsed_seconds REAL, -- keep, unify with `elapsed_seconds` sent here from `generation_requests`
-    logs_json TEXT, -- keep, unify with `logs_json` sent here from `generation_requests`
-    error TEXT -- keep, unify with `error` sent here from `generation_requests`
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id TEXT NOT NULL UNIQUE REFERENCES generation_requests(id),
+    started_at TEXT,
+    completed_at TEXT,
+    status TEXT NOT NULL,
+    prediction_id TEXT,
+    logs_json TEXT NOT NULL,
+    error TEXT,
+    elapsed_seconds REAL
 );
 ```
 
+Target asset table. Store one row per generated local asset.
+
+```sqlite
+CREATE TABLE generation_assets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    result_id INTEGER NOT NULL REFERENCES generation_results(id),
+    request_id TEXT NOT NULL REFERENCES generation_requests(id),
+    sequence INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (request_id, sequence)
+);
+```
+
+Indexes:
+
+- `generation_requests(sent_at)`.
+- `generation_results(status)`.
+- `generation_assets(request_id, sequence)`.
+
+Repository behavior:
+
+- `create_request(...)` inserts into `generation_requests` and also creates an initial `generation_results` row with `status = 'queued'`, empty `logs_json`, and no prediction id.
+- `mark_started(...)` updates only `generation_results.started_at` and `generation_results.status`.
+- `mark_finished(...)` updates only `generation_results.completed_at`, `status`, `prediction_id`, `logs_json`, `error`, and `elapsed_seconds`.
+- `add_result(...)` inserts into `generation_assets`; it should not duplicate logs or errors per asset.
+- Existing debug/test helpers such as `get_request(...)` and `list_results(...)` may be updated or replaced with helpers that expose the new row shapes for tests.
+- Keep JSON serialization deterministic with sorted keys.
+
 ### Acceptance Criteria
 
--- create acceptance criteria here
+- App startup creates the versioned schema idempotently in a fresh database.
+- An unversioned lab database is handled explicitly and does not leave mixed old/new tables behind.
+- Accepted requests persist:
+  - request id;
+  - sent timestamp;
+  - model alias and Replicate model key;
+  - full request JSON sent to Replicate;
+  - validated user parameters JSON;
+  - source image filename JSON.
+- Starting and finishing a request update the lifecycle/result row, not the immutable request row.
+- Successful generation with multiple images creates one `generation_results` row and one `generation_assets` row per stored image.
+- Failed and timed-out requests create/update the lifecycle/result row with actionable error details and no fake asset rows.
+- The in-memory polling behavior remains unchanged.
+- Existing tests that assert Replicate payload construction and worker lifecycle behavior continue to pass after updating expected database row shapes.
 
 ### Suggested Tests
 
--- create good tests here
+- `SQLiteGenerationLog.initialize()` creates `schema_version`, `generation_requests`, `generation_results`, and `generation_assets`, and can be called twice.
+- Initializing over the current unversioned lab schema rebuilds to the new versioned schema.
+- `create_request(...)` persists recreatable request data and creates a queued lifecycle row.
+- `mark_started(...)` updates only the lifecycle row with `running` and `started_at`.
+- `mark_finished(..., status="succeeded", prediction_id=..., logs=...)` records terminal state, prediction id, logs, completion timestamp, and elapsed time.
+- `mark_finished(..., status="failed" | "timeout", error=...)` records error details without inserting assets.
+- `add_result(...)` inserts asset metadata into `generation_assets` with stable sequence ordering and without copying logs/errors per asset.
+- Worker test verifies a successful multi-image result creates one terminal lifecycle update and multiple asset rows.
+- API route/generation log test verifies the stored `request_sent_json` includes fixed model inputs such as `disable_safety_checker: true`.
 
 ### Notes
 
