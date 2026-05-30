@@ -1,17 +1,12 @@
 from imagegen.model_registry import MODEL_REGISTRY
 
 
-def test_seedream45_registry_entry_is_pinned():
+def test_seedream45_registry_entry_identifies_replicate_model():
     model = MODEL_REGISTRY["seedream45"]
 
     assert model.replicate_model == "bytedance/seedream-4.5"
     assert model.edit_capable is True
     assert model.fixed_inputs == {"disable_safety_checker": True}
-    assert (
-        model.version
-        == "bd4492f8492cc564460074e069bff1d55428cf48286f0a0f4a4a39b50f088ff6"
-    )
-    assert model.pinned_model.endswith(model.version)
     assert model.documentation_url.endswith("/api/schema")
 
 
@@ -31,15 +26,11 @@ def test_seedream45_registry_entry_has_mvp_parameters():
     assert "disable_safety_checker" not in parameter_names
 
 
-def test_flux_flex_registry_entry_is_pinned_from_schema():
+def test_flux_flex_registry_entry_identifies_replicate_model():
     model = MODEL_REGISTRY["flux-flex"]
 
     assert model.display_name == "Flux 2 Flex"
     assert model.replicate_model == "black-forest-labs/flux-2-flex"
-    assert (
-        model.version
-        == "6cd65040df6f64996ef52b21b021e93caff7c519877b6072fdec8c7de330a132"
-    )
     assert model.documentation_url == (
         "https://replicate.com/black-forest-labs/flux-2-flex/api/schema"
     )

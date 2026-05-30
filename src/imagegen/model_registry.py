@@ -37,7 +37,6 @@ class ReplicateModel:
     display_name: str
     documentation_url: str
     replicate_model: str
-    version: str
     edit_capable: bool
     fixed_inputs: dict[str, object]
     default_width: int
@@ -48,17 +47,12 @@ class ReplicateModel:
     source_image_max: int = 14
     custom_dimensions: CustomDimensionsControl | None = None
 
-    @property
-    def pinned_model(self) -> str:
-        return f"{self.replicate_model}:{self.version}"
-
 
 SEEDREAM45 = ReplicateModel(
     alias="seedream45",
     display_name="Seedream 4.5",
     documentation_url="https://replicate.com/bytedance/seedream-4.5/api/schema",
     replicate_model="bytedance/seedream-4.5",
-    version="bd4492f8492cc564460074e069bff1d55428cf48286f0a0f4a4a39b50f088ff6",
     edit_capable=True,
     fixed_inputs={"disable_safety_checker": True},
     default_width=2048,
@@ -147,7 +141,6 @@ FLUX_FLEX = ReplicateModel(
     display_name="Flux 2 Flex",
     documentation_url="https://replicate.com/black-forest-labs/flux-2-flex/api/schema",
     replicate_model="black-forest-labs/flux-2-flex",
-    version="6cd65040df6f64996ef52b21b021e93caff7c519877b6072fdec8c7de330a132",
     edit_capable=True,
     fixed_inputs={},
     default_width=1024,
