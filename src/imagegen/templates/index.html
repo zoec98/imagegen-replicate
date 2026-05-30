@@ -34,20 +34,6 @@
             <div class="model-heading">
               <span class="model-label-row">
                 <label class="model-selector-label" for="model-selector">Model</label>
-                <span class="pricing-popover">
-                  <button
-                    class="pricing-info"
-                    type="button"
-                    aria-label="Pricing information"
-                    aria-describedby="model-pricing-tooltip"
-                    {% if not model.pricing %}hidden{% endif %}
-                  >i</button>
-                  <span id="model-pricing-tooltip" class="pricing-tooltip" role="tooltip">
-                    {% for pricing in model.pricing %}
-                      <span>{{ pricing.price }} {{ pricing.title }}{% if pricing.description %} {{ pricing.description }}{% endif %}</span>
-                    {% endfor %}
-                  </span>
-                </span>
               </span>
               <div class="model-control-row">
                 <select id="model-selector" name="model">
@@ -69,7 +55,23 @@
               </div>
               <label for="prompt">Prompt</label>
             </div>
-            <button class="generate-button" type="submit" data-default-label="Generate">Generate</button>
+            <div class="generate-controls">
+              <span class="pricing-popover">
+                <button
+                  class="pricing-info"
+                  type="button"
+                  aria-label="Pricing information"
+                  aria-describedby="model-pricing-tooltip"
+                  {% if not model.pricing %}hidden{% endif %}
+                >i</button>
+                <span id="model-pricing-tooltip" class="pricing-tooltip" role="tooltip">
+                  {% for pricing in model.pricing %}
+                    <span>{{ pricing.price }} {{ pricing.title }}{% if pricing.description %} {{ pricing.description }}{% endif %}</span>
+                  {% endfor %}
+                </span>
+              </span>
+              <button class="generate-button" type="submit" data-default-label="Generate">Generate</button>
+            </div>
           </div>
           <textarea id="prompt" name="prompt" rows="9">{{ prompt }}</textarea>
         </div>

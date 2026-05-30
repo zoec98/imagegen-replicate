@@ -41,6 +41,13 @@ body {
   justify-content: space-between;
 }
 
+.generate-controls {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 0.5rem;
+}
+
 .model-heading {
   display: grid;
   gap: 0.375rem;
@@ -110,7 +117,7 @@ body {
   font-size: 0.8125rem;
   font-weight: 500;
   gap: 0.375rem;
-  left: 50%;
+  right: 0;
   line-height: 1.35;
   max-width: min(24rem, calc(100vw - 2rem));
   min-width: 16rem;
@@ -119,7 +126,6 @@ body {
   pointer-events: none;
   position: absolute;
   top: calc(100% + 0.5rem);
-  transform: translateX(-50%);
   transition: opacity 120ms ease, visibility 120ms ease;
   visibility: hidden;
   z-index: 10;

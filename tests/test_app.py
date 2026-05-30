@@ -86,6 +86,12 @@ def test_index_renders_prompt_form(app_factory):
     assert b'aria-label="Pricing information"' in response.data
     assert b'class="pricing-tooltip"' in response.data
     assert b"$0.04 per output image or 25 images for $1" in response.data
+    assert response.data.index(b'class="pricing-info"') > response.data.index(
+        b'id="model-selector"'
+    )
+    assert response.data.index(b'class="pricing-info"') < response.data.index(
+        b'class="generate-button"'
+    )
     assert b'value="flux-flex"' in response.data
     assert b'value="seedream45" selected' in response.data
     assert b'name="prompt"' in response.data
