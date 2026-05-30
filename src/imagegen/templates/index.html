@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token }}">
+    <meta name="app-build" content="{{ app_checksum }}">
     <title>imagegen</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
     <script defer src="{{ url_for('static', filename='app.js') }}"></script>
@@ -14,6 +15,7 @@
         class="prompt-form"
         data-api-generate-url="{{ url_for('api_generate') }}"
         data-api-images-url="{{ url_for('api_images') }}"
+        data-api-app-version-url="{{ url_for('api_app_version') }}"
         data-poll-seconds="{{ app_config.replicate_poll_seconds }}"
       >
         {% with messages = get_flashed_messages(with_categories=true) %}

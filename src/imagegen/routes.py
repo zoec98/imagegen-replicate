@@ -18,6 +18,7 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 
+from imagegen.app_version import app_checksum
 from imagegen.gallery import IMAGE_EXTENSIONS, list_gallery_images
 from imagegen.security import ensure_csrf_token
 
@@ -49,6 +50,7 @@ def register_routes(app: Flask) -> None:
             ],
             prompt="",
             csrf_token=ensure_csrf_token(),
+            app_checksum=app_checksum(),
         )
 
     @app.get("/images/<path:filename>")

@@ -2,6 +2,7 @@ import json
 import os
 
 from imagegen.app import create_app
+from imagegen.app_version import app_checksum
 
 
 def extract_csrf_token(response):
@@ -9,6 +10,28 @@ def extract_csrf_token(response):
     start = response.data.index(marker) + len(marker)
     end = response.data.index(b'"', start)
     return response.data[start:end].decode("utf-8")
+
+
+def extract_app_checksum(response):
+    marker = b'<meta name="app-build" content="'
+    start = response.data.index(marker) + len(marker)
+    end = response.data.index(b'"', start)
+    return response.data[start:end].decode("utf-8")
+
+
+def test_app_checksum_changes_when_asset_content_changes(tmp_path):
+    template = tmp_path / "index.html"
+    script = tmp_path / "app.js"
+    style = tmp_path / "app.css"
+    template.write_text("<html></html>", encoding="utf-8")
+    script.write_text("console.log('one');", encoding="utf-8")
+    style.write_text("body { color: black; }", encoding="utf-8")
+
+    first = app_checksum((template, script, style))
+
+    script.write_text("console.log('two');", encoding="utf-8")
+
+    assert app_checksum((template, script, style)) != first
 
 
 def test_create_app_returns_flask_app(app_factory):
@@ -21,14 +44,18 @@ def test_index_renders_prompt_form(app_factory):
     client = app_factory().test_client()
 
     response = client.get("/")
+    checksum = extract_app_checksum(response)
 
     assert response.status_code == 200
     assert b'name="csrf-token"' in response.data
+    assert b'name="app-build"' in response.data
+    assert len(checksum) == 16
     assert b'src="/static/app.js"' in response.data
     assert b'<form\n        class="prompt-form"' in response.data
     assert b'action="/generate"' not in response.data
     assert b'data-api-generate-url="/api/generate"' in response.data
     assert b'data-api-images-url="/api/images"' in response.data
+    assert b'data-api-app-version-url="/api/app-version"' in response.data
     assert b'data-poll-seconds="1.0"' in response.data
     assert b'class="messages" aria-live="polite"' in response.data
     assert b'name="prompt"' in response.data
@@ -37,6 +64,17 @@ def test_index_renders_prompt_form(app_factory):
     assert b'name="max_images"' in response.data
     assert b"disable_safety_checker" not in response.data
     assert b"Generate" in response.data
+
+
+def test_api_app_version_matches_rendered_checksum(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/")
+    checksum = extract_app_checksum(index)
+
+    response = client.get("/api/app-version")
+
+    assert response.status_code == 200
+    assert response.json == {"app_checksum": checksum}
 
 
 def test_index_lists_existing_images(tmp_path, app_factory):

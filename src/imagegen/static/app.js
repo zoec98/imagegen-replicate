@@ -11,12 +11,16 @@
   const csrfToken = document
     .querySelector('meta[name="csrf-token"]')
     ?.getAttribute("content");
+  const pageChecksum = document
+    .querySelector('meta[name="app-build"]')
+    ?.getAttribute("content");
   const terminalStatuses = new Set(["succeeded", "failed", "timeout"]);
   const pollSeconds = Number.parseFloat(form.dataset.pollSeconds || "1");
   const pollMilliseconds = Math.max(
     250,
     (Number.isFinite(pollSeconds) ? pollSeconds : 1) * 1000,
   );
+  let isPageStale = false;
 
   function showMessage(text, category) {
     if (!messages) {
@@ -36,11 +40,35 @@
     if (!generateButton) {
       return;
     }
-    generateButton.disabled = isGenerating;
+    generateButton.disabled = isGenerating || isPageStale;
     generateButton.setAttribute("aria-busy", isGenerating ? "true" : "false");
     generateButton.textContent = isGenerating
       ? "Generating"
       : generateButton.dataset.defaultLabel || "Generate";
+  }
+
+  function markPageStale() {
+    isPageStale = true;
+    setGenerating(false);
+    showMessage("This page is out of date. Reload the page before generating.", "error");
+  }
+
+  async function checkAppFreshness() {
+    if (!pageChecksum || !form.dataset.apiAppVersionUrl) {
+      return true;
+    }
+    const response = await fetch(form.dataset.apiAppVersionUrl, {
+      credentials: "same-origin",
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "App version check failed.");
+    }
+    if (data.app_checksum !== pageChecksum) {
+      markPageStale();
+      return false;
+    }
+    return true;
   }
 
   function collectParameters() {
@@ -131,9 +159,11 @@
     if (data.status === "succeeded") {
       showMessage(statusMessage(data), "success");
       refreshGallery().catch((error) => showMessage(error.message, "error"));
+      checkAppFreshness().catch(() => {});
       return;
     }
     showMessage(statusMessage(data), "error");
+    checkAppFreshness().catch(() => {});
   }
 
   async function pollGeneration(statusUrl) {
@@ -182,6 +212,15 @@
       return;
     }
 
+    try {
+      if (!(await checkAppFreshness())) {
+        return;
+      }
+    } catch (error) {
+      showMessage(error.message || "App version check failed.", "error");
+      return;
+    }
+
     setGenerating(true);
     showMessage("Generation request queued.", "info");
 
@@ -218,5 +257,8 @@
     }
   }
 
+  checkAppFreshness().catch((error) => {
+    showMessage(error.message || "App version check failed.", "error");
+  });
   form.addEventListener("submit", submitGeneration);
 })();

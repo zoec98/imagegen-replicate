@@ -12,6 +12,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, url_for
 
+from imagegen.app_version import app_checksum
 from imagegen.gallery import GalleryImage, list_gallery_images
 from imagegen.request_store import GenerationRequest, RequestStore
 from imagegen.security import require_api_csrf
@@ -20,6 +21,10 @@ from imagegen.worker import GenerationWorker
 
 
 def register_api_routes(app: Flask) -> None:
+    @app.get("/api/app-version")
+    def api_app_version():
+        return jsonify({"app_checksum": app_checksum()})
+
     @app.post("/api/generate")
     @require_api_csrf
     def api_generate():
