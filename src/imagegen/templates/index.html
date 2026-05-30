@@ -7,6 +7,7 @@
     <meta name="app-build" content="{{ app_checksum }}">
     <title>imagegen</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v=app_checksum) }}">
+    <script id="model-registry-data" type="application/json">{{ model_registry | tojson }}</script>
     <script defer src="{{ url_for('static', filename='app.js', v=app_checksum) }}"></script>
   </head>
   <body>
@@ -30,8 +31,13 @@
 
         <div class="prompt-panel">
           <div class="prompt-bar">
-            <div>
-              <p class="model-name">{{ model.display_name }}</p>
+            <div class="model-heading">
+              <label class="model-selector-label" for="model-selector">Model</label>
+              <select id="model-selector" name="model">
+                {% for registry_model in model_registry %}
+                  <option value="{{ registry_model.alias }}" {% if registry_model.alias == model.alias %}selected{% endif %}>{{ registry_model.display_name }}</option>
+                {% endfor %}
+              </select>
               <label for="prompt">Prompt</label>
             </div>
             <button class="generate-button" type="submit" data-default-label="Generate">Generate</button>

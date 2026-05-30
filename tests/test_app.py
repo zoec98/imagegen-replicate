@@ -29,6 +29,13 @@ def extract_attribute(response, marker):
     return response.data[start:end].decode("utf-8")
 
 
+def extract_model_registry(response):
+    marker = b'<script id="model-registry-data" type="application/json">'
+    start = response.data.index(marker) + len(marker)
+    end = response.data.index(b"</script>", start)
+    return json.loads(response.data[start:end].decode("utf-8"))
+
+
 def test_app_checksum_changes_when_asset_content_changes(tmp_path):
     template = tmp_path / "index.html"
     script = tmp_path / "app.js"
@@ -67,12 +74,33 @@ def test_index_renders_prompt_form(app_factory):
     assert b'data-api-app-version-url="/api/app-version"' in response.data
     assert b'data-poll-seconds="1.0"' in response.data
     assert b'class="messages" aria-live="polite"' in response.data
+    assert b'id="model-selector"' in response.data
+    assert b'value="flux-flex"' in response.data
+    assert b'value="seedream45" selected' in response.data
     assert b'name="prompt"' in response.data
     assert b'name="size"' in response.data
     assert b'name="aspect_ratio"' in response.data
     assert b'name="max_images"' in response.data
     assert b"disable_safety_checker" not in response.data
     assert b"Generate" in response.data
+
+
+def test_index_exposes_model_registry_metadata(app_factory):
+    client = app_factory().test_client()
+
+    response = client.get("/")
+    registry = extract_model_registry(response)
+
+    aliases = {model["alias"] for model in registry}
+    assert aliases == {"flux-flex", "seedream45"}
+    flux = next(model for model in registry if model["alias"] == "flux-flex")
+    assert flux["display_name"] == "Flux 2 Flex"
+    assert flux["source_image_parameter"] == "input_images"
+    assert {parameter["name"] for parameter in flux["parameters"]} >= {
+        "guidance",
+        "output_format",
+    }
+    assert "prompt" not in {parameter["name"] for parameter in flux["parameters"]}
 
 
 def test_index_static_asset_urls_are_cache_busted(app_factory):

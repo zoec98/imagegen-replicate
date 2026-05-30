@@ -20,6 +20,7 @@ from werkzeug.utils import secure_filename
 
 from imagegen.app_version import app_checksum
 from imagegen.gallery import IMAGE_EXTENSIONS, list_gallery_images
+from imagegen.model_registry import MODEL_REGISTRY, ModelParameter, ReplicateModel
 from imagegen.security import ensure_csrf_token
 
 
@@ -39,6 +40,12 @@ def register_routes(app: Flask) -> None:
                 metadata_provider=app.config["IMAGEGEN_METADATA_PROVIDER"],
             ),
             model=app_config.model,
+            model_registry=[
+                _model_json(model)
+                for model in sorted(
+                    MODEL_REGISTRY.values(), key=lambda item: item.alias
+                )
+            ],
             app_config=app_config,
             parameters=[
                 parameter
@@ -46,7 +53,8 @@ def register_routes(app: Flask) -> None:
                     app_config.model.parameters,
                     key=lambda item: item.order if item.order is not None else 999,
                 )
-                if parameter.name not in {"prompt", "image_input"}
+                if parameter.name
+                not in {"prompt", app_config.model.source_image_parameter}
             ],
             prompt="",
             csrf_token=ensure_csrf_token(),
@@ -84,3 +92,33 @@ def safe_image_filename(filename: str) -> str | None:
     if safe_name != filename or Path(filename).suffix.lower() not in IMAGE_EXTENSIONS:
         return None
     return safe_name
+
+
+def _model_json(model: ReplicateModel) -> dict[str, object]:
+    return {
+        "alias": model.alias,
+        "display_name": model.display_name,
+        "edit_capable": model.edit_capable,
+        "source_image_parameter": model.source_image_parameter,
+        "parameters": [
+            _parameter_json(parameter)
+            for parameter in sorted(
+                model.parameters,
+                key=lambda item: item.order if item.order is not None else 999,
+            )
+            if parameter.name not in {"prompt", model.source_image_parameter}
+        ],
+    }
+
+
+def _parameter_json(parameter: ModelParameter) -> dict[str, object]:
+    return {
+        "name": parameter.name,
+        "description": parameter.description,
+        "type": parameter.type,
+        "default": parameter.default,
+        "choices": list(parameter.choices),
+        "minimum": parameter.minimum,
+        "maximum": parameter.maximum,
+        "order": parameter.order,
+    }

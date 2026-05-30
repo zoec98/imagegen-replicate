@@ -5,6 +5,8 @@
   }
 
   const promptInput = form.querySelector("#prompt");
+  const modelSelector = form.querySelector("#model-selector");
+  const parameterGrid = form.querySelector(".parameter-grid");
   const generateButton = form.querySelector(".generate-button");
   const messages = form.querySelector(".messages");
   const gallery = document.querySelector(".gallery");
@@ -21,6 +23,30 @@
     (Number.isFinite(pollSeconds) ? pollSeconds : 1) * 1000,
   );
   let isPageStale = false;
+
+  function loadModelRegistry() {
+    const element = document.querySelector("#model-registry-data");
+    if (!element?.textContent) {
+      return [];
+    }
+    try {
+      const models = JSON.parse(element.textContent);
+      return Array.isArray(models) ? models : [];
+    } catch {
+      return [];
+    }
+  }
+
+  const modelRegistry = loadModelRegistry();
+
+  function selectedModel() {
+    const selectedAlias = modelSelector?.value;
+    return (
+      modelRegistry.find((model) => model.alias === selectedAlias) ||
+      modelRegistry[0] ||
+      null
+    );
+  }
 
   function showMessage(text, category) {
     if (!messages) {
@@ -85,6 +111,78 @@
       parameters[control.name] = control.value;
     });
     return parameters;
+  }
+
+  function parameterLabel(name) {
+    return name.replaceAll("_", " ");
+  }
+
+  function parameterInput(parameter) {
+    if (Array.isArray(parameter.choices) && parameter.choices.length > 0) {
+      const select = document.createElement("select");
+      parameter.choices.forEach((choice) => {
+        const option = document.createElement("option");
+        option.value = String(choice);
+        option.textContent = String(choice);
+        if (choice === parameter.default) {
+          option.selected = true;
+        }
+        select.append(option);
+      });
+      return select;
+    }
+
+    const input = document.createElement("input");
+    if (parameter.type === "integer" || parameter.type === "number") {
+      input.type = "number";
+      if (parameter.type === "number") {
+        input.step = "any";
+      }
+      if (parameter.minimum !== null && parameter.minimum !== undefined) {
+        input.min = String(parameter.minimum);
+      }
+      if (parameter.maximum !== null && parameter.maximum !== undefined) {
+        input.max = String(parameter.maximum);
+      }
+    } else if (parameter.type === "boolean") {
+      input.type = "checkbox";
+      input.checked = parameter.default === true;
+    } else {
+      input.type = "text";
+    }
+    if (parameter.default !== null && parameter.default !== undefined && parameter.default !== "") {
+      input.value = String(parameter.default);
+    }
+    return input;
+  }
+
+  function renderParameters(model) {
+    if (!parameterGrid || !model) {
+      return;
+    }
+    parameterGrid.replaceChildren();
+    if (!Array.isArray(model.parameters)) {
+      return;
+    }
+    model.parameters.forEach((parameter) => {
+      const id = `parameter-${parameter.name}`;
+      const label = document.createElement("label");
+      label.className = "field";
+      label.htmlFor = id;
+
+      const text = document.createElement("span");
+      text.textContent = parameterLabel(parameter.name);
+
+      const control = parameterInput(parameter);
+      control.id = id;
+      control.name = parameter.name;
+      if (parameter.description) {
+        control.title = parameter.description;
+      }
+
+      label.append(text, control);
+      parameterGrid.append(label);
+    });
   }
 
   function statusMessage(data) {
@@ -233,6 +331,7 @@
           "X-CSRF-Token": csrfToken,
         },
         body: JSON.stringify({
+          model: modelSelector?.value || undefined,
           prompt,
           parameters: collectParameters(),
         }),
@@ -260,5 +359,9 @@
   checkAppFreshness().catch((error) => {
     showMessage(error.message || "App version check failed.", "error");
   });
+  modelSelector?.addEventListener("change", () => {
+    renderParameters(selectedModel());
+  });
+  renderParameters(selectedModel());
   form.addEventListener("submit", submitGeneration);
 })();
