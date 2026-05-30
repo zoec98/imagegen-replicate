@@ -60,6 +60,38 @@ The page includes an app build checksum. If the server-side assets change while 
 
 Image edit sources are selected from local gallery images. Source images are submitted as local filenames; image bytes are not placed in the browser JSON payload.
 
+## Prompt Palettes
+
+Prompt palettes are reusable text fragments stored as plain text files. By default, palette files live under `data/fragments`; set `IMAGEGEN_FRAGMENT_ROOT` to use a different directory.
+
+Each directory under the fragment root is one singular palette, such as `character` or `style`. Each `.txt` file is one fragment. Filenames store spaces as underscores, and the UI displays underscores as spaces.
+
+Example:
+
+```text
+data/fragments/
+|-- character
+|   |-- aoife.txt
+|   `-- zoe.txt
+`-- style
+    |-- comic_lawrence.txt
+    `-- photo.txt
+```
+
+This creates `character` fragments named `aoife` and `zoe`, plus `style` fragments named `comic lawrence` and `photo`.
+
+Fragment names and palette names must start with a letter and may contain only letters, numbers, underscores, and hyphens. Fragment content is limited to 256 bytes and may not contain `(`, `)`, or `:`.
+
+Selecting a palette entry inserts editable annotation text into the prompt:
+
+```text
+(character: zoe fragment content)
+```
+
+The browser keeps annotations visible so you can swap fragments later. When a generation request is sent, the server validates the prompt and strips annotation syntax before calling the model provider. The provider receives only the fragment content and plain prompt text. The app keeps the annotated prompt in request status, SQLite history, and embedded image metadata.
+
+External edits to files under `data/fragments` are picked up on page refresh. The in-app palette editor can create, update, and delete entries inside existing palette directories, but creating or deleting whole palette directories is a filesystem task.
+
 ## Gallery
 
 Generated images appear in the local gallery. Each gallery card provides:
@@ -76,6 +108,8 @@ Loading metadata requires metadata embedded by this app. If metadata is missing 
 Generated files are downloaded from Replicate into `data/images` by default. Supported local image formats are PNG, JPEG, and WebP. GIF files are not accepted as source images or stored generation results.
 
 The app embeds generated-image metadata directly into PNG, JPEG, and WebP files. Metadata includes the model, prompt, parameters, source URL, creation time, and related generation identifiers. New generated images do not use JSON sidecar files.
+
+Palette fragments are stored under `data/fragments` by default. They are plain text files and are not generated outputs.
 
 Durable request history is recorded in SQLite at `data/imagegen.sqlite3` by default. The database stores accepted request facts, prediction lifecycle state, and generated asset rows. The active browser polling state remains in memory.
 
