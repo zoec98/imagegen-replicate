@@ -39,6 +39,24 @@ ENV_SETTINGS: tuple[EnvSetting, ...] = (
         comment="SQLite database path for durable generation request history.",
     ),
     EnvSetting(
+        name="IMMICH_URL",
+        default="",
+        comment="Optional Immich server URL for uploading gallery images.",
+    ),
+    EnvSetting(
+        name="IMMICH_GALLERY_ID",
+        default="",
+        comment="Optional Immich album id to attach uploaded images to.",
+    ),
+    EnvSetting(
+        name="IMMICH_API_KEY",
+        default="",
+        comment=(
+            "Optional Immich API key. Required permissions: asset.upload and "
+            "albumAsset.create."
+        ),
+    ),
+    EnvSetting(
         name="IMAGEGEN_MODEL",
         default=DEFAULT_MODEL_ALIAS,
         comment=f"Default model alias. Options: {', '.join(sorted(MODEL_REGISTRY))}.",
@@ -66,11 +84,22 @@ class AppConfig:
     replicate_api_token: str
     output_dir: Path
     generation_log_path: Path
+    immich_url: str
+    immich_gallery_id: str
+    immich_api_key: str
     model_alias: str
     model: ReplicateModel
     flask_secret_key: str
     replicate_poll_seconds: float
     replicate_timeout_seconds: float
+
+    @property
+    def immich_enabled(self) -> bool:
+        return bool(
+            self.immich_url.strip()
+            and self.immich_gallery_id.strip()
+            and self.immich_api_key.strip()
+        )
 
 
 def ensure_env_file(path: str | Path = ".env") -> Path:
@@ -121,6 +150,9 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
         replicate_api_token=os.getenv("REPLICATE_API_TOKEN", "").strip(),
         output_dir=output_dir,
         generation_log_path=generation_log_path,
+        immich_url=os.getenv("IMMICH_URL", "").strip().rstrip("/"),
+        immich_gallery_id=os.getenv("IMMICH_GALLERY_ID", "").strip(),
+        immich_api_key=os.getenv("IMMICH_API_KEY", "").strip(),
         model_alias=model_alias,
         model=model,
         flask_secret_key=os.getenv(

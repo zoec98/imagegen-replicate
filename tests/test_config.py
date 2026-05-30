@@ -15,6 +15,9 @@ def test_ensure_env_file_creates_expected_defaults(tmp_path):
     assert "REPLICATE_API_TOKEN=" in content
     assert "IMAGEGEN_OUTPUT_DIR=data/images" in content
     assert "IMAGEGEN_DB_PATH=data/imagegen.sqlite3" in content
+    assert "IMMICH_URL=" in content
+    assert "IMMICH_GALLERY_ID=" in content
+    assert "IMMICH_API_KEY=" in content
     assert "IMAGEGEN_MODEL=seedream45" in content
     assert "IMAGEGEN_FLASK_SECRET_KEY=dev-secret-change-me" in content
     assert "IMAGEGEN_REPLICATE_POLL_SECONDS=1.0" in content
@@ -49,6 +52,9 @@ def test_write_env_example_uses_non_secret_defaults(tmp_path):
     content = example_path.read_text(encoding="utf-8")
     assert "REPLICATE_API_TOKEN=" in content
     assert "IMAGEGEN_DB_PATH=data/imagegen.sqlite3" in content
+    assert "IMMICH_URL=" in content
+    assert "IMMICH_GALLERY_ID=" in content
+    assert "IMMICH_API_KEY=" in content
     assert "IMAGEGEN_MODEL=seedream45" in content
 
 
@@ -57,6 +63,9 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     monkeypatch.delenv("IMAGEGEN_OUTPUT_DIR", raising=False)
     monkeypatch.delenv("IMAGEGEN_MODEL", raising=False)
     monkeypatch.delenv("IMAGEGEN_DB_PATH", raising=False)
+    monkeypatch.delenv("IMMICH_URL", raising=False)
+    monkeypatch.delenv("IMMICH_GALLERY_ID", raising=False)
+    monkeypatch.delenv("IMMICH_API_KEY", raising=False)
     monkeypatch.delenv("IMAGEGEN_FLASK_SECRET_KEY", raising=False)
     monkeypatch.delenv("IMAGEGEN_REPLICATE_POLL_SECONDS", raising=False)
     monkeypatch.delenv("IMAGEGEN_REPLICATE_TIMEOUT_SECONDS", raising=False)
@@ -65,6 +74,9 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
         "REPLICATE_API_TOKEN=test-token\n"
         "IMAGEGEN_OUTPUT_DIR=custom/images\n"
         "IMAGEGEN_DB_PATH=custom/imagegen.sqlite3\n"
+        "IMMICH_URL=https://immich.example.test/\n"
+        "IMMICH_GALLERY_ID=album-123\n"
+        "IMMICH_API_KEY=immich-key\n"
         "IMAGEGEN_MODEL=seedream45\n"
         "IMAGEGEN_FLASK_SECRET_KEY=test-secret\n"
         "IMAGEGEN_REPLICATE_POLL_SECONDS=2.5\n"
@@ -77,6 +89,10 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     assert config.replicate_api_token == "test-token"
     assert config.output_dir == tmp_path / "custom/images"
     assert config.generation_log_path == tmp_path / "custom/imagegen.sqlite3"
+    assert config.immich_url == "https://immich.example.test"
+    assert config.immich_gallery_id == "album-123"
+    assert config.immich_api_key == "immich-key"
+    assert config.immich_enabled is True
     assert config.model_alias == "seedream45"
     assert config.model is MODEL_REGISTRY["seedream45"]
     assert config.flask_secret_key == "test-secret"
@@ -90,6 +106,22 @@ def test_load_config_rejects_unknown_model(tmp_path, monkeypatch):
 
     with pytest.raises(ValueError, match="Unknown IMAGEGEN_MODEL"):
         load_config(env_path)
+
+
+def test_load_config_disables_immich_unless_all_values_are_set(tmp_path, monkeypatch):
+    monkeypatch.delenv("IMMICH_URL", raising=False)
+    monkeypatch.delenv("IMMICH_GALLERY_ID", raising=False)
+    monkeypatch.delenv("IMMICH_API_KEY", raising=False)
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "IMMICH_URL=https://immich.example.test\n"
+        "IMMICH_API_KEY=immich-key\n",
+        encoding="utf-8",
+    )
+
+    config = load_config(env_path)
+
+    assert config.immich_enabled is False
 
 
 def test_load_config_does_not_override_existing_environment(tmp_path, monkeypatch):

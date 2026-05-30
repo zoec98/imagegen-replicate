@@ -65,6 +65,7 @@ def register_routes(app: Flask) -> None:
             prompt="",
             csrf_token=ensure_csrf_token(),
             app_checksum=app_checksum(),
+            immich_enabled=app_config.immich_enabled,
         )
 
     @app.get("/images/<path:filename>")

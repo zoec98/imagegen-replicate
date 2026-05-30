@@ -369,6 +369,23 @@ select {
   color: #b00020;
 }
 
+.gallery-immich {
+  color: #0369a1;
+}
+
+.gallery-immich-uploading {
+  color: #64748b;
+  cursor: wait;
+}
+
+.gallery-immich-uploaded {
+  color: #0a6b2b;
+}
+
+.gallery-immich-failed {
+  color: #b00020;
+}
+
 .image-info-wrap {
   display: inline-flex;
   position: relative;

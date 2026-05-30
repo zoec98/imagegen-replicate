@@ -502,6 +502,53 @@
     await refreshGallery();
   }
 
+  async function uploadGalleryImageToImmich(figure) {
+    const uploadUrl = figure?.dataset.immichUploadUrl;
+    const filename = figure?.dataset.filename || "image";
+    const button = figure?.querySelector(".gallery-immich");
+    if (!uploadUrl) {
+      showMessage("Immich upload is not configured for this image.", "error");
+      return;
+    }
+    if (!csrfToken) {
+      showMessage("Missing CSRF token.", "error");
+      return;
+    }
+    if (button) {
+      button.disabled = true;
+      button.classList.remove("gallery-immich-failed");
+      button.classList.add("gallery-immich-uploading");
+      button.setAttribute("aria-label", `Uploading ${filename} to Immich`);
+    }
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+      },
+      body: JSON.stringify({}),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      if (button) {
+        button.disabled = false;
+        button.classList.remove("gallery-immich-uploading");
+        button.classList.add("gallery-immich-failed");
+        button.setAttribute("aria-label", `Immich upload failed for ${filename}`);
+      }
+      throw new Error(data.error || `Could not upload ${filename} to Immich.`);
+    }
+    if (button) {
+      button.disabled = false;
+      button.classList.remove("gallery-immich-uploading", "gallery-immich-failed");
+      button.classList.add("gallery-immich-uploaded");
+      button.setAttribute("aria-label", `${filename} uploaded to Immich`);
+    }
+    const status = data.status === "already_present" ? "already present" : "uploaded";
+    showMessage(`${filename} ${status} in Immich.`, "success");
+  }
+
   async function metadataForInfo(figure) {
     if (!figure?.dataset.metadataUrl) {
       return null;
@@ -578,6 +625,9 @@
     if (image.delete_url) {
       figure.dataset.deleteUrl = image.delete_url;
     }
+    if (image.immich_upload_url) {
+      figure.dataset.immichUploadUrl = image.immich_upload_url;
+    }
     if (image.metadata_url) {
       figure.dataset.metadataUrl = image.metadata_url;
     }
@@ -629,6 +679,15 @@
       `${extension.toUpperCase()} image`,
     );
 
+    let immichButton = null;
+    if (image.immich_upload_url) {
+      immichButton = iconButton(
+        "gallery-immich",
+        `Upload ${image.filename} to Immich`,
+        "M7 18a5 5 0 1 1 1-9.9A6.5 6.5 0 0 1 20.5 11 3.5 3.5 0 0 1 20 18h-5v-5h3l-6-6-6 6h3v5z",
+      );
+    }
+
     const loadButton = iconButton(
       "gallery-load",
       `Load metadata from ${image.filename}`,
@@ -640,7 +699,11 @@
       `Delete ${image.filename}`,
       "M9 3h6l1 2h4v2H4V5h4zm-3 6h12l-.7 11H6.7z",
     );
-    actions.append(infoWrap, typeIndicator, loadButton, deleteButton);
+    actions.append(infoWrap, typeIndicator);
+    if (immichButton) {
+      actions.append(immichButton);
+    }
+    actions.append(loadButton, deleteButton);
 
     const sourceButton = document.createElement("button");
     sourceButton.className = "source-select";
@@ -835,6 +898,14 @@
       const figure = deleteButton.closest(".gallery-item");
       deleteGalleryImage(figure).catch((error) => {
         showMessage(error.message || "Image could not be deleted.", "error");
+      });
+      return;
+    }
+    const immichButton = event.target.closest(".gallery-immich");
+    if (immichButton) {
+      const figure = immichButton.closest(".gallery-item");
+      uploadGalleryImageToImmich(figure).catch((error) => {
+        showMessage(error.message || "Image could not be uploaded to Immich.", "error");
       });
       return;
     }
