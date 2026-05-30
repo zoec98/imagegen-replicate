@@ -15,6 +15,7 @@ from flask import Flask, jsonify, request, url_for
 from imagegen.app_version import app_checksum
 from imagegen.gallery import GalleryImage, list_gallery_images
 from imagegen.generation_log import GenerationLog
+from imagegen.model_registry import MODEL_REGISTRY, ReplicateModel
 from imagegen.replicate_client import build_prediction_input
 from imagegen.request_store import GenerationRequest, RequestStore
 from imagegen.security import require_api_csrf
@@ -31,28 +32,35 @@ def register_api_routes(app: Flask) -> None:
     @require_api_csrf
     def api_generate():
         payload = request.get_json(silent=True) or {}
+        app_config = app.config["IMAGEGEN_APP_CONFIG"]
+        try:
+            selected_model = _selected_model(
+                payload, default_alias=app_config.model_alias
+            )
+        except ValidationError as error:
+            return jsonify({"error": str(error)}), 400
         try:
             validated = validate_generation_payload(
                 payload,
-                model=app.config["IMAGEGEN_APP_CONFIG"].model,
+                model=selected_model,
                 output_dir=Path(app.config["IMAGEGEN_OUTPUT_DIR"]),
             )
         except ValidationError as error:
             return jsonify({"error": str(error)}), 400
 
-        app_config = app.config["IMAGEGEN_APP_CONFIG"]
         record = _request_store(app).create(
+            model_alias=selected_model.alias,
             prompt=validated.prompt,
             parameters=validated.parameters,
             source_images=validated.source_images,
         )
         _generation_log(app).create_request(
             record,
-            model_alias=app_config.model_alias,
-            model=app_config.model.replicate_model,
+            model_alias=selected_model.alias,
+            model=selected_model.replicate_model,
             replicate_input=build_prediction_input(
                 validated.prompt,
-                app_config.model,
+                selected_model,
                 parameters=validated.parameters,
                 source_image_inputs=validated.source_images,
             ),
@@ -110,6 +118,19 @@ def _generation_log(app: Flask) -> GenerationLog:
         msg = "IMAGEGEN_GENERATION_LOG must provide generation log methods."
         raise TypeError(msg)
     return generation_log
+
+
+def _selected_model(
+    payload: dict[str, object], *, default_alias: str
+) -> ReplicateModel:
+    alias = payload.get("model", default_alias)
+    if not isinstance(alias, str) or not alias.strip():
+        raise ValidationError("model must be a valid model id.")
+    model = MODEL_REGISTRY.get(alias.strip())
+    if model is None:
+        choices = ", ".join(sorted(MODEL_REGISTRY))
+        raise ValidationError(f"Unknown model: {alias}. Expected one of: {choices}.")
+    return model
 
 
 def _request_json(app: Flask, record: GenerationRequest) -> dict[str, object]:

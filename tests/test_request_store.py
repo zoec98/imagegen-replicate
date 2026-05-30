@@ -10,6 +10,7 @@ def test_request_store_creates_and_gets_queued_request():
     )
 
     assert record.request_id
+    assert record.model_alias == "seedream45"
     assert record.status == "queued"
     assert record.prompt == "a small red house"
     assert record.parameters == {"size": "2K"}
@@ -97,6 +98,7 @@ def test_request_store_json_contains_lifecycle_fields():
     payload = record.to_json()
 
     assert payload["request_id"] == record.request_id
+    assert payload["model"] == "seedream45"
     assert payload["status"] == "running"
     assert payload["prompt"] == "prompt"
     assert payload["parameters"] == {"size": "2K"}

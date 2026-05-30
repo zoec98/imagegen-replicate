@@ -15,14 +15,6 @@ from imagegen.model_registry import ModelParameter, ReplicateModel
 from imagegen.source_images import SourceImageError, validate_source_images
 
 
-MVP_PARAMETER_NAMES = {
-    "size",
-    "aspect_ratio",
-    "sequential_image_generation",
-    "max_images",
-}
-
-
 @dataclass(frozen=True)
 class ValidatedGenerationRequest:
     prompt: str
@@ -74,23 +66,33 @@ def validate_model_parameters(
 ) -> dict[str, object]:
     registry_parameters = {parameter.name: parameter for parameter in model.parameters}
     validated: dict[str, object] = {}
+    source_image_parameter = model.source_image_parameter
 
     for name in raw_parameters:
         if name in model.fixed_inputs:
             raise ValidationError(f"{name} is fixed by the server.")
         if name == "prompt":
             raise ValidationError("prompt must be submitted as a top-level field.")
-        if name == "image_input":
-            raise ValidationError("image_input is not supported by the MVP API yet.")
-        if name not in MVP_PARAMETER_NAMES or name not in registry_parameters:
+        if name == source_image_parameter:
+            raise ValidationError(
+                f"{source_image_parameter} must be submitted as source_images.",
+            )
+        if name not in registry_parameters:
             raise ValidationError(f"Unknown parameter: {name}.")
 
-    for name in sorted(MVP_PARAMETER_NAMES):
-        parameter = registry_parameters.get(name)
-        if parameter is None:
+    for parameter in sorted(
+        model.parameters,
+        key=lambda item: item.order if item.order is not None else 999,
+    ):
+        if parameter.name in {"prompt", source_image_parameter}:
             continue
-        raw_value = raw_parameters.get(name, parameter.default)
-        validated[name] = _validate_parameter_value(parameter, raw_value)
+        if parameter.name in raw_parameters:
+            raw_value = raw_parameters[parameter.name]
+        elif _has_default(parameter):
+            raw_value = parameter.default
+        else:
+            continue
+        validated[parameter.name] = _validate_parameter_value(parameter, raw_value)
 
     return validated
 
@@ -100,6 +102,8 @@ def _validate_parameter_value(parameter: ModelParameter, value: Any) -> object:
         return _validate_select(parameter, value)
     if parameter.type == "integer":
         return _validate_integer(parameter, value)
+    if parameter.type == "number":
+        return _validate_number(parameter, value)
     if parameter.type == "boolean":
         if not isinstance(value, bool):
             raise ValidationError(f"{parameter.name} must be a boolean.")
@@ -114,6 +118,10 @@ def _validate_parameter_value(parameter: ModelParameter, value: Any) -> object:
         return value
 
     raise ValidationError(f"{parameter.name} has unsupported parameter type.")
+
+
+def _has_default(parameter: ModelParameter) -> bool:
+    return parameter.default != "" and parameter.default != ()
 
 
 def _validate_select(parameter: ModelParameter, value: Any) -> object:
@@ -135,6 +143,26 @@ def _validate_integer(parameter: ModelParameter, value: Any) -> int:
             raise ValidationError(f"{parameter.name} must be an integer.") from error
     else:
         raise ValidationError(f"{parameter.name} must be an integer.")
+
+    if parameter.minimum is not None and parsed < parameter.minimum:
+        raise ValidationError(f"{parameter.name} must be at least {parameter.minimum}.")
+    if parameter.maximum is not None and parsed > parameter.maximum:
+        raise ValidationError(f"{parameter.name} must be at most {parameter.maximum}.")
+    return parsed
+
+
+def _validate_number(parameter: ModelParameter, value: Any) -> float:
+    if isinstance(value, bool):
+        raise ValidationError(f"{parameter.name} must be a number.")
+    if isinstance(value, int | float):
+        parsed = float(value)
+    elif isinstance(value, str):
+        try:
+            parsed = float(value)
+        except ValueError as error:
+            raise ValidationError(f"{parameter.name} must be a number.") from error
+    else:
+        raise ValidationError(f"{parameter.name} must be a number.")
 
     if parameter.minimum is not None and parsed < parameter.minimum:
         raise ValidationError(f"{parameter.name} must be at least {parameter.minimum}.")

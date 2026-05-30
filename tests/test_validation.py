@@ -157,7 +157,10 @@ def test_validate_model_parameters_rejects_fixed_input_override():
 
 
 def test_validate_model_parameters_rejects_image_input_for_mvp():
-    with pytest.raises(ValidationError, match="image_input is not supported"):
+    with pytest.raises(
+        ValidationError,
+        match="image_input must be submitted as source_images.",
+    ):
         validate_model_parameters(
             {"image_input": ["image.png"]},
             model=MODEL_REGISTRY["seedream45"],
@@ -169,4 +172,94 @@ def test_validate_model_parameters_rejects_unknown_parameter():
         validate_model_parameters(
             {"width": 1024},
             model=MODEL_REGISTRY["seedream45"],
+        )
+
+
+def test_validate_flux_flex_parameters_accepts_defaults_and_numbers():
+    result = validate_model_parameters(
+        {
+            "aspect_ratio": "custom",
+            "width": "1024",
+            "height": 768,
+            "guidance": "5.5",
+            "prompt_upsampling": False,
+        },
+        model=MODEL_REGISTRY["flux-flex"],
+    )
+
+    assert result == {
+        "aspect_ratio": "custom",
+        "resolution": "1 MP",
+        "width": 1024,
+        "height": 768,
+        "safety_tolerance": 2,
+        "prompt_upsampling": False,
+        "steps": 30,
+        "guidance": 5.5,
+        "output_format": "webp",
+        "output_quality": 80,
+    }
+
+
+def test_validate_flux_flex_parameters_omits_optional_width_height_seed_by_default():
+    result = validate_model_parameters({}, model=MODEL_REGISTRY["flux-flex"])
+
+    assert "width" not in result
+    assert "height" not in result
+    assert "seed" not in result
+
+
+def test_validate_flux_flex_rejects_seedream_only_parameter():
+    with pytest.raises(
+        ValidationError,
+        match="Unknown parameter: sequential_image_generation.",
+    ):
+        validate_model_parameters(
+            {"sequential_image_generation": "auto"},
+            model=MODEL_REGISTRY["flux-flex"],
+        )
+
+
+def test_validate_seedream_rejects_flux_only_parameter():
+    with pytest.raises(ValidationError, match="Unknown parameter: guidance."):
+        validate_model_parameters(
+            {"guidance": 4.5},
+            model=MODEL_REGISTRY["seedream45"],
+        )
+
+
+def test_validate_flux_flex_rejects_out_of_range_guidance():
+    with pytest.raises(ValidationError, match="guidance must be at most 10."):
+        validate_model_parameters(
+            {"guidance": 10.5},
+            model=MODEL_REGISTRY["flux-flex"],
+        )
+
+
+def test_validate_flux_flex_rejects_source_parameter_in_parameters():
+    with pytest.raises(
+        ValidationError,
+        match="input_images must be submitted as source_images.",
+    ):
+        validate_model_parameters(
+            {"input_images": ["source.png"]},
+            model=MODEL_REGISTRY["flux-flex"],
+        )
+
+
+def test_validate_flux_flex_source_images_use_model_limit(tmp_path):
+    filenames = []
+    for index in range(11):
+        filename = f"source-{index}.png"
+        (tmp_path / filename).write_bytes(b"image")
+        filenames.append(filename)
+
+    with pytest.raises(
+        ValidationError,
+        match="source_images cannot contain more than 10 files.",
+    ):
+        validate_generation_payload(
+            {"prompt": "edit this", "source_images": filenames},
+            model=MODEL_REGISTRY["flux-flex"],
+            output_dir=tmp_path,
         )

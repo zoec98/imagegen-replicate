@@ -21,6 +21,7 @@ REQUEST_STATUSES: set[str] = {"queued", "running", "succeeded", "failed", "timeo
 @dataclass
 class GenerationRequest:
     request_id: str
+    model_alias: str
     prompt: str
     parameters: dict[str, object]
     source_images: list[str]
@@ -36,6 +37,7 @@ class GenerationRequest:
     def to_json(self) -> dict[str, object]:
         return {
             "request_id": self.request_id,
+            "model": self.model_alias,
             "status": self.status,
             "prompt": self.prompt,
             "parameters": self.parameters,
@@ -63,10 +65,12 @@ class RequestStore:
         prompt: str,
         parameters: dict[str, object],
         source_images: list[str] | None = None,
+        model_alias: str = "seedream45",
     ) -> GenerationRequest:
         now = datetime.now(UTC)
         request_record = GenerationRequest(
             request_id=uuid.uuid4().hex,
+            model_alias=model_alias,
             prompt=prompt,
             parameters=dict(parameters),
             source_images=list(source_images or []),

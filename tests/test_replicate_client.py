@@ -105,6 +105,22 @@ def test_build_prediction_input_fixed_inputs_override_parameters():
     assert payload["disable_safety_checker"] is True
 
 
+def test_build_prediction_input_uses_model_specific_source_image_field():
+    payload = build_prediction_input(
+        "edit this",
+        MODEL_REGISTRY["flux-flex"],
+        parameters={"guidance": 5.5},
+        source_image_inputs=["source.png"],
+    )
+
+    assert payload["prompt"] == "edit this"
+    assert payload["input_images"] == ["source.png"]
+    assert payload["guidance"] == 5.5
+    assert payload["output_format"] == "webp"
+    assert "image_input" not in payload
+    assert "disable_safety_checker" not in payload
+
+
 def test_generate_image_urls_creates_prediction_and_polls(tmp_path):
     created = FakePrediction(id="abc123", status="processing")
     completed = FakePrediction(

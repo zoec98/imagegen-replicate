@@ -222,6 +222,7 @@ def test_api_generate_accepts_json_and_returns_request_id(app_factory):
         f"/api/generation/{response.json['request_id']}"
     )
     assert response.json["poll_seconds"] == 1.0
+    assert response.json["model"] == "seedream45"
     assert response.json["status"] == "queued"
     assert response.json["prompt"] == "a small red house"
     assert response.json["source_images"] == []
@@ -232,6 +233,54 @@ def test_api_generate_accepts_json_and_returns_request_id(app_factory):
         "size": "2K",
     }
     assert response.json["images"] == []
+
+
+def test_api_generate_accepts_flux_flex_model_payload(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "model": "flux-flex",
+            "prompt": "a small red house",
+            "parameters": {"guidance": "5.5", "output_format": "png"},
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 202
+    assert response.json["model"] == "flux-flex"
+    assert response.json["parameters"] == {
+        "aspect_ratio": "1:1",
+        "resolution": "1 MP",
+        "safety_tolerance": 2,
+        "prompt_upsampling": True,
+        "steps": 30,
+        "guidance": 5.5,
+        "output_format": "png",
+        "output_quality": 80,
+    }
+
+
+def test_api_generate_rejects_unknown_model(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={"model": "unknown", "prompt": "a small red house"},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {
+        "error": "Unknown model: unknown. Expected one of: flux-flex, seedream45."
+    }
 
 
 def test_api_generate_logs_recreatable_request_payload(app_factory):

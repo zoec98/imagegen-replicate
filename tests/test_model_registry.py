@@ -29,3 +29,59 @@ def test_seedream45_registry_entry_has_mvp_parameters():
         "max_images",
     } <= parameter_names
     assert "disable_safety_checker" not in parameter_names
+
+
+def test_flux_flex_registry_entry_is_pinned_from_schema():
+    model = MODEL_REGISTRY["flux-flex"]
+
+    assert model.display_name == "Flux 2 Flex"
+    assert model.replicate_model == "black-forest-labs/flux-2-flex"
+    assert (
+        model.version
+        == "6cd65040df6f64996ef52b21b021e93caff7c519877b6072fdec8c7de330a132"
+    )
+    assert model.documentation_url == (
+        "https://replicate.com/black-forest-labs/flux-2-flex/api/schema"
+    )
+    assert model.edit_capable is True
+    assert model.source_image_parameter == "input_images"
+    assert model.source_image_max == 10
+    assert model.fixed_inputs == {}
+
+
+def test_flux_flex_registry_entry_has_schema_parameters():
+    parameters = {
+        parameter.name: parameter
+        for parameter in MODEL_REGISTRY["flux-flex"].parameters
+    }
+
+    assert {
+        "prompt",
+        "input_images",
+        "aspect_ratio",
+        "resolution",
+        "width",
+        "height",
+        "safety_tolerance",
+        "seed",
+        "prompt_upsampling",
+        "steps",
+        "guidance",
+        "output_format",
+        "output_quality",
+    } <= set(parameters)
+    assert parameters["aspect_ratio"].choices == (
+        "match_input_image",
+        "custom",
+        "1:1",
+        "16:9",
+        "3:2",
+        "2:3",
+        "4:5",
+        "5:4",
+        "9:16",
+        "3:4",
+        "4:3",
+    )
+    assert parameters["guidance"].type == "number"
+    assert parameters["guidance"].default == 4.5

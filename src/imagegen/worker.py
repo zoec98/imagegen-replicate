@@ -10,11 +10,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from pathlib import Path
 from typing import Protocol
 
 from imagegen.config import AppConfig
 from imagegen.generation_log import GenerationLog
+from imagegen.model_registry import MODEL_REGISTRY
 from imagegen.replicate_client import (
     ReplicatePredictionTimeout,
     ReplicateResult,
@@ -71,10 +73,16 @@ def run_generation_request(
     store.update(request_record.request_id, status="running")
     if generation_log is not None:
         generation_log.mark_started(request_record.request_id)
+    request_model = MODEL_REGISTRY[request_record.model_alias]
+    request_config = replace(
+        app_config,
+        model_alias=request_model.alias,
+        model=request_model,
+    )
     try:
         result = generate(
             request_record.prompt,
-            app_config,
+            request_config,
             parameters=request_record.parameters,
             source_image_paths=source_image_paths(
                 request_record.source_images,

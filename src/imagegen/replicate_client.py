@@ -137,14 +137,14 @@ def build_prediction_input(
     for parameter in model.parameters:
         if parameter.name == "prompt":
             prediction_input[parameter.name] = prompt
-        elif parameter.name == "image_input":
+        elif parameter.name == model.source_image_parameter:
             continue
         elif parameter.default != "":
             prediction_input[parameter.name] = parameter.default
     if parameters:
         prediction_input.update(parameters)
-    if source_image_inputs:
-        prediction_input["image_input"] = source_image_inputs
+    if source_image_inputs and model.source_image_parameter:
+        prediction_input[model.source_image_parameter] = source_image_inputs
     prediction_input.update(model.fixed_inputs)
     return prediction_input
 

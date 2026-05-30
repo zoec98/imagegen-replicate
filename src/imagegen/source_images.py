@@ -15,9 +15,6 @@ from imagegen.gallery import IMAGE_EXTENSIONS
 from imagegen.model_registry import ReplicateModel
 
 
-MAX_SOURCE_IMAGES = 14
-
-
 class SourceImageError(ValueError):
     pass
 
@@ -36,9 +33,9 @@ def validate_source_images(
         return []
     if not model.edit_capable:
         raise SourceImageError("This model does not accept source images.")
-    if len(value) > MAX_SOURCE_IMAGES:
+    if len(value) > model.source_image_max:
         raise SourceImageError(
-            f"source_images cannot contain more than {MAX_SOURCE_IMAGES} files."
+            f"source_images cannot contain more than {model.source_image_max} files."
         )
 
     return [

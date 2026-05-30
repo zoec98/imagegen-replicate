@@ -40,7 +40,8 @@ def test_run_generation_request_succeeded_updates_request(app_config):
 
     def fake_generate(prompt, config, *, parameters, source_image_paths):
         assert prompt == "a red house"
-        assert config is app_config
+        assert config.output_dir == app_config.output_dir
+        assert config.model_alias == "seedream45"
         assert parameters == {"size": "2K"}
         assert source_image_paths == [source_path]
         return ReplicateResult(
@@ -154,6 +155,29 @@ def test_run_generation_request_logs_failure(app_config):
             {"status": "failed", "error": "Replicate failed."},
         ),
     ]
+
+
+def test_run_generation_request_uses_request_model(app_config):
+    store = RequestStore()
+    record = store.create(
+        model_alias="flux-flex",
+        prompt="a red house",
+        parameters={"guidance": 5.5},
+    )
+
+    def fake_generate(prompt, config, *, parameters, source_image_paths):
+        assert config.model_alias == "flux-flex"
+        assert config.model.replicate_model == "black-forest-labs/flux-2-flex"
+        return ReplicateResult(
+            prediction_id="prediction-123",
+            output_urls=[],
+            stored_images=[],
+            logs="done",
+        )
+
+    run_generation_request(store, record, app_config, fake_generate)
+
+    assert record.status == "succeeded"
 
 
 def test_threaded_worker_start_returns_before_generation_completes(app_config):
