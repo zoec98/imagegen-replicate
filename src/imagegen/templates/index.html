@@ -8,6 +8,7 @@
     <title>imagegen</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v=app_checksum) }}">
     <script id="model-registry-data" type="application/json">{{ model_registry | tojson }}</script>
+    <script id="palette-data" type="application/json">{{ palettes | tojson }}</script>
     <script defer src="{{ url_for('static', filename='app.js', v=app_checksum) }}"></script>
   </head>
   <body>

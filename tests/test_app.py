@@ -40,6 +40,13 @@ def extract_model_registry(response):
     return json.loads(response.data[start:end].decode("utf-8"))
 
 
+def extract_palette_data(response):
+    marker = b'<script id="palette-data" type="application/json">'
+    start = response.data.index(marker) + len(marker)
+    end = response.data.index(b"</script>", start)
+    return json.loads(response.data[start:end].decode("utf-8"))
+
+
 def test_app_checksum_changes_when_asset_content_changes(tmp_path):
     template = tmp_path / "index.html"
     script = tmp_path / "app.js"
@@ -162,6 +169,81 @@ def test_index_exposes_model_registry_metadata(app_factory):
     )
     assert seed["semantic_type"] == "seed"
     assert "prompt" not in {parameter["name"] for parameter in flux["parameters"]}
+
+
+def test_index_exposes_empty_palette_data_when_fragment_root_is_missing(app_factory):
+    client = app_factory().test_client()
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert extract_palette_data(response) == []
+
+
+def test_index_exposes_palette_data(app_config, app_factory):
+    character = app_config.fragment_root / "character"
+    style = app_config.fragment_root / "style"
+    character.mkdir(parents=True)
+    style.mkdir()
+    (character / "zoe.txt").write_text("blue hair", encoding="utf-8")
+    (character / "aoife.txt").write_text("red hair", encoding="utf-8")
+    (style / "comic_lawrence.txt").write_text("ink style", encoding="utf-8")
+    client = app_factory().test_client()
+
+    response = client.get("/")
+    palettes = extract_palette_data(response)
+
+    assert response.status_code == 200
+    assert palettes == [
+        {
+            "name": "character",
+            "display_name": "character",
+            "fragments": [
+                {
+                    "name": "aoife",
+                    "display_name": "aoife",
+                    "content": "red hair",
+                },
+                {
+                    "name": "zoe",
+                    "display_name": "zoe",
+                    "content": "blue hair",
+                },
+            ],
+        },
+        {
+            "name": "style",
+            "display_name": "style",
+            "fragments": [
+                {
+                    "name": "comic_lawrence",
+                    "display_name": "comic lawrence",
+                    "content": "ink style",
+                },
+            ],
+        },
+    ]
+
+
+def test_index_excludes_invalid_palette_fragments(app_config, app_factory):
+    style = app_config.fragment_root / "style"
+    style.mkdir(parents=True)
+    (style / "valid.txt").write_text("valid content", encoding="utf-8")
+    (style / "bad.txt").write_text("bad: content", encoding="utf-8")
+    (style / "ignore.md").write_text("ignored", encoding="utf-8")
+    client = app_factory().test_client()
+
+    response = client.get("/")
+    palettes = extract_palette_data(response)
+
+    assert response.status_code == 200
+    assert palettes[0]["fragments"] == [
+        {
+            "name": "valid",
+            "display_name": "valid",
+            "content": "valid content",
+        },
+    ]
 
 
 def test_index_static_asset_urls_are_cache_busted(app_factory):

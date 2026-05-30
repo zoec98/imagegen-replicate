@@ -27,6 +27,7 @@ from imagegen.model_registry import (
     ModelParameter,
     ReplicateModel,
 )
+from imagegen.palettes import Palette, PaletteFragment, PaletteRepository
 from imagegen.security import ensure_csrf_token
 
 
@@ -51,6 +52,12 @@ def register_routes(app: Flask) -> None:
                 for model in sorted(
                     MODEL_REGISTRY.values(), key=lambda item: item.alias
                 )
+            ],
+            palettes=[
+                _palette_json(palette)
+                for palette in PaletteRepository(
+                    app_config.fragment_root
+                ).list_palettes()
             ],
             app_config=app_config,
             parameters=[
@@ -158,4 +165,22 @@ def _custom_dimensions_json(
         "scale_parameter": control.scale_parameter,
         "width_parameter": control.width_parameter,
         "height_parameter": control.height_parameter,
+    }
+
+
+def _palette_json(palette: Palette) -> dict[str, object]:
+    return {
+        "name": palette.name,
+        "display_name": palette.display_name,
+        "fragments": [
+            _palette_fragment_json(fragment) for fragment in palette.fragments
+        ],
+    }
+
+
+def _palette_fragment_json(fragment: PaletteFragment) -> dict[str, str]:
+    return {
+        "name": fragment.name,
+        "display_name": fragment.display_name,
+        "content": fragment.content,
     }
