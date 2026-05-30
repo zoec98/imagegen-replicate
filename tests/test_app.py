@@ -433,11 +433,15 @@ def test_api_generate_logs_recreatable_request_payload(app_factory):
 
     assert response.status_code == 202
     row = app.config["IMAGEGEN_GENERATION_LOG"].get_request(response.json["request_id"])
+    result = app.config["IMAGEGEN_GENERATION_LOG"].get_result(
+        response.json["request_id"]
+    )
     assert row is not None
-    assert row["status"] == "queued"
+    assert result is not None
+    assert result["status"] == "queued"
     assert row["model_alias"] == "seedream45"
     assert row["model"] == "bytedance/seedream-4.5"
-    assert json.loads(row["replicate_input_json"]) == {
+    assert json.loads(row["request_sent_json"]) == {
         "aspect_ratio": "match_input_image",
         "disable_safety_checker": True,
         "max_images": 1,

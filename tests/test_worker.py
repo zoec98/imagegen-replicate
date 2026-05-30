@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Event
 
+from imagegen.generation_log import SQLiteGenerationLog
 from imagegen.image_store import StoredImage
 from imagegen.replicate_client import ReplicatePredictionTimeout, ReplicateResult
 from imagegen.request_store import RequestStore
@@ -129,6 +130,64 @@ def test_run_generation_request_logs_lifecycle_and_results(app_config):
     assert generation_log.calls[2][2]["sequence"] == 1
     assert generation_log.calls[2][2]["image"] is stored_image
     assert generation_log.calls[2][2]["logs"] == ["created", "finished"]
+
+
+def test_run_generation_request_persists_multiple_assets(app_config):
+    store = RequestStore()
+    record = store.create(prompt="a red house", parameters={})
+    generation_log = SQLiteGenerationLog(app_config.generation_log_path)
+    generation_log.initialize()
+    generation_log.create_request(
+        record,
+        model_alias="seedream45",
+        model="bytedance/seedream-4.5",
+        replicate_input={"prompt": "a red house"},
+    )
+    stored_images = [
+        StoredImage(
+            path=app_config.output_dir / "seedream45-prediction-123-01.png",
+            source_url="https://example.test/image-1.png",
+            content_type="image/png",
+            size_bytes=123,
+            created_at="2026-05-30T12:00:00+00:00",
+        ),
+        StoredImage(
+            path=app_config.output_dir / "seedream45-prediction-123-02.png",
+            source_url="https://example.test/image-2.png",
+            content_type="image/png",
+            size_bytes=456,
+            created_at="2026-05-30T12:00:01+00:00",
+        ),
+    ]
+
+    def fake_generate(prompt, config, *, parameters, source_image_paths):
+        return ReplicateResult(
+            prediction_id="prediction-123",
+            output_urls=[
+                "https://example.test/image-1.png",
+                "https://example.test/image-2.png",
+            ],
+            stored_images=stored_images,
+            logs="created\nfinished",
+        )
+
+    run_generation_request(
+        store,
+        record,
+        app_config,
+        fake_generate,
+        generation_log,
+    )
+
+    result = generation_log.get_result(record.request_id)
+    assets = generation_log.list_assets(record.request_id)
+    assert result is not None
+    assert result["status"] == "succeeded"
+    assert result["prediction_id"] == "prediction-123"
+    assert [asset["filename"] for asset in assets] == [
+        "seedream45-prediction-123-01.png",
+        "seedream45-prediction-123-02.png",
+    ]
 
 
 def test_run_generation_request_logs_failure(app_config):

@@ -21,6 +21,56 @@ def test_initialize_creates_schema_idempotently(tmp_path):
         }
     assert "generation_requests" in tables
     assert "generation_results" in tables
+    assert "generation_assets" in tables
+    assert "schema_version" in tables
+    with sqlite3.connect(log.path) as connection:
+        version = connection.execute("SELECT version FROM schema_version").fetchone()[0]
+    assert version == 1
+
+
+def test_initialize_rebuilds_unversioned_lab_schema(tmp_path):
+    log = SQLiteGenerationLog(tmp_path / "imagegen.sqlite3")
+    log.path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(log.path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE generation_requests (
+                id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                status TEXT NOT NULL,
+                model_alias TEXT NOT NULL,
+                model TEXT NOT NULL,
+                replicate_input_json TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                parameters_json TEXT NOT NULL,
+                source_image_filenames_json TEXT NOT NULL
+            );
+            INSERT INTO generation_requests
+            VALUES ('old', '2026-05-30T12:00:00+00:00', 'queued',
+                'seedream45', 'bytedance/seedream-4.5', '{}', 'old', '{}', '[]');
+            """
+        )
+
+    log.initialize()
+
+    with sqlite3.connect(log.path) as connection:
+        columns = [
+            row[1]
+            for row in connection.execute("PRAGMA table_info(generation_requests)")
+        ]
+        count = connection.execute(
+            "SELECT count(*) FROM generation_requests"
+        ).fetchone()[0]
+    assert columns == [
+        "id",
+        "sent_at",
+        "model_alias",
+        "model",
+        "request_sent_json",
+        "parameters_json",
+        "source_image_filenames_json",
+    ]
+    assert count == 0
 
 
 def test_create_request_persists_recreatable_payload(tmp_path):
@@ -46,11 +96,14 @@ def test_create_request_persists_recreatable_payload(tmp_path):
     )
 
     row = log.get_request(record.request_id)
+    result = log.get_result(record.request_id)
     assert row is not None
-    assert row["status"] == "queued"
+    assert result is not None
+    assert result["status"] == "queued"
+    assert json.loads(result["logs_json"]) == []
     assert row["model_alias"] == "seedream45"
     assert row["model"] == "bytedance/seedream-4.5"
-    assert json.loads(row["replicate_input_json"]) == replicate_input
+    assert json.loads(row["request_sent_json"]) == replicate_input
     assert json.loads(row["parameters_json"]) == {"size": "2K"}
     assert json.loads(row["source_image_filenames_json"]) == ["source.png"]
 
@@ -74,7 +127,9 @@ def test_lifecycle_updates_status_and_elapsed_time(tmp_path):
         logs=["created", "finished"],
     )
 
-    row = log.get_request(record.request_id)
+    request_row = log.get_request(record.request_id)
+    row = log.get_result(record.request_id)
+    assert request_row is not None
     assert row is not None
     assert row["status"] == "succeeded"
     assert row["started_at"]
@@ -98,10 +153,11 @@ def test_failed_request_persists_error_detail(tmp_path):
     log.mark_started(record.request_id)
     log.mark_finished(record.request_id, status="failed", error="Replicate failed.")
 
-    row = log.get_request(record.request_id)
+    row = log.get_result(record.request_id)
     assert row is not None
     assert row["status"] == "failed"
     assert row["error"] == "Replicate failed."
+    assert log.list_assets(record.request_id) == []
 
 
 def test_add_result_persists_stored_image_metadata(tmp_path):
@@ -130,10 +186,13 @@ def test_add_result_persists_stored_image_metadata(tmp_path):
         logs=["done"],
     )
 
-    rows = log.list_results(record.request_id)
+    result = log.get_result(record.request_id)
+    rows = log.list_assets(record.request_id)
+    assert result is not None
     assert rows == [
         {
             "id": 1,
+            "result_id": result["id"],
             "request_id": record.request_id,
             "sequence": 1,
             "filename": "seedream45-prediction-123-01.png",
@@ -141,8 +200,38 @@ def test_add_result_persists_stored_image_metadata(tmp_path):
             "content_type": "image/png",
             "size_bytes": 123,
             "created_at": "2026-05-30T12:00:00+00:00",
-            "elapsed_seconds": 1.25,
-            "logs_json": '["done"]',
-            "error": None,
         }
     ]
+
+
+def test_multiple_assets_share_one_lifecycle_row(tmp_path):
+    log = SQLiteGenerationLog(tmp_path / "imagegen.sqlite3")
+    log.initialize()
+    record = RequestStore().create(prompt="prompt", parameters={})
+    log.create_request(
+        record,
+        model_alias="seedream45",
+        model="bytedance/seedream-4.5",
+        replicate_input={"prompt": "prompt"},
+    )
+    log.mark_finished(record.request_id, status="succeeded", prediction_id="prediction")
+
+    for sequence in (1, 2):
+        log.add_result(
+            record.request_id,
+            sequence=sequence,
+            image=StoredImage(
+                path=tmp_path / f"seedream45-prediction-{sequence:02}.png",
+                source_url=f"https://example.com/out-{sequence}.png",
+                content_type="image/png",
+                size_bytes=123 + sequence,
+                created_at="2026-05-30T12:00:00+00:00",
+            ),
+        )
+
+    result = log.get_result(record.request_id)
+    assets = log.list_assets(record.request_id)
+    assert result is not None
+    assert result["status"] == "succeeded"
+    assert [asset["sequence"] for asset in assets] == [1, 2]
+    assert {asset["result_id"] for asset in assets} == {result["id"]}
