@@ -18,6 +18,7 @@
         data-api-generate-url="{{ url_for('api_generate') }}"
         data-api-images-url="{{ url_for('api_images') }}"
         data-api-app-version-url="{{ url_for('api_app_version') }}"
+        data-api-palettes-url="{{ url_for('api_palettes') }}"
         data-poll-seconds="{{ app_config.replicate_poll_seconds }}"
       >
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -57,6 +58,11 @@
               <label for="prompt">Prompt</label>
             </div>
             <div class="generate-controls">
+              <button
+                class="palette-editor-toggle"
+                type="button"
+                {% if not palettes %}hidden{% endif %}
+              >Palettes</button>
               <span class="pricing-popover">
                 <button
                   class="pricing-info"
@@ -88,6 +94,31 @@
                   </select>
                 </label>
               {% endfor %}
+            </div>
+            <div class="palette-editor" hidden>
+              <div class="palette-editor-grid">
+                <label class="palette-field" for="palette-editor-palette">
+                  <span>palette</span>
+                  <select id="palette-editor-palette"></select>
+                </label>
+                <label class="palette-field" for="palette-editor-fragment">
+                  <span>entry</span>
+                  <select id="palette-editor-fragment"></select>
+                </label>
+                <label class="palette-field" for="palette-editor-name">
+                  <span>new entry</span>
+                  <input id="palette-editor-name" autocomplete="off">
+                </label>
+              </div>
+              <label class="palette-editor-content" for="palette-editor-content">
+                <span>content</span>
+                <textarea id="palette-editor-content" rows="4"></textarea>
+              </label>
+              <div class="palette-editor-actions">
+                <button class="palette-editor-create" type="button">Create</button>
+                <button class="palette-editor-update" type="button">Update</button>
+                <button class="palette-editor-delete" type="button">Delete</button>
+              </div>
             </div>
           {% endif %}
         </div>

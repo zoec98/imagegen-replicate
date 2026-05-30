@@ -31,6 +31,14 @@ class PaletteError(ValueError):
     pass
 
 
+class PaletteNotFoundError(PaletteError):
+    pass
+
+
+class PaletteConflictError(PaletteError):
+    pass
+
+
 @dataclass(frozen=True)
 class PaletteRepository:
     root: Path
@@ -63,6 +71,59 @@ class PaletteRepository:
             content=read_fragment_content(path),
         )
 
+    def create_fragment(
+        self,
+        palette_name: str,
+        fragment_name: str,
+        content: str,
+    ) -> PaletteFragment:
+        palette_name = validate_name(palette_name, label="palette")
+        fragment_name = normalize_fragment_name(fragment_name)
+        content = validate_fragment_content(content)
+        palette_dir = self._palette_dir(palette_name)
+        if not palette_dir.is_dir():
+            msg = f"Palette not found: {palette_name}."
+            raise PaletteNotFoundError(msg)
+        path = self._fragment_path(palette_name, fragment_name)
+        if path.exists():
+            msg = f"Fragment already exists: {palette_name}/{fragment_name}."
+            raise PaletteConflictError(msg)
+        path.write_text(content, encoding="utf-8")
+        return PaletteFragment(
+            name=fragment_name,
+            display_name=display_name(fragment_name),
+            content=content,
+        )
+
+    def update_fragment(
+        self,
+        palette_name: str,
+        fragment_name: str,
+        content: str,
+    ) -> PaletteFragment:
+        palette_name = validate_name(palette_name, label="palette")
+        fragment_name = validate_name(fragment_name, label="fragment")
+        content = validate_fragment_content(content)
+        path = self._fragment_path(palette_name, fragment_name)
+        if not path.is_file():
+            msg = f"Fragment not found: {palette_name}/{fragment_name}."
+            raise PaletteNotFoundError(msg)
+        path.write_text(content, encoding="utf-8")
+        return PaletteFragment(
+            name=fragment_name,
+            display_name=display_name(fragment_name),
+            content=content,
+        )
+
+    def delete_fragment(self, palette_name: str, fragment_name: str) -> None:
+        palette_name = validate_name(palette_name, label="palette")
+        fragment_name = validate_name(fragment_name, label="fragment")
+        path = self._fragment_path(palette_name, fragment_name)
+        if not path.is_file():
+            msg = f"Fragment not found: {palette_name}/{fragment_name}."
+            raise PaletteNotFoundError(msg)
+        path.unlink()
+
     def _palette_from_dir(self, palette_dir: Path) -> Palette:
         fragments = [
             PaletteFragment(
@@ -77,6 +138,14 @@ class PaletteRepository:
             display_name=display_name(palette_dir.name),
             fragments=tuple(fragments),
         )
+
+    def _palette_dir(self, palette_name: str) -> Path:
+        root = self.root.resolve()
+        path = (root / palette_name).resolve()
+        if not path.is_relative_to(root):
+            msg = "Palette path is outside the configured fragment root."
+            raise PaletteError(msg)
+        return path
 
     def _fragment_path(self, palette_name: str, fragment_name: str) -> Path:
         root = self.root.resolve()

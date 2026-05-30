@@ -10,6 +10,15 @@
   const pricingTooltip = form.querySelector(".pricing-tooltip");
   const parameterGrid = form.querySelector(".parameter-grid");
   const paletteControls = form.querySelector(".palette-controls");
+  const paletteEditorToggle = form.querySelector(".palette-editor-toggle");
+  const paletteEditor = form.querySelector(".palette-editor");
+  const paletteEditorPalette = form.querySelector("#palette-editor-palette");
+  const paletteEditorFragment = form.querySelector("#palette-editor-fragment");
+  const paletteEditorName = form.querySelector("#palette-editor-name");
+  const paletteEditorContent = form.querySelector("#palette-editor-content");
+  const paletteEditorCreate = form.querySelector(".palette-editor-create");
+  const paletteEditorUpdate = form.querySelector(".palette-editor-update");
+  const paletteEditorDelete = form.querySelector(".palette-editor-delete");
   const generateButton = form.querySelector(".generate-button");
   const editToggle = form.querySelector(".edit-toggle");
   const sourceCounter = form.querySelector(".source-counter");
@@ -45,7 +54,7 @@
   }
 
   const modelRegistry = loadJsonData("#model-registry-data");
-  const paletteData = loadJsonData("#palette-data");
+  let paletteData = loadJsonData("#palette-data");
   const parameterState = {};
   const selectedSourceImages = new Set();
   let editModeEnabled = false;
@@ -199,6 +208,190 @@
     }
     promptInput.setRangeText(nextText, promptInput.selectionStart, promptInput.selectionEnd, "end");
     showMessage(`${fragment.display_name} inserted.`, "success");
+  }
+
+  function setPaletteEditorOpen(isOpen) {
+    if (paletteEditor) {
+      paletteEditor.hidden = !isOpen;
+    }
+    paletteEditorToggle?.classList.toggle("palette-editor-toggle-active", isOpen);
+    paletteEditorToggle?.setAttribute("aria-pressed", isOpen ? "true" : "false");
+  }
+
+  function paletteUrl(path = "") {
+    const base = form.dataset.apiPalettesUrl || "/api/palettes";
+    return `${base}${path}`;
+  }
+
+  function encoded(value) {
+    return encodeURIComponent(value);
+  }
+
+  function renderPromptPaletteControls() {
+    if (!paletteControls) {
+      return;
+    }
+    paletteControls.replaceChildren();
+    paletteData.forEach((palette) => {
+      const label = document.createElement("label");
+      label.className = "palette-field";
+      label.htmlFor = `palette-${palette.name}`;
+
+      const text = document.createElement("span");
+      text.textContent = palette.display_name;
+
+      const select = document.createElement("select");
+      select.id = `palette-${palette.name}`;
+      select.dataset.paletteName = palette.name;
+
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = `Select ${palette.display_name}`;
+      select.append(placeholder);
+
+      (palette.fragments || []).forEach((fragment) => {
+        const option = document.createElement("option");
+        option.value = fragment.name;
+        option.textContent = fragment.display_name;
+        select.append(option);
+      });
+
+      label.append(text, select);
+      paletteControls.append(label);
+    });
+  }
+
+  function populatePaletteEditor(selectedPalette = "", selectedFragment = "") {
+    if (!paletteEditorPalette || !paletteEditorFragment) {
+      return;
+    }
+    paletteEditorPalette.replaceChildren();
+    paletteData.forEach((palette) => {
+      const option = document.createElement("option");
+      option.value = palette.name;
+      option.textContent = palette.display_name;
+      option.selected = palette.name === selectedPalette;
+      paletteEditorPalette.append(option);
+    });
+    const palette =
+      paletteData.find((item) => item.name === paletteEditorPalette.value) ||
+      paletteData[0] ||
+      null;
+    paletteEditorFragment.replaceChildren();
+    if (!palette) {
+      return;
+    }
+    (palette.fragments || []).forEach((fragment) => {
+      const option = document.createElement("option");
+      option.value = fragment.name;
+      option.textContent = fragment.display_name;
+      option.selected = fragment.name === selectedFragment;
+      paletteEditorFragment.append(option);
+    });
+  }
+
+  async function refreshPaletteData(selectedPalette = "", selectedFragment = "") {
+    if (!form.dataset.apiPalettesUrl) {
+      return;
+    }
+    const response = await fetch(form.dataset.apiPalettesUrl, {
+      credentials: "same-origin",
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Palette refresh failed.");
+    }
+    paletteData = Array.isArray(data.palettes) ? data.palettes : [];
+    renderPromptPaletteControls();
+    populatePaletteEditor(selectedPalette, selectedFragment);
+  }
+
+  async function loadEditorFragment() {
+    if (!paletteEditorPalette?.value || !paletteEditorFragment?.value) {
+      if (paletteEditorContent) {
+        paletteEditorContent.value = "";
+      }
+      return;
+    }
+    const response = await fetch(
+      paletteUrl(
+        `/${encoded(paletteEditorPalette.value)}/fragments/${encoded(
+          paletteEditorFragment.value,
+        )}`,
+      ),
+      { credentials: "same-origin" },
+    );
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Palette fragment could not be loaded.");
+    }
+    if (paletteEditorName) {
+      paletteEditorName.value = "";
+    }
+    if (paletteEditorContent) {
+      paletteEditorContent.value = data.fragment?.content || "";
+    }
+  }
+
+  async function writePaletteFragment(method, url, body) {
+    if (!csrfToken) {
+      throw new Error("Missing CSRF token.");
+    }
+    const response = await fetch(url, {
+      method,
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Palette edit failed.");
+    }
+    return data;
+  }
+
+  async function createPaletteFragment() {
+    const paletteName = paletteEditorPalette?.value || "";
+    const name = paletteEditorName?.value || "";
+    const content = paletteEditorContent?.value || "";
+    const data = await writePaletteFragment(
+      "POST",
+      paletteUrl(`/${encoded(paletteName)}/fragments`),
+      { name, content },
+    );
+    await refreshPaletteData(paletteName, data.fragment?.name || "");
+    showMessage(`${data.fragment?.display_name || "Fragment"} created.`, "success");
+  }
+
+  async function updatePaletteFragment() {
+    const paletteName = paletteEditorPalette?.value || "";
+    const fragmentName = paletteEditorFragment?.value || "";
+    const content = paletteEditorContent?.value || "";
+    const data = await writePaletteFragment(
+      "PUT",
+      paletteUrl(`/${encoded(paletteName)}/fragments/${encoded(fragmentName)}`),
+      { content },
+    );
+    await refreshPaletteData(paletteName, data.fragment?.name || fragmentName);
+    showMessage(`${data.fragment?.display_name || "Fragment"} updated.`, "success");
+  }
+
+  async function deletePaletteFragment() {
+    const paletteName = paletteEditorPalette?.value || "";
+    const fragmentName = paletteEditorFragment?.value || "";
+    const data = await writePaletteFragment(
+      "DELETE",
+      paletteUrl(`/${encoded(paletteName)}/fragments/${encoded(fragmentName)}`),
+      {},
+    );
+    await refreshPaletteData(paletteName, "");
+    if (paletteEditorContent) {
+      paletteEditorContent.value = "";
+    }
+    showMessage(`${data.deleted || "Fragment"} deleted.`, "success");
   }
 
   function sourceImageLimit(model) {
@@ -1009,6 +1202,22 @@
     clearSelectedSources();
     sourceStatus("");
   });
+  paletteEditorToggle?.addEventListener("click", () => {
+    if (!paletteEditor) {
+      return;
+    }
+    const nextOpen = paletteEditor.hidden;
+    setPaletteEditorOpen(nextOpen);
+    if (nextOpen) {
+      populatePaletteEditor(
+        paletteEditorPalette?.value || "",
+        paletteEditorFragment?.value || "",
+      );
+      loadEditorFragment().catch((error) => {
+        showMessage(error.message || "Palette fragment could not be loaded.", "error");
+      });
+    }
+  });
   paletteControls?.addEventListener("change", (event) => {
     const control = event.target;
     if (!control?.dataset?.paletteName || !control.value) {
@@ -1016,6 +1225,32 @@
     }
     insertPaletteFragment(control.dataset.paletteName, control.value);
     control.value = "";
+  });
+  paletteEditorPalette?.addEventListener("change", () => {
+    populatePaletteEditor(paletteEditorPalette.value, "");
+    loadEditorFragment().catch((error) => {
+      showMessage(error.message || "Palette fragment could not be loaded.", "error");
+    });
+  });
+  paletteEditorFragment?.addEventListener("change", () => {
+    loadEditorFragment().catch((error) => {
+      showMessage(error.message || "Palette fragment could not be loaded.", "error");
+    });
+  });
+  paletteEditorCreate?.addEventListener("click", () => {
+    createPaletteFragment().catch((error) => {
+      showMessage(error.message || "Palette fragment could not be created.", "error");
+    });
+  });
+  paletteEditorUpdate?.addEventListener("click", () => {
+    updatePaletteFragment().catch((error) => {
+      showMessage(error.message || "Palette fragment could not be updated.", "error");
+    });
+  });
+  paletteEditorDelete?.addEventListener("click", () => {
+    deletePaletteFragment().catch((error) => {
+      showMessage(error.message || "Palette fragment could not be deleted.", "error");
+    });
   });
   gallery?.addEventListener("click", (event) => {
     const infoButton = event.target.closest(".gallery-info");
@@ -1087,6 +1322,8 @@
   });
   renderPricing(selectedModel());
   renderParameters(selectedModel());
+  populatePaletteEditor();
+  setPaletteEditorOpen(!paletteEditor?.hidden);
   updateSourceSelectionUi();
   form.addEventListener("submit", submitGeneration);
 })();

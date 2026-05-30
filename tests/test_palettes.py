@@ -119,3 +119,58 @@ def test_read_fragment_content_rejects_non_utf8(tmp_path):
 
     with pytest.raises(PaletteError, match="UTF-8"):
         read_fragment_content(fragment)
+
+
+def test_create_fragment_requires_existing_palette(tmp_path):
+    repository = PaletteRepository(tmp_path / "fragments")
+
+    with pytest.raises(PaletteError, match="Palette not found"):
+        repository.create_fragment("character", "zoe", "Zoe description")
+
+
+def test_create_fragment_writes_normalized_name(tmp_path):
+    root = tmp_path / "fragments"
+    (root / "style").mkdir(parents=True)
+    repository = PaletteRepository(root)
+
+    fragment = repository.create_fragment(
+        "style",
+        "comic lawrence",
+        "ink style",
+    )
+
+    assert fragment.name == "comic_lawrence"
+    assert (root / "style" / "comic_lawrence.txt").read_text(
+        encoding="utf-8"
+    ) == "ink style"
+
+
+def test_create_fragment_rejects_conflict(tmp_path):
+    root = tmp_path / "fragments"
+    (root / "style").mkdir(parents=True)
+    (root / "style" / "photo.txt").write_text("photo", encoding="utf-8")
+
+    with pytest.raises(PaletteError, match="already exists"):
+        PaletteRepository(root).create_fragment("style", "photo", "new")
+
+
+def test_update_fragment_overwrites_existing_content(tmp_path):
+    root = tmp_path / "fragments"
+    (root / "style").mkdir(parents=True)
+    (root / "style" / "photo.txt").write_text("old", encoding="utf-8")
+
+    fragment = PaletteRepository(root).update_fragment("style", "photo", "new")
+
+    assert fragment.content == "new"
+    assert (root / "style" / "photo.txt").read_text(encoding="utf-8") == "new"
+
+
+def test_delete_fragment_removes_existing_file(tmp_path):
+    root = tmp_path / "fragments"
+    (root / "style").mkdir(parents=True)
+    fragment_path = root / "style" / "photo.txt"
+    fragment_path.write_text("photo", encoding="utf-8")
+
+    PaletteRepository(root).delete_fragment("style", "photo")
+
+    assert not fragment_path.exists()

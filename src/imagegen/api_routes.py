@@ -17,6 +17,14 @@ from imagegen.gallery import GalleryImage, list_gallery_images
 from imagegen.generation_log import GenerationLog
 from imagegen.immich_client import ImmichClient, ImmichUploadError
 from imagegen.model_registry import MODEL_REGISTRY, ReplicateModel
+from imagegen.palettes import (
+    Palette,
+    PaletteConflictError,
+    PaletteError,
+    PaletteFragment,
+    PaletteNotFoundError,
+    PaletteRepository,
+)
 from imagegen.prompt_annotations import strip_prompt_annotations
 from imagegen.replicate_client import build_prediction_input
 from imagegen.request_store import GenerationRequest, RequestStore
@@ -93,6 +101,74 @@ def register_api_routes(app: Flask) -> None:
             {"images": [_gallery_image_json(app, image) for image in images]}
         )
 
+    @app.get("/api/palettes")
+    def api_palettes():
+        try:
+            palettes = _palette_repository(app).list_palettes()
+        except PaletteError as error:
+            return jsonify({"error": str(error)}), 400
+        return jsonify({"palettes": [_palette_json(palette) for palette in palettes]})
+
+    @app.get("/api/palettes/<palette_name>/fragments/<fragment_name>")
+    def api_palette_fragment(palette_name: str, fragment_name: str):
+        try:
+            fragment = _palette_repository(app).read_fragment(
+                palette_name,
+                fragment_name,
+            )
+        except PaletteNotFoundError as error:
+            return jsonify({"error": str(error)}), 404
+        except PaletteError as error:
+            return jsonify({"error": str(error)}), 400
+        return jsonify({"fragment": _palette_fragment_json(fragment)})
+
+    @app.post("/api/palettes/<palette_name>/fragments")
+    @require_api_csrf
+    def api_create_palette_fragment(palette_name: str):
+        payload = request.get_json(silent=True) or {}
+        try:
+            name, content = _fragment_payload(payload, require_name=True)
+            fragment = _palette_repository(app).create_fragment(
+                palette_name,
+                name,
+                content,
+            )
+        except PaletteNotFoundError as error:
+            return jsonify({"error": str(error)}), 404
+        except PaletteConflictError as error:
+            return jsonify({"error": str(error)}), 409
+        except PaletteError as error:
+            return jsonify({"error": str(error)}), 400
+        return jsonify({"fragment": _palette_fragment_json(fragment)}), 201
+
+    @app.put("/api/palettes/<palette_name>/fragments/<fragment_name>")
+    @require_api_csrf
+    def api_update_palette_fragment(palette_name: str, fragment_name: str):
+        payload = request.get_json(silent=True) or {}
+        try:
+            _, content = _fragment_payload(payload, require_name=False)
+            fragment = _palette_repository(app).update_fragment(
+                palette_name,
+                fragment_name,
+                content,
+            )
+        except PaletteNotFoundError as error:
+            return jsonify({"error": str(error)}), 404
+        except PaletteError as error:
+            return jsonify({"error": str(error)}), 400
+        return jsonify({"fragment": _palette_fragment_json(fragment)})
+
+    @app.delete("/api/palettes/<palette_name>/fragments/<fragment_name>")
+    @require_api_csrf
+    def api_delete_palette_fragment(palette_name: str, fragment_name: str):
+        try:
+            _palette_repository(app).delete_fragment(palette_name, fragment_name)
+        except PaletteNotFoundError as error:
+            return jsonify({"error": str(error)}), 404
+        except PaletteError as error:
+            return jsonify({"error": str(error)}), 400
+        return jsonify({"deleted": fragment_name})
+
     @app.post("/api/images/<path:filename>/immich-upload")
     @require_api_csrf
     def api_immich_upload(filename: str):
@@ -154,6 +230,26 @@ def _generation_log(app: Flask) -> GenerationLog:
     return generation_log
 
 
+def _palette_repository(app: Flask) -> PaletteRepository:
+    return PaletteRepository(app.config["IMAGEGEN_APP_CONFIG"].fragment_root)
+
+
+def _fragment_payload(
+    payload: object,
+    *,
+    require_name: bool,
+) -> tuple[str, str]:
+    if not isinstance(payload, dict):
+        raise PaletteError("Palette fragment payload must be an object.")
+    name = payload.get("name", "")
+    content = payload.get("content", "")
+    if require_name and not isinstance(name, str):
+        raise PaletteError("Fragment name is required.")
+    if not isinstance(content, str):
+        raise PaletteError("Fragment content must be a string.")
+    return str(name), content
+
+
 def _immich_enabled(app: Flask) -> bool:
     return bool(app.config["IMAGEGEN_APP_CONFIG"].immich_enabled)
 
@@ -212,3 +308,21 @@ def _gallery_image_json(app: Flask, image: GalleryImage) -> dict[str, str | None
             filename=image.filename,
         )
     return payload
+
+
+def _palette_json(palette: Palette) -> dict[str, object]:
+    return {
+        "name": palette.name,
+        "display_name": palette.display_name,
+        "fragments": [
+            _palette_fragment_json(fragment) for fragment in palette.fragments
+        ],
+    }
+
+
+def _palette_fragment_json(fragment: PaletteFragment) -> dict[str, str]:
+    return {
+        "name": fragment.name,
+        "display_name": fragment.display_name,
+        "content": fragment.content,
+    }
