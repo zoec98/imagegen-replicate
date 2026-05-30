@@ -40,10 +40,31 @@ def test_validate_generation_payload_preserves_prompt_without_length_limit(tmp_p
     assert result.prompt == prompt
 
 
+def test_validate_generation_payload_accepts_valid_annotated_prompt(tmp_path):
+    prompt = "portrait of (character: zoe blue hair)"
+
+    result = validate_generation_payload(
+        {"prompt": prompt},
+        model=MODEL_REGISTRY["seedream45"],
+        output_dir=tmp_path,
+    )
+
+    assert result.prompt == prompt
+
+
 def test_validate_generation_payload_rejects_blank_prompt(tmp_path):
     with pytest.raises(ValidationError, match="Prompt is required."):
         validate_generation_payload(
             {"prompt": "   "},
+            model=MODEL_REGISTRY["seedream45"],
+            output_dir=tmp_path,
+        )
+
+
+def test_validate_generation_payload_rejects_invalid_annotated_prompt(tmp_path):
+    with pytest.raises(ValidationError, match="missing a closing"):
+        validate_generation_payload(
+            {"prompt": "portrait of (character: zoe blue hair"},
             model=MODEL_REGISTRY["seedream45"],
             output_dir=tmp_path,
         )

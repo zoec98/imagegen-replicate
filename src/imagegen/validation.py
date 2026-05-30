@@ -16,6 +16,10 @@ from imagegen.model_registry import (
     ModelParameter,
     ReplicateModel,
 )
+from imagegen.prompt_annotations import (
+    PromptAnnotationError,
+    validate_prompt_annotations,
+)
 from imagegen.source_images import SourceImageError, validate_source_images
 
 
@@ -40,6 +44,10 @@ def validate_generation_payload(
     prompt = str(payload.get("prompt", "")).strip()
     if not prompt:
         raise ValidationError("Prompt is required.")
+    try:
+        validate_prompt_annotations(prompt)
+    except PromptAnnotationError as error:
+        raise ValidationError(str(error)) from error
 
     raw_parameters = payload.get("parameters", {})
     if raw_parameters is None:

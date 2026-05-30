@@ -474,6 +474,24 @@ def test_api_generate_rejects_unknown_model(app_factory):
     }
 
 
+def test_api_generate_rejects_invalid_annotation_before_request_creation(app_factory):
+    app = app_factory()
+    client = app.test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={"prompt": "portrait of (character: zoe blue hair"},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Prompt annotation is missing a closing ')'."}
+    assert app.config["IMAGEGEN_REQUEST_STORE"]._requests == {}
+
+
 def test_api_generate_logs_recreatable_request_payload(app_factory):
     app = app_factory()
     client = app.test_client()
