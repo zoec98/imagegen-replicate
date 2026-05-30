@@ -1,5 +1,6 @@
 import json
 import os
+from urllib.parse import parse_qs, urlparse
 
 from imagegen.app import create_app
 from imagegen.app_version import app_checksum
@@ -14,6 +15,12 @@ def extract_csrf_token(response):
 
 def extract_app_checksum(response):
     marker = b'<meta name="app-build" content="'
+    start = response.data.index(marker) + len(marker)
+    end = response.data.index(b'"', start)
+    return response.data[start:end].decode("utf-8")
+
+
+def extract_attribute(response, marker):
     start = response.data.index(marker) + len(marker)
     end = response.data.index(b'"', start)
     return response.data[start:end].decode("utf-8")
@@ -50,7 +57,6 @@ def test_index_renders_prompt_form(app_factory):
     assert b'name="csrf-token"' in response.data
     assert b'name="app-build"' in response.data
     assert len(checksum) == 16
-    assert b'src="/static/app.js"' in response.data
     assert b'<form\n        class="prompt-form"' in response.data
     assert b'action="/generate"' not in response.data
     assert b'data-api-generate-url="/api/generate"' in response.data
@@ -64,6 +70,20 @@ def test_index_renders_prompt_form(app_factory):
     assert b'name="max_images"' in response.data
     assert b"disable_safety_checker" not in response.data
     assert b"Generate" in response.data
+
+
+def test_index_static_asset_urls_are_cache_busted(app_factory):
+    client = app_factory().test_client()
+
+    response = client.get("/")
+    checksum = extract_app_checksum(response)
+    css_url = extract_attribute(response, b'<link rel="stylesheet" href="')
+    js_url = extract_attribute(response, b'<script defer src="')
+
+    assert urlparse(css_url).path == "/static/app.css"
+    assert urlparse(js_url).path == "/static/app.js"
+    assert parse_qs(urlparse(css_url).query) == {"v": [checksum]}
+    assert parse_qs(urlparse(js_url).query) == {"v": [checksum]}
 
 
 def test_api_app_version_matches_rendered_checksum(app_factory):
