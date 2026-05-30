@@ -67,7 +67,7 @@ The planned UI flow is:
 9. Preview the returned image results.
 10. Download or reuse the generated files from the local results area.
 
-Generated files should be downloaded from Replicate and stored locally by the application with useful metadata, including the model, prompt, parameters, source URL, and creation time.
+Generated files should be downloaded from Replicate and stored locally by the application with embedded metadata, including the model, prompt, parameters, source URL, and creation time.
 
 Supported local image formats are PNG, JPEG, and WebP. GIF files are not accepted
 as source images or stored generation results.

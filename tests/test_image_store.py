@@ -1,7 +1,8 @@
-import json
+from io import BytesIO
 
 import httpx
 import pytest
+from PIL import Image
 
 from imagegen.image_store import (
     ImageDownloadError,
@@ -9,6 +10,7 @@ from imagegen.image_store import (
     max_download_bytes,
     persist_generated_images,
 )
+from imagegen.metadata import EmbeddedImageMetadataProvider
 from imagegen.model_registry import MODEL_REGISTRY
 
 
@@ -16,12 +18,18 @@ def response_client(response):
     return httpx.Client(transport=httpx.MockTransport(lambda request: response))
 
 
-def test_download_image_writes_file_and_metadata(tmp_path):
+def image_bytes(image_format):
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8), (255, 0, 0)).save(buffer, image_format)
+    return buffer.getvalue()
+
+
+def test_download_image_writes_file_and_embedded_metadata(tmp_path):
     model = MODEL_REGISTRY["seedream45"]
     response = httpx.Response(
         200,
         headers={"content-type": "image/jpeg"},
-        content=b"jpeg-data",
+        content=image_bytes("JPEG"),
         request=httpx.Request("GET", "https://example.com/out.jpg"),
     )
 
@@ -37,14 +45,12 @@ def test_download_image_writes_file_and_metadata(tmp_path):
     )
 
     assert stored.path == tmp_path / "seedream45-abc123-01.jpg"
-    assert stored.path.read_bytes() == b"jpeg-data"
-    assert stored.metadata_path == tmp_path / "seedream45-abc123-01.jpg.json"
-    metadata = json.loads(stored.metadata_path.read_text(encoding="utf-8"))
-    assert metadata["model_alias"] == "seedream45"
-    assert metadata["prediction_id"] == "abc123"
-    assert metadata["prompt"] == "a cookie"
-    assert metadata["source_url"] == "https://example.com/out.jpg"
-    assert metadata["parameters"]["disable_safety_checker"] is True
+    assert not (tmp_path / "seedream45-abc123-01.jpg.json").exists()
+    metadata = EmbeddedImageMetadataProvider().get(stored.path)
+    assert metadata.content_type == "image/jpeg"
+    assert metadata.created_at == stored.created_at
+    assert metadata.parameters is not None
+    assert metadata.parameters["disable_safety_checker"] is True
 
 
 def test_persist_generated_images_creates_output_directory(tmp_path):
@@ -53,7 +59,7 @@ def test_persist_generated_images_creates_output_directory(tmp_path):
     response = httpx.Response(
         200,
         headers={"content-type": "image/png"},
-        content=b"png-data",
+        content=image_bytes("PNG"),
         request=httpx.Request("GET", "https://example.com/out.png"),
     )
 

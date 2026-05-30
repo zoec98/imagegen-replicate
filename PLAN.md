@@ -148,9 +148,20 @@ The current app-like `/api/*` generation flow remains the baseline.
 
 ### Open Decisions
 
-- GPLv3 licensing is acceptable for this project, so `pyexiv2` remains the preferred dependency if the format and platform spike passes.
-- Whether the canonical structured metadata field should be XMP or EXIF `UserComment`.
-- Whether full metadata should be duplicated into embedded metadata or only the `parameters` key, now that SQLite will hold the full generation record.
+- `pyexiv2` was spiked first and installed through `uv`, but import failed on the
+  local macOS arm64 environment because its bundled Exiv2 library expected a
+  missing Homebrew `inih` dylib. Because that native dependency behavior is not
+  acceptable for this project stage, the selected implementation uses Pillow.
+- Pillow successfully round-tripped metadata for JPEG, PNG, and WebP in the
+  local spike.
+- The structured application metadata contract is:
+  - PNG: JSON stored in a namespaced `imagegen:metadata` text chunk.
+  - JPEG/WebP: JSON stored in EXIF `UserComment`.
+  - Human-readable description: generated image summary stored in EXIF
+    `ImageDescription` for JPEG/WebP, and mirrored to PNG text description keys.
+- The embedded JSON currently stores the full generation metadata payload,
+  including the previous sidecar `parameters` key. SQLite can later become the
+  durable canonical history without requiring this embedded payload to shrink.
 
 ## Ticket 4: SQLite Generation Log
 

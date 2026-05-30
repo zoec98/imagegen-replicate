@@ -1,10 +1,4 @@
-"""Generated image metadata access.
-
-This module owns metadata lookup for generated images. The current
-implementation reads legacy JSON sidecars, but callers use the provider
-interface so the storage can later move into image EXIF without changing route
-or gallery code.
-"""
+"""Generated image metadata access."""
 
 from __future__ import annotations
 
@@ -13,25 +7,50 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from imagegen.metadata_embed import read_embedded_metadata
+
 
 @dataclass(frozen=True)
 class ImageMetadata:
     content_type: str | None = None
     created_at: str | None = None
+    parameters: dict[str, object] | None = None
 
     @property
     def exists(self) -> bool:
-        return self.content_type is not None or self.created_at is not None
+        return (
+            self.content_type is not None
+            or self.created_at is not None
+            or self.parameters is not None
+        )
 
-    def to_json(self) -> dict[str, str | None]:
-        return {
+    def to_json(self) -> dict[str, object]:
+        payload: dict[str, object] = {
             "content_type": self.content_type,
             "created_at": self.created_at,
         }
+        if self.parameters is not None:
+            payload["parameters"] = self.parameters
+        return payload
 
 
 class ImageMetadataProvider(Protocol):
     def get(self, image_path: Path) -> ImageMetadata: ...
+
+
+class EmbeddedImageMetadataProvider:
+    def __init__(self, fallback: ImageMetadataProvider | None = None) -> None:
+        self._fallback = fallback
+
+    def get(self, image_path: Path) -> ImageMetadata:
+        value = read_embedded_metadata(image_path)
+        if isinstance(value, dict):
+            metadata = image_metadata_from_dict(value)
+            if metadata.exists:
+                return metadata
+        if self._fallback is not None:
+            return self._fallback.get(image_path)
+        return ImageMetadata()
 
 
 class SidecarImageMetadataProvider:
@@ -45,10 +64,16 @@ class SidecarImageMetadataProvider:
             return ImageMetadata()
         if not isinstance(value, dict):
             return ImageMetadata()
-        return ImageMetadata(
-            content_type=_metadata_string(value, "content_type"),
-            created_at=_metadata_string(value, "created_at"),
-        )
+        return image_metadata_from_dict(value)
+
+
+def image_metadata_from_dict(metadata: dict[str, object]) -> ImageMetadata:
+    parameters = metadata.get("parameters")
+    return ImageMetadata(
+        content_type=_metadata_string(metadata, "content_type"),
+        created_at=_metadata_string(metadata, "created_at"),
+        parameters=parameters if isinstance(parameters, dict) else None,
+    )
 
 
 def sidecar_metadata_path(image_path: Path) -> Path:

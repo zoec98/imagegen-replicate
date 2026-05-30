@@ -1,12 +1,11 @@
-"""Local storage for generated image files and metadata.
+"""Local storage for generated image files and embedded metadata.
 
 This module downloads Replicate image outputs, validates basic response safety,
-writes files under the configured output directory, and creates sidecar metadata.
+writes files under the configured output directory, and embeds metadata.
 """
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,6 +13,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from imagegen.metadata_embed import write_embedded_metadata
 from imagegen.model_registry import ReplicateModel
 
 
@@ -28,10 +28,10 @@ DOWNLOAD_SIZE_OVERHEAD_BYTES = 1024 * 1024
 @dataclass(frozen=True)
 class StoredImage:
     path: Path
-    metadata_path: Path
     source_url: str
     content_type: str
     size_bytes: int
+    created_at: str
 
 
 class ImageDownloadError(RuntimeError):
@@ -101,10 +101,10 @@ def download_image(
     extension = _extension_for(content_type, url)
     filename = f"{model.alias}-{prediction_id}-{sequence:02d}{extension}"
     path = output_dir / filename
-    metadata_path = path.with_name(path.name + ".json")
     path.write_bytes(content)
+    created_at = datetime.now(UTC).isoformat()
     metadata = {
-        "created_at": datetime.now(UTC).isoformat(),
+        "created_at": created_at,
         "model_alias": model.alias,
         "model": model.replicate_model,
         "prediction_id": prediction_id,
@@ -116,13 +116,13 @@ def download_image(
         "size_bytes": len(content),
         "filename": filename,
     }
-    metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
+    write_embedded_metadata(path, metadata)
     return StoredImage(
         path=path,
-        metadata_path=metadata_path,
         source_url=url,
         content_type=content_type,
         size_bytes=len(content),
+        created_at=created_at,
     )
 
 
