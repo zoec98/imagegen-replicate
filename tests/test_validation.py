@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 
 from imagegen.model_registry import MODEL_REGISTRY
@@ -23,6 +25,7 @@ def test_validate_generation_payload_accepts_defaults(tmp_path):
         "size": "2K",
     }
     assert result.source_images == []
+    assert result.edit_mode is False
 
 
 def test_validate_generation_payload_preserves_prompt_without_length_limit(tmp_path):
@@ -52,6 +55,7 @@ def test_validate_generation_payload_accepts_existing_source_images(tmp_path):
     result = validate_generation_payload(
         {
             "prompt": "edit this",
+            "edit_mode": True,
             "source_images": ["source.png"],
         },
         model=MODEL_REGISTRY["seedream45"],
@@ -59,12 +63,67 @@ def test_validate_generation_payload_accepts_existing_source_images(tmp_path):
     )
 
     assert result.source_images == ["source.png"]
+    assert result.edit_mode is True
+
+
+def test_validate_generation_payload_rejects_invalid_edit_mode(tmp_path):
+    with pytest.raises(ValidationError, match="edit_mode must be a boolean."):
+        validate_generation_payload(
+            {"prompt": "edit this", "edit_mode": "true"},
+            model=MODEL_REGISTRY["seedream45"],
+            output_dir=tmp_path,
+        )
+
+
+def test_validate_generation_payload_rejects_edit_mode_without_sources(tmp_path):
+    with pytest.raises(
+        ValidationError,
+        match="edit_mode requires at least one source image.",
+    ):
+        validate_generation_payload(
+            {"prompt": "edit this", "edit_mode": True},
+            model=MODEL_REGISTRY["seedream45"],
+            output_dir=tmp_path,
+        )
+
+
+def test_validate_generation_payload_rejects_sources_outside_edit_mode(tmp_path):
+    (tmp_path / "source.png").write_bytes(b"image")
+
+    with pytest.raises(
+        ValidationError,
+        match="source_images can only be submitted in edit mode.",
+    ):
+        validate_generation_payload(
+            {"prompt": "edit this", "source_images": ["source.png"]},
+            model=MODEL_REGISTRY["seedream45"],
+            output_dir=tmp_path,
+        )
+
+
+def test_validate_generation_payload_rejects_edit_mode_for_text_only_model(tmp_path):
+    text_only_model = replace(MODEL_REGISTRY["seedream45"], edit_capable=False)
+    (tmp_path / "source.png").write_bytes(b"image")
+
+    with pytest.raises(
+        ValidationError,
+        match="This model does not accept edit requests.",
+    ):
+        validate_generation_payload(
+            {
+                "prompt": "edit this",
+                "edit_mode": True,
+                "source_images": ["source.png"],
+            },
+            model=text_only_model,
+            output_dir=tmp_path,
+        )
 
 
 def test_validate_generation_payload_rejects_non_array_source_images(tmp_path):
     with pytest.raises(ValidationError, match="source_images must be an array."):
         validate_generation_payload(
-            {"prompt": "edit this", "source_images": "source.png"},
+            {"prompt": "edit this", "edit_mode": True, "source_images": "source.png"},
             model=MODEL_REGISTRY["seedream45"],
             output_dir=tmp_path,
         )
@@ -73,7 +132,11 @@ def test_validate_generation_payload_rejects_non_array_source_images(tmp_path):
 def test_validate_generation_payload_rejects_missing_source_image(tmp_path):
     with pytest.raises(ValidationError, match="Source image not found: missing.png."):
         validate_generation_payload(
-            {"prompt": "edit this", "source_images": ["missing.png"]},
+            {
+                "prompt": "edit this",
+                "edit_mode": True,
+                "source_images": ["missing.png"],
+            },
             model=MODEL_REGISTRY["seedream45"],
             output_dir=tmp_path,
         )
@@ -84,7 +147,11 @@ def test_validate_generation_payload_rejects_gif_source_image(tmp_path):
 
     with pytest.raises(ValidationError, match="Invalid source image filename"):
         validate_generation_payload(
-            {"prompt": "edit this", "source_images": ["source.gif"]},
+            {
+                "prompt": "edit this",
+                "edit_mode": True,
+                "source_images": ["source.gif"],
+            },
             model=MODEL_REGISTRY["seedream45"],
             output_dir=tmp_path,
         )
@@ -96,7 +163,11 @@ def test_validate_generation_payload_rejects_unsafe_source_image(tmp_path):
         match=r"Invalid source image filename: ../sample.png.",
     ):
         validate_generation_payload(
-            {"prompt": "edit this", "source_images": ["../sample.png"]},
+            {
+                "prompt": "edit this",
+                "edit_mode": True,
+                "source_images": ["../sample.png"],
+            },
             model=MODEL_REGISTRY["seedream45"],
             output_dir=tmp_path,
         )
@@ -309,7 +380,7 @@ def test_validate_flux_flex_source_images_use_model_limit(tmp_path):
         match="source_images cannot contain more than 10 files.",
     ):
         validate_generation_payload(
-            {"prompt": "edit this", "source_images": filenames},
+            {"prompt": "edit this", "edit_mode": True, "source_images": filenames},
             model=MODEL_REGISTRY["flux-flex"],
             output_dir=tmp_path,
         )

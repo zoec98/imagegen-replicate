@@ -38,6 +38,18 @@ class FakePredictionsApi:
         return self.updates.pop(0)
 
 
+class FailingCreatePredictionsApi:
+    def __init__(self):
+        self.input = None
+
+    def create(self, *, model, input):
+        self.input = input
+        raise RuntimeError("create failed")
+
+    def get(self, id):
+        raise AssertionError("get should not be called")
+
+
 def app_config(tmp_path):
     return AppConfig(
         replicate_api_token="test-token",
@@ -200,6 +212,24 @@ def test_generate_image_urls_passes_source_image_files_and_metadata(tmp_path):
     assert image_input[0].name == str(source_path)
     assert image_input[0].closed is True
     assert stored[0][1]["prediction_input"]["image_input"] == ["source.png"]
+
+
+def test_generate_image_urls_closes_source_files_when_prediction_create_fails(tmp_path):
+    source_path = tmp_path / "source.png"
+    source_path.write_bytes(b"source-bytes")
+    api = FailingCreatePredictionsApi()
+
+    with pytest.raises(RuntimeError, match="create failed"):
+        generate_image_urls(
+            "edit this",
+            app_config(tmp_path),
+            source_image_paths=[source_path],
+            predictions_api=api,
+        )
+
+    image_input = api.input["image_input"]
+    assert len(image_input) == 1
+    assert image_input[0].closed is True
 
 
 def test_generate_image_urls_raises_on_failed_prediction(tmp_path):

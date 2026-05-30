@@ -1,12 +1,15 @@
 import json
 import os
+from dataclasses import replace
 from urllib.parse import parse_qs, urlparse
 
 from PIL import Image
 
+from imagegen import api_routes
 from imagegen.app import create_app
 from imagegen.app_version import app_checksum
 from imagegen.metadata_embed import write_embedded_metadata
+from imagegen.model_registry import MODEL_REGISTRY
 
 
 def extract_csrf_token(response):
@@ -505,6 +508,7 @@ def test_api_generate_accepts_existing_source_images(tmp_path, app_factory):
         "/api/generate",
         json={
             "prompt": "edit this",
+            "edit_mode": True,
             "source_images": ["source.png"],
         },
         headers={"X-CSRF-Token": token},
@@ -513,6 +517,103 @@ def test_api_generate_accepts_existing_source_images(tmp_path, app_factory):
 
     assert response.status_code == 202
     assert response.json["source_images"] == ["source.png"]
+    row = client.application.config["IMAGEGEN_GENERATION_LOG"].get_request(
+        response.json["request_id"]
+    )
+    assert row is not None
+    assert json.loads(row["source_image_filenames_json"]) == ["source.png"]
+    assert json.loads(row["request_sent_json"])["image_input"] == ["source.png"]
+
+
+def test_api_generate_rejects_invalid_edit_mode(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "prompt": "edit this",
+            "edit_mode": "true",
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "edit_mode must be a boolean."}
+
+
+def test_api_generate_rejects_edit_mode_without_source_images(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "prompt": "edit this",
+            "edit_mode": True,
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "edit_mode requires at least one source image."}
+
+
+def test_api_generate_rejects_source_images_outside_edit_mode(tmp_path, app_factory):
+    (tmp_path / "source.png").write_bytes(b"image")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "prompt": "edit this",
+            "source_images": ["source.png"],
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {
+        "error": "source_images can only be submitted in edit mode."
+    }
+
+
+def test_api_generate_rejects_edit_mode_for_non_edit_model(
+    tmp_path,
+    app_factory,
+    monkeypatch,
+):
+    (tmp_path / "source.png").write_bytes(b"image")
+    monkeypatch.setitem(
+        api_routes.MODEL_REGISTRY,
+        "text-only",
+        replace(MODEL_REGISTRY["seedream45"], alias="text-only", edit_capable=False),
+    )
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "model": "text-only",
+            "prompt": "edit this",
+            "edit_mode": True,
+            "source_images": ["source.png"],
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "This model does not accept edit requests."}
 
 
 def test_api_generate_rejects_missing_source_image(app_factory):
@@ -524,6 +625,7 @@ def test_api_generate_rejects_missing_source_image(app_factory):
         "/api/generate",
         json={
             "prompt": "edit this",
+            "edit_mode": True,
             "source_images": ["missing.png"],
         },
         headers={"X-CSRF-Token": token},
@@ -544,6 +646,7 @@ def test_api_generate_rejects_gif_source_image(tmp_path, app_factory):
         "/api/generate",
         json={
             "prompt": "edit this",
+            "edit_mode": True,
             "source_images": ["source.gif"],
         },
         headers={"X-CSRF-Token": token},

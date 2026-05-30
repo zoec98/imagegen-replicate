@@ -265,6 +265,21 @@
     return parameters;
   }
 
+  function collectGenerationPayload(prompt) {
+    const payload = {
+      model: modelSelector?.value || undefined,
+      prompt,
+      parameters: collectParameters(),
+    };
+    if (editModeEnabled) {
+      payload.edit_mode = true;
+    }
+    if (editModeEnabled && selectedSourceImages.size > 0) {
+      payload.source_images = Array.from(selectedSourceImages);
+    }
+    return payload;
+  }
+
   function parameterLabel(name) {
     return name.replaceAll("_", " ");
   }
@@ -537,11 +552,7 @@
           "Content-Type": "application/json",
           "X-CSRF-Token": csrfToken,
         },
-        body: JSON.stringify({
-          model: modelSelector?.value || undefined,
-          prompt,
-          parameters: collectParameters(),
-        }),
+        body: JSON.stringify(collectGenerationPayload(prompt)),
       });
       const data = await response.json();
       if (!response.ok) {

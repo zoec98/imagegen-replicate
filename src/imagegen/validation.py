@@ -24,6 +24,7 @@ class ValidatedGenerationRequest:
     prompt: str
     parameters: dict[str, object]
     source_images: list[str]
+    edit_mode: bool
 
 
 class ValidationError(ValueError):
@@ -46,21 +47,59 @@ def validate_generation_payload(
     if not isinstance(raw_parameters, dict):
         raise ValidationError("parameters must be an object.")
 
-    try:
-        source_images = validate_source_images(
-            payload.get("source_images"),
-            model=model,
-            output_dir=output_dir,
-        )
-    except SourceImageError as error:
-        raise ValidationError(str(error)) from error
+    edit_mode = _validate_edit_mode(payload.get("edit_mode", False))
+    source_images = _validate_payload_source_images(
+        payload.get("source_images"),
+        edit_mode=edit_mode,
+        model=model,
+        output_dir=output_dir,
+    )
 
     parameters = validate_model_parameters(raw_parameters, model=model)
     return ValidatedGenerationRequest(
         prompt=prompt,
         parameters=parameters,
         source_images=source_images,
+        edit_mode=edit_mode,
     )
+
+
+def _validate_edit_mode(value: Any) -> bool:
+    if not isinstance(value, bool):
+        raise ValidationError("edit_mode must be a boolean.")
+    return value
+
+
+def _validate_payload_source_images(
+    value: Any,
+    *,
+    edit_mode: bool,
+    model: ReplicateModel,
+    output_dir: Path,
+) -> list[str]:
+    if not edit_mode:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise ValidationError("source_images must be an array.")
+        if value:
+            raise ValidationError("source_images can only be submitted in edit mode.")
+        return []
+
+    if not model.edit_capable:
+        raise ValidationError("This model does not accept edit requests.")
+
+    try:
+        source_images = validate_source_images(
+            value,
+            model=model,
+            output_dir=output_dir,
+        )
+    except SourceImageError as error:
+        raise ValidationError(str(error)) from error
+    if not source_images:
+        raise ValidationError("edit_mode requires at least one source image.")
+    return source_images
 
 
 def validate_model_parameters(
