@@ -79,6 +79,8 @@ For generated images:
 - Store downloaded files under an application-controlled output directory.
 - Generate collision-resistant filenames.
 - Preserve useful metadata, such as model name, prompt, parameters, source URL, and creation time.
+- Read generated-image author metadata from `AUTHOR`; synthesize copyright from
+  `AUTHOR` and the generated image's creation year.
 - Store generated image metadata in embedded image metadata, not JSON sidecars. PNG uses an application text chunk; JPEG and WebP use EXIF fields.
 - Store a human-readable generated-image description for external tools, and parseable application metadata separately in the embedded payload.
 - Store durable generation request/result history in SQLite under the configured data directory, `data/` by default.

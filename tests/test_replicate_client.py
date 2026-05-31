@@ -54,6 +54,7 @@ def app_config(tmp_path):
     return AppConfig(
         replicate_api_token="test-token",
         data_dir=tmp_path,
+        author="Test Author",
         immich_url="",
         immich_gallery_id="",
         immich_api_key="",

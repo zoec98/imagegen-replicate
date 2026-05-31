@@ -115,6 +115,8 @@ The committed `data-example/` tree is sample/reference data. The ignored `data/`
 
 The app embeds generated-image metadata directly into PNG, JPEG, and WebP files. Metadata includes the model, prompt, parameters, source URL, creation time, and related generation identifiers. New generated images do not use JSON sidecar files.
 
+Set `AUTHOR` in `.env` to the author name used for generated image metadata. New `.env` files use `Noname Changeme Nescio` as a placeholder. Copyright metadata is derived from the generated image year and `AUTHOR`.
+
 Palette fragments are stored under `data/fragments` by default. They are plain text files and are not generated outputs.
 
 Durable request history is recorded in SQLite at `data/imagegen.sqlite3` by default. The database stores accepted request facts, prediction lifecycle state, and generated asset rows. The active browser polling state remains in memory.

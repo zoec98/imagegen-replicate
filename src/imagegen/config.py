@@ -34,6 +34,11 @@ ENV_SETTINGS: tuple[EnvSetting, ...] = (
         comment="Directory where runtime data, images, palettes, trash, and SQLite live.",
     ),
     EnvSetting(
+        name="AUTHOR",
+        default="Noname Changeme Nescio",
+        comment="Author name embedded in generated image metadata.",
+    ),
+    EnvSetting(
         name="IMMICH_URL",
         default="",
         comment="Optional Immich server URL for uploading gallery images.",
@@ -84,6 +89,7 @@ DEPRECATED_ENV_SETTING_NAMES = {
 class AppConfig:
     replicate_api_token: str
     data_dir: Path
+    author: str
     immich_url: str
     immich_gallery_id: str
     immich_api_key: str
@@ -160,6 +166,7 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
     return AppConfig(
         replicate_api_token=os.getenv("REPLICATE_API_TOKEN", "").strip(),
         data_dir=data_dir,
+        author=os.getenv("AUTHOR", "Noname Changeme Nescio").strip(),
         immich_url=os.getenv("IMMICH_URL", "").strip().rstrip("/"),
         immich_gallery_id=os.getenv("IMMICH_GALLERY_ID", "").strip(),
         immich_api_key=os.getenv("IMMICH_API_KEY", "").strip(),
