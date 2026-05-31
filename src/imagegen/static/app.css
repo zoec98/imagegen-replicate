@@ -29,10 +29,10 @@ textarea {
     box-shadow 120ms ease, color 120ms ease, transform 120ms ease;
 }
 
-button:not(:disabled):hover,
+button:not(.gallery-delete-armed):not(:disabled):hover,
 input:not(:disabled):hover,
 select:not(:disabled):hover,
-.gallery-action:not(:disabled):hover,
+.gallery-action:not(.gallery-delete-armed):not(:disabled):hover,
 .source-select:not(:disabled):hover {
   animation: ui-pulse 420ms ease-in-out;
 }
@@ -461,6 +461,7 @@ select {
   gap: 0.375rem;
   min-width: 0;
   position: relative;
+  width: 100%;
 }
 
 .image-type,
@@ -503,6 +504,23 @@ select {
 
 .gallery-delete {
   color: #b00020;
+  margin-left: auto;
+}
+
+.gallery-delete-armed {
+  background: #b00020;
+  border-color: #b00020;
+  color: #ffffff;
+  position: relative;
+  transform: scale(1.35);
+  z-index: 2;
+}
+
+.gallery-delete-armed:hover,
+.gallery-delete-armed:focus-visible {
+  background: #8f001a;
+  border-color: #8f001a;
+  color: #ffffff;
 }
 
 .gallery-immich {

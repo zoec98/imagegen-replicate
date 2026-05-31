@@ -57,6 +57,7 @@
   let paletteData = loadJsonData("#palette-data");
   const parameterState = {};
   const selectedSourceImages = new Set();
+  let armedDeleteButton = null;
   let editModeEnabled = false;
 
   function selectedModel() {
@@ -825,6 +826,33 @@
     await refreshGallery();
   }
 
+  function disarmGalleryDelete() {
+    if (!armedDeleteButton) {
+      return;
+    }
+    armedDeleteButton.classList.remove("gallery-delete-armed");
+    const filename = armedDeleteButton.closest(".gallery-item")?.dataset.filename;
+    armedDeleteButton.setAttribute(
+      "aria-label",
+      `Delete ${filename || "image"}`,
+    );
+    armedDeleteButton = null;
+  }
+
+  function armGalleryDelete(button) {
+    if (!button) {
+      return;
+    }
+    if (armedDeleteButton && armedDeleteButton !== button) {
+      disarmGalleryDelete();
+    }
+    armedDeleteButton = button;
+    const filename = button.closest(".gallery-item")?.dataset.filename || "image";
+    button.classList.add("gallery-delete-armed");
+    button.setAttribute("aria-label", `Confirm delete ${filename}`);
+    showMessage(`Click delete again to remove ${filename}.`, "info");
+  }
+
   async function uploadGalleryImageToImmich(figure) {
     const uploadUrl = figure?.dataset.immichUploadUrl;
     const filename = figure?.dataset.filename || "image";
@@ -1061,6 +1089,7 @@
     if (!gallery || !form.dataset.apiImagesUrl) {
       return;
     }
+    disarmGalleryDelete();
     const response = await fetch(form.dataset.apiImagesUrl, {
       credentials: "same-origin",
     });
@@ -1255,11 +1284,13 @@
   gallery?.addEventListener("click", (event) => {
     const infoButton = event.target.closest(".gallery-info");
     if (infoButton) {
+      disarmGalleryDelete();
       refreshInfoTooltip(infoButton.closest(".gallery-item"));
       return;
     }
     const loadButton = event.target.closest(".gallery-load");
     if (loadButton) {
+      disarmGalleryDelete();
       const figure = loadButton.closest(".gallery-item");
       loadGalleryMetadata(figure).catch((error) => {
         showMessage(error.message || "Image metadata could not be loaded.", "error");
@@ -1269,13 +1300,19 @@
     const deleteButton = event.target.closest(".gallery-delete");
     if (deleteButton) {
       const figure = deleteButton.closest(".gallery-item");
+      if (armedDeleteButton !== deleteButton) {
+        armGalleryDelete(deleteButton);
+        return;
+      }
       deleteGalleryImage(figure).catch((error) => {
+        disarmGalleryDelete();
         showMessage(error.message || "Image could not be deleted.", "error");
       });
       return;
     }
     const immichButton = event.target.closest(".gallery-immich");
     if (immichButton) {
+      disarmGalleryDelete();
       const figure = immichButton.closest(".gallery-item");
       uploadGalleryImageToImmich(figure).catch((error) => {
         showMessage(error.message || "Image could not be uploaded to Immich.", "error");
@@ -1286,6 +1323,7 @@
     if (!button) {
       return;
     }
+    disarmGalleryDelete();
     const figure = button.closest(".gallery-item");
     toggleSourceImage(figure?.dataset.filename || "");
   });
