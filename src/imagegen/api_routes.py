@@ -11,7 +11,11 @@ from __future__ import annotations
 from flask import Flask, jsonify, request, url_for
 
 from imagegen.app_version import app_checksum
-from imagegen.gallery import GalleryImage, list_gallery_images
+from imagegen.gallery import (
+    GalleryImage,
+    list_gallery_images,
+    move_gallery_image_to_trash,
+)
 from imagegen.generation_log import GenerationLog
 from imagegen.immich_client import ImmichClient, ImmichUploadError
 from imagegen.model_registry import MODEL_REGISTRY, ReplicateModel
@@ -190,10 +194,15 @@ def register_api_routes(app: Flask) -> None:
         safe_name = safe_image_filename(filename)
         if safe_name is None:
             return jsonify({"error": "Image not found."}), 404
-        image_path = app.config["IMAGEGEN_APP_CONFIG"].output_dir / safe_name
-        if not image_path.is_file():
+        app_config = app.config["IMAGEGEN_APP_CONFIG"]
+        try:
+            move_gallery_image_to_trash(
+                safe_name,
+                output_dir=app_config.output_dir,
+                trash_dir=app_config.trash_dir,
+            )
+        except FileNotFoundError:
             return jsonify({"error": "Image not found."}), 404
-        image_path.unlink()
         return jsonify({"deleted": safe_name})
 
     if app.config.get("IMAGEGEN_ENABLE_TEST_API"):

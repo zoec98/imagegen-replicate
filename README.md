@@ -99,7 +99,7 @@ Generated images appear in the local gallery. Each gallery card provides:
 - An information button with filename, model, dimensions, and prompt.
 - A file type badge for PNG, JPG, or WebP.
 - A load button that reads embedded metadata and replaces the current prompt, model, and supported settings.
-- A delete button that removes the local image after a CSRF-protected server request.
+- A delete button that moves the local image to trash after a CSRF-protected server request.
 
 Loading metadata requires metadata embedded by this app. If metadata is missing or references an unsupported model/settings shape, the UI shows an error and preserves the current workspace.
 
@@ -108,6 +108,8 @@ Loading metadata requires metadata embedded by this app. If metadata is missing 
 Generated files are downloaded from Replicate into `data/images` by default. Supported local image formats are PNG, JPEG, and WebP. GIF files are not accepted as source images or stored generation results.
 
 Set `IMAGEGEN_DATA_DIR` to move the runtime data root. The app derives generated images, palette fragments, gallery trash, and SQLite history from that one directory.
+
+Gallery delete moves files from `data/images` to `data/trash` by default. If a trashed filename already exists, the app creates a unique trash filename instead of overwriting it.
 
 The committed `data-example/` tree is sample/reference data. The ignored `data/` tree is the default local runtime directory for real generations, uploads, palette edits, trash, and SQLite history.
 

@@ -1411,7 +1411,7 @@ def test_api_images_includes_embedded_metadata(app_config, app_factory):
     }
 
 
-def test_api_delete_image_removes_valid_image(app_config, app_factory):
+def test_api_delete_image_moves_valid_image_to_trash(app_config, app_factory):
     image_path = app_config.output_dir / "sample.png"
     image_path.parent.mkdir(parents=True)
     image_path.write_bytes(b"image")
@@ -1429,6 +1429,56 @@ def test_api_delete_image_removes_valid_image(app_config, app_factory):
     assert response.status_code == 200
     assert response.json == {"deleted": "sample.png"}
     assert not image_path.exists()
+    assert (app_config.trash_dir / "sample.png").read_bytes() == b"image"
+
+
+def test_api_delete_image_creates_missing_trash_dir(app_config, app_factory):
+    app = app_factory()
+    app_config.trash_dir.rmdir()
+    image_path = app_config.output_dir / "sample.png"
+    image_path.write_bytes(b"image")
+    client = app.test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/delete",
+        json={},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 200
+    assert not image_path.exists()
+    assert (app_config.trash_dir / "sample.png").read_bytes() == b"image"
+
+
+def test_api_delete_image_does_not_overwrite_trash_collision(
+    app_config,
+    app_factory,
+):
+    app = app_factory()
+    image_path = app_config.output_dir / "sample.png"
+    image_path.write_bytes(b"new image")
+    trash_path = app_config.trash_dir / "sample.png"
+    trash_path.write_bytes(b"old image")
+    client = app.test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/delete",
+        json={},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 200
+    assert response.json == {"deleted": "sample.png"}
+    assert trash_path.read_bytes() == b"old image"
+    collision_files = sorted(app_config.trash_dir.glob("sample-*.png"))
+    assert len(collision_files) == 1
+    assert collision_files[0].read_bytes() == b"new image"
 
 
 def test_api_delete_image_rejects_path_traversal(app_config, app_factory):
@@ -1465,6 +1515,26 @@ def test_api_delete_image_rejects_missing_image(app_factory):
 
     assert response.status_code == 404
     assert response.json == {"error": "Image not found."}
+
+
+def test_api_delete_image_rejects_gif(app_config, app_factory):
+    image_path = app_config.output_dir / "sample.gif"
+    image_path.parent.mkdir(parents=True)
+    image_path.write_bytes(b"gif")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.gif/delete",
+        json={},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 404
+    assert response.json == {"error": "Image not found."}
+    assert image_path.exists()
 
 
 def test_api_delete_image_requires_csrf(app_config, app_factory):

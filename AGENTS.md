@@ -260,5 +260,5 @@ Keep this file focused on contributors and agents.
 - Do not make `disable_safety_checker` user-configurable when a model supports it; keep it set to `true` in generated Replicate payloads.
 - Do not hide Replicate errors behind generic messages in logs; preserve actionable details while avoiding credential leakage.
 - Do not trust browser-submitted parameters, filenames, MIME types, or output URLs.
-- Keep gallery deletion inside the configured output directory; validate filenames before unlinking and require CSRF protection.
+- Keep gallery deletion inside the configured output directory; validate filenames, require CSRF protection, and move deleted images to the configured trash directory instead of unlinking them from routes.
 - Do not use destructive git commands or revert unrelated user changes.

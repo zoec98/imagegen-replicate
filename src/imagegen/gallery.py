@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from uuid import uuid4
 
 from imagegen.metadata import EmbeddedImageMetadataProvider, ImageMetadataProvider
 
@@ -53,6 +54,21 @@ def list_gallery_images(
     ]
 
 
+def move_gallery_image_to_trash(
+    filename: str,
+    *,
+    output_dir: Path,
+    trash_dir: Path,
+) -> Path:
+    image_path = output_dir / filename
+    if image_path.parent != output_dir or not image_path.is_file():
+        raise FileNotFoundError(filename)
+
+    trash_dir.mkdir(parents=True, exist_ok=True)
+    trash_path = _trash_path(filename, trash_dir=trash_dir)
+    return image_path.replace(trash_path)
+
+
 def _gallery_image(
     path: Path,
     *,
@@ -70,3 +86,15 @@ def _gallery_image(
         content_type=metadata.content_type,
         created_at=metadata.created_at,
     )
+
+
+def _trash_path(filename: str, *, trash_dir: Path) -> Path:
+    candidate = trash_dir / filename
+    if not candidate.exists():
+        return candidate
+
+    source = Path(filename)
+    while True:
+        candidate = trash_dir / f"{source.stem}-{uuid4().hex}{source.suffix}"
+        if not candidate.exists():
+            return candidate
