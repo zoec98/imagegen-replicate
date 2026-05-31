@@ -81,7 +81,7 @@ For generated images:
 - Preserve useful metadata, such as model name, prompt, parameters, source URL, and creation time.
 - Store generated image metadata in embedded image metadata, not JSON sidecars. PNG uses an application text chunk; JPEG and WebP use EXIF fields.
 - Store a human-readable generated-image description for external tools, and parseable application metadata separately in the embedded payload.
-- Store durable generation request/result history in SQLite under `data/` by default.
+- Store durable generation request/result history in SQLite under the configured data directory, `data/` by default.
 - Keep route and gallery code behind provider/repository boundaries. Do not read embedded metadata or SQLite tables directly from templates or JavaScript-facing route code.
 - Store source image references as local filenames, not image bytes or database blobs.
 - GIF files are unsupported for generated outputs and source images.
@@ -132,6 +132,9 @@ Style, character, and other palettes are reusable prompt fragments. Store fragme
 ```text
 data/fragments
 ```
+
+Committed sample fragments live under `data-example/fragments`. Keep local
+runtime data under ignored `data/` or another private `IMAGEGEN_DATA_DIR` value.
 
 Every directory under the fragment root is one singular palette, for example:
 
@@ -244,7 +247,7 @@ Keep this file focused on contributors and agents.
 - Do not commit API tokens, generated private images, uploaded user images, or local `.env` files.
 - Do not make real Replicate API calls from tests.
 - Do not introduce network calls in unit tests unless they are explicitly marked integration tests and skipped by default.
-- Do not store uploaded files or generated outputs in source-controlled paths unless they are intentional fixtures.
+- Do not store uploaded files or generated outputs in source-controlled paths unless they are intentional fixtures. Keep sample/reference payloads under `data-example/`, not `data/`.
 - Do not read or write JSON sidecars for generated-image metadata.
 - Do not bypass `ImageMetadataProvider` or `SQLiteGenerationLog` from route/gallery code.
 - Do not bypass `PaletteRepository` for palette file access.

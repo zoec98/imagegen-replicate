@@ -62,14 +62,14 @@ Image edit sources are selected from local gallery images. Source images are sub
 
 ## Prompt Palettes
 
-Prompt palettes are reusable text fragments stored as plain text files. By default, palette files live under `data/fragments`. Set `IMAGEGEN_DATA_DIR` to move all runtime data, including generated images, palettes, trash, and SQLite history.
+Prompt palettes are reusable text fragments stored as plain text files. By default, runtime palette files live under `data/fragments`. The repository includes sample fragments under `data-example/fragments`; use them as reference data or duplicate selected samples into your configured runtime fragment directory.
 
 Each directory under the fragment root is one singular palette, such as `character` or `style`. Each `.txt` file is one fragment. Filenames store spaces as underscores, and the UI displays underscores as spaces.
 
 Example:
 
 ```text
-data/fragments/
+data-example/fragments/
 |-- character
 |   |-- aoife.txt
 |   `-- zoe.txt
@@ -90,7 +90,7 @@ Selecting a palette entry inserts editable annotation text into the prompt:
 
 The browser keeps annotations visible so you can swap fragments later. When a generation request is sent, the server validates the prompt and strips annotation syntax before calling the model provider. The provider receives only the fragment content and plain prompt text. The app keeps the annotated prompt in request status, SQLite history, and embedded image metadata.
 
-External edits to files under `data/fragments` are picked up on page refresh. The in-app palette editor can create, update, and delete entries inside existing palette directories, but creating or deleting whole palette directories is a filesystem task.
+External edits to files under your configured fragment root, `data/fragments` by default, are picked up on page refresh. The in-app palette editor can create, update, and delete entries inside existing palette directories, but creating or deleting whole palette directories is a filesystem task.
 
 ## Gallery
 
@@ -108,6 +108,8 @@ Loading metadata requires metadata embedded by this app. If metadata is missing 
 Generated files are downloaded from Replicate into `data/images` by default. Supported local image formats are PNG, JPEG, and WebP. GIF files are not accepted as source images or stored generation results.
 
 Set `IMAGEGEN_DATA_DIR` to move the runtime data root. The app derives generated images, palette fragments, gallery trash, and SQLite history from that one directory.
+
+The committed `data-example/` tree is sample/reference data. The ignored `data/` tree is the default local runtime directory for real generations, uploads, palette edits, trash, and SQLite history.
 
 The app embeds generated-image metadata directly into PNG, JPEG, and WebP files. Metadata includes the model, prompt, parameters, source URL, creation time, and related generation identifiers. New generated images do not use JSON sidecar files.
 
