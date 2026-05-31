@@ -14,7 +14,11 @@ from urllib.parse import urlparse
 import httpx
 
 from imagegen.metadata_embed import write_embedded_metadata
+from imagegen.metadata_policy import synthesize_copyright
 from imagegen.model_registry import ReplicateModel
+
+
+SOFTWARE_NAME = "https://github.com/zoec98/imagegen-replicate"
 
 
 CONTENT_TYPE_EXTENSIONS = {
@@ -46,6 +50,7 @@ def persist_generated_images(
     prompt: str,
     prediction_id: str,
     prediction_input: dict[str, object],
+    author: str,
     client: httpx.Client | None = None,
 ) -> list[StoredImage]:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -61,6 +66,7 @@ def persist_generated_images(
                 prediction_id=prediction_id,
                 sequence=sequence,
                 prediction_input=prediction_input,
+                author=author,
                 client=http_client,
             )
             for sequence, url in enumerate(urls, start=1)
@@ -79,6 +85,7 @@ def download_image(
     prediction_id: str,
     sequence: int,
     prediction_input: dict[str, object],
+    author: str,
     client: httpx.Client,
 ) -> StoredImage:
     response = client.get(url)
@@ -115,6 +122,9 @@ def download_image(
         "content_type": content_type,
         "size_bytes": len(content),
         "filename": filename,
+        "author": author,
+        "copyright": synthesize_copyright(author, created_at),
+        "software": SOFTWARE_NAME,
     }
     write_embedded_metadata(path, metadata)
     return StoredImage(

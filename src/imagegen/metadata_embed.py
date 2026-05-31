@@ -8,6 +8,7 @@ can round-trip it for both formats without native Exiv2 dependencies.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -15,9 +16,18 @@ from PIL import Image, PngImagePlugin, UnidentifiedImageError
 
 
 IMAGE_DESCRIPTION_TAG = 270
+SOFTWARE_TAG = 305
+DATETIME_TAG = 306
+ARTIST_TAG = 315
+COPYRIGHT_TAG = 33432
+DATETIME_ORIGINAL_TAG = 36867
+DATETIME_DIGITIZED_TAG = 36868
 USER_COMMENT_TAG = 37510
+XP_COMMENT_TAG = 40092
+XP_AUTHOR_TAG = 40093
 PNG_DESCRIPTION_KEYS = ("Description", "ImageDescription")
 PNG_METADATA_KEY = "imagegen:metadata"
+PNG_SYNTHETIC_KEYS = ("Author", "Copyright", "Software", "Creation Time")
 USER_COMMENT_PREFIX = b"UNICODE\0"
 
 
@@ -32,10 +42,10 @@ def write_embedded_metadata(image_path: Path, metadata: dict[str, Any]) -> None:
         with Image.open(image_path) as image:
             image_format = image.format
             if image_format == "PNG":
-                _write_png_metadata(image_path, image, payload, description)
+                _write_png_metadata(image_path, image, payload, description, metadata)
                 return
             if image_format in {"JPEG", "WEBP"}:
-                _write_exif_metadata(image_path, image, payload, description)
+                _write_exif_metadata(image_path, image, payload, description, metadata)
                 return
     except (OSError, UnidentifiedImageError) as error:
         msg = f"Could not write embedded metadata for {image_path.name}."
@@ -76,6 +86,7 @@ def _write_png_metadata(
     image: Image.Image,
     payload: str,
     description: str,
+    metadata: dict[str, Any],
 ) -> None:
     pnginfo = PngImagePlugin.PngInfo()
     for key, value in image.info.items():
@@ -83,10 +94,12 @@ def _write_png_metadata(
             isinstance(value, str)
             and key != PNG_METADATA_KEY
             and key not in PNG_DESCRIPTION_KEYS
+            and key not in PNG_SYNTHETIC_KEYS
         ):
             pnginfo.add_text(key, value)
     for key in PNG_DESCRIPTION_KEYS:
         pnginfo.add_text(key, description)
+    _add_png_synthetic_metadata(pnginfo, metadata=metadata)
     pnginfo.add_text(PNG_METADATA_KEY, payload)
     image.save(image_path, format="PNG", pnginfo=pnginfo)
 
@@ -96,11 +109,74 @@ def _write_exif_metadata(
     image: Image.Image,
     payload: str,
     description: str,
+    metadata: dict[str, Any],
 ) -> None:
     exif = image.getexif()
     exif[IMAGE_DESCRIPTION_TAG] = description[:1024]
+    _add_exif_synthetic_metadata(exif, metadata=metadata)
     exif[USER_COMMENT_TAG] = USER_COMMENT_PREFIX + payload.encode("utf-16-be")
     image.save(image_path, format=image.format, exif=exif)
+
+
+def _add_png_synthetic_metadata(
+    pnginfo: PngImagePlugin.PngInfo,
+    *,
+    metadata: dict[str, Any],
+) -> None:
+    author = _metadata_text(metadata, "author")
+    copyright_text = _metadata_text(metadata, "copyright")
+    software = _metadata_text(metadata, "software")
+    created_at = _metadata_text(metadata, "created_at")
+
+    if author:
+        pnginfo.add_text("Author", author)
+    if copyright_text:
+        pnginfo.add_text("Copyright", copyright_text)
+    if software:
+        pnginfo.add_text("Software", software)
+    if created_at:
+        pnginfo.add_text("Creation Time", created_at)
+
+
+def _add_exif_synthetic_metadata(exif: Image.Exif, *, metadata: dict[str, Any]) -> None:
+    author = _metadata_text(metadata, "author")
+    copyright_text = _metadata_text(metadata, "copyright")
+    software = _metadata_text(metadata, "software")
+    exif_datetime = _exif_datetime(_metadata_text(metadata, "created_at"))
+
+    if author:
+        exif[ARTIST_TAG] = author
+        exif[XP_AUTHOR_TAG] = _encode_xp_text(author)
+    if copyright_text:
+        exif[COPYRIGHT_TAG] = copyright_text
+        exif[XP_COMMENT_TAG] = _encode_xp_text(copyright_text)
+    if software:
+        exif[SOFTWARE_TAG] = software
+    if exif_datetime:
+        exif[DATETIME_TAG] = exif_datetime
+        exif[DATETIME_ORIGINAL_TAG] = exif_datetime
+        exif[DATETIME_DIGITIZED_TAG] = exif_datetime
+
+
+def _metadata_text(metadata: dict[str, Any], key: str) -> str | None:
+    value = metadata.get(key)
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _exif_datetime(created_at: str | None) -> str | None:
+    if not created_at:
+        return None
+    try:
+        parsed = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.strftime("%Y:%m:%d %H:%M:%S")
+
+
+def _encode_xp_text(value: str) -> bytes:
+    return f"{value}\0".encode("utf-16-le")
 
 
 def _read_exif_metadata(image: Image.Image) -> dict[str, Any] | None:

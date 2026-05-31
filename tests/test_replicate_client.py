@@ -200,6 +200,7 @@ def test_generate_image_urls_creates_prediction_and_polls(tmp_path):
     assert api.get_calls == ["abc123"]
     assert stored[0][0] == ["https://example.com/one.png"]
     assert stored[0][1]["prediction_id"] == "abc123"
+    assert stored[0][1]["author"] == "Test Author"
 
 
 def test_generate_image_urls_strips_provider_prompt_but_persists_annotated_prompt(

@@ -11,6 +11,7 @@ from imagegen.image_store import (
     persist_generated_images,
 )
 from imagegen.metadata import EmbeddedImageMetadataProvider
+from imagegen.metadata_embed import read_embedded_metadata
 from imagegen.model_registry import MODEL_REGISTRY
 
 
@@ -41,6 +42,7 @@ def test_download_image_writes_file_and_embedded_metadata(tmp_path):
         prediction_id="abc123",
         sequence=1,
         prediction_input={"prompt": "a cookie", "disable_safety_checker": True},
+        author="Zoé Cordelier",
         client=response_client(response),
     )
 
@@ -51,6 +53,11 @@ def test_download_image_writes_file_and_embedded_metadata(tmp_path):
     assert metadata.created_at == stored.created_at
     assert metadata.parameters is not None
     assert metadata.parameters["disable_safety_checker"] is True
+    payload = read_embedded_metadata(stored.path)
+    assert payload is not None
+    assert payload["author"] == "Zoé Cordelier"
+    assert payload["copyright"].endswith("Zoé Cordelier")
+    assert payload["software"] == "imagegen"
 
 
 def test_persist_generated_images_creates_output_directory(tmp_path):
@@ -70,6 +77,7 @@ def test_persist_generated_images_creates_output_directory(tmp_path):
         prompt="a cookie",
         prediction_id="abc123",
         prediction_input={"prompt": "a cookie"},
+        author="Zoé Cordelier",
         client=response_client(response),
     )
 
@@ -94,6 +102,7 @@ def test_download_image_rejects_non_image_response(tmp_path):
             prediction_id="abc123",
             sequence=1,
             prediction_input={},
+            author="Zoé Cordelier",
             client=response_client(response),
         )
 
@@ -115,6 +124,7 @@ def test_download_image_rejects_gif_response(tmp_path):
             prediction_id="abc123",
             sequence=1,
             prediction_input={},
+            author="Zoé Cordelier",
             client=response_client(response),
         )
 
@@ -137,6 +147,7 @@ def test_download_image_rejects_oversized_response(tmp_path):
             prediction_id="abc123",
             sequence=1,
             prediction_input={},
+            author="Zoé Cordelier",
             client=response_client(response),
         )
 

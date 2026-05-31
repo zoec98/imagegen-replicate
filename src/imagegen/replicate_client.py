@@ -119,6 +119,7 @@ def generate_image_urls(
         prompt=prompt,
         prediction_id=prediction.id,
         prediction_input=prediction_metadata_input,
+        author=app_config.author,
     )
     return ReplicateResult(
         prediction_id=prediction.id,
