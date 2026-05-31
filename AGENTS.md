@@ -81,8 +81,12 @@ For generated images:
 - Preserve useful metadata, such as model name, prompt, parameters, source URL, and creation time.
 - Read generated-image author metadata from `AUTHOR`; synthesize copyright from
   `AUTHOR` and the generated image's creation year.
+- Treat the stored generated file as the canonical metadata-rich image.
 - Store generated image metadata in embedded image metadata, not JSON sidecars. PNG uses an application text chunk; JPEG and WebP use EXIF fields.
 - Store a human-readable generated-image description for external tools, and parseable application metadata separately in the embedded payload.
+- Write and strip image metadata with Python helpers, not by shelling out to `exiftool` or other metadata tools.
+- Keep open/view, normal download, and clean download behavior distinct. Open/view serves the stored file for browser display. Normal download serves the stored metadata-rich file with attachment headers. Clean download serves a temporary metadata-stripped copy without mutating the stored file.
+- Store clean export files under the configured temporary directory, not in the gallery output directory, and do not expose them as gallery assets.
 - Store durable generation request/result history in SQLite under the configured data directory, `data/` by default.
 - Keep route and gallery code behind provider/repository boundaries. Do not read embedded metadata or SQLite tables directly from templates or JavaScript-facing route code.
 - Store source image references as local filenames, not image bytes or database blobs.
@@ -251,6 +255,9 @@ Keep this file focused on contributors and agents.
 - Do not introduce network calls in unit tests unless they are explicitly marked integration tests and skipped by default.
 - Do not store uploaded files or generated outputs in source-controlled paths unless they are intentional fixtures. Keep sample/reference payloads under `data-example/`, not `data/`.
 - Do not read or write JSON sidecars for generated-image metadata.
+- Do not use shell metadata tools such as `exiftool`; keep metadata writes and clean exports in Python.
+- Do not strip metadata from the stored gallery image when creating a clean download.
+- Do not write clean exports into the gallery output directory or list them as gallery images.
 - Do not bypass `ImageMetadataProvider` or `SQLiteGenerationLog` from route/gallery code.
 - Do not bypass `PaletteRepository` for palette file access.
 - Do not overwrite existing user prompts, palette files, or generated outputs without an explicit user action.

@@ -56,7 +56,7 @@ The page includes an app build checksum. If the server-side assets change while 
 4. For image edits, enable `Edit`, select one or more existing gallery images as sources, then submit the request.
 5. Press `Generate`.
 6. Watch request status in the message area.
-7. Use the gallery to open generated images, inspect metadata, load metadata back into the workspace, or delete local images.
+7. Use the gallery to open generated images, download metadata-rich or clean copies, inspect metadata, load metadata back into the workspace, or delete local images.
 
 Image edit sources are selected from local gallery images. Source images are submitted as local filenames; image bytes are not placed in the browser JSON payload.
 
@@ -96,10 +96,15 @@ External edits to files under your configured fragment root, `data/fragments` by
 
 Generated images appear in the local gallery. Each gallery card provides:
 
+- The image itself as an open/view link to the stored local file.
 - An information button with filename, model, dimensions, and prompt.
 - A file type badge for PNG, JPG, or WebP.
+- A normal download button that downloads the stored metadata-rich image.
+- A clean download button that downloads a temporary copy with embedded metadata stripped.
 - A load button that reads embedded metadata and replaces the current prompt, model, and supported settings.
 - A delete button that moves the local image to trash after a CSRF-protected server request.
+
+Opening an image views the stored file in the browser. Normal download also uses the stored file, but forces a download response so the saved copy keeps the app metadata, prompt, author, copyright, and generation details. Clean download creates a separate stripped export for sharing outside the app; it does not rewrite the stored gallery image.
 
 Loading metadata requires metadata embedded by this app. If metadata is missing or references an unsupported model/settings shape, the UI shows an error and preserves the current workspace.
 
@@ -113,9 +118,13 @@ Gallery delete moves files from `data/images` to `data/trash` by default. If a t
 
 The committed `data-example/` tree is sample/reference data. The ignored `data/` tree is the default local runtime directory for real generations, uploads, palette edits, trash, and SQLite history.
 
-The app embeds generated-image metadata directly into PNG, JPEG, and WebP files. Metadata includes the model, prompt, parameters, source URL, creation time, and related generation identifiers. New generated images do not use JSON sidecar files.
+The stored gallery image is the canonical metadata-rich file. The app embeds generated-image metadata directly into PNG, JPEG, and WebP files. Metadata includes the model, prompt, parameters, source URL, creation time, and related generation identifiers. New generated images do not use JSON sidecar files.
 
 Set `AUTHOR` in `.env` to the author name used for generated image metadata. New `.env` files use `Noname Changeme Nescio` as a placeholder. Copyright metadata is derived from the generated image year and `AUTHOR`.
+
+Clean downloads are created on demand under `data/tmp` by default, using the same `IMAGEGEN_DATA_DIR` root. Clean exports remove the app metadata payload and normal image metadata where supported by the format. They are not gallery assets and are not intended for reuse inside the app.
+
+Image metadata writing and clean export handling are implemented in Python. The app does not require `exiftool` or other shell metadata tools.
 
 Palette fragments are stored under `data/fragments` by default. They are plain text files and are not generated outputs.
 
