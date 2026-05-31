@@ -13,6 +13,7 @@ from flask import (
     abort,
     redirect,
     render_template,
+    send_file,
     send_from_directory,
     url_for,
 )
@@ -20,6 +21,7 @@ from werkzeug.utils import secure_filename
 
 from imagegen.app_version import app_checksum
 from imagegen.gallery import IMAGE_EXTENSIONS, list_gallery_images
+from imagegen.image_export import ImageExportError, clean_image_export
 from imagegen.model_registry import (
     MODEL_REGISTRY,
     CustomDimensionsControl,
@@ -92,6 +94,40 @@ def register_routes(app: Flask) -> None:
             abort(404)
         return redirect(url_for("image_file", filename=safe_name))
 
+    @app.get("/images/<path:filename>/download")
+    def image_download(filename: str):
+        safe_name = safe_image_filename(filename)
+        if safe_name is None:
+            abort(404)
+        image_path = app.config["IMAGEGEN_APP_CONFIG"].output_dir / safe_name
+        if not image_path.is_file():
+            abort(404)
+        return send_from_directory(
+            app.config["IMAGEGEN_APP_CONFIG"].output_dir,
+            safe_name,
+            as_attachment=True,
+            download_name=safe_name,
+        )
+
+    @app.get("/images/<path:filename>/download-clean")
+    def image_download_clean(filename: str):
+        safe_name = safe_image_filename(filename)
+        if safe_name is None:
+            abort(404)
+        app_config = app.config["IMAGEGEN_APP_CONFIG"]
+        image_path = app_config.output_dir / safe_name
+        if not image_path.is_file():
+            abort(404)
+        try:
+            export_path = clean_image_export(image_path, tmp_dir=app_config.tmp_dir)
+        except ImageExportError:
+            abort(400)
+        return send_file(
+            export_path,
+            as_attachment=True,
+            download_name=clean_download_name(safe_name),
+        )
+
     @app.get("/images/<path:filename>/metadata")
     def image_metadata(filename: str):
         safe_name = safe_image_filename(filename)
@@ -109,6 +145,11 @@ def safe_image_filename(filename: str) -> str | None:
     if safe_name != filename or Path(filename).suffix.lower() not in IMAGE_EXTENSIONS:
         return None
     return safe_name
+
+
+def clean_download_name(filename: str) -> str:
+    path = Path(filename)
+    return f"{path.stem}-clean{path.suffix}"
 
 
 def _model_json(model: ReplicateModel) -> dict[str, object]:
