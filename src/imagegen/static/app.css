@@ -487,6 +487,8 @@ select {
 
 .gallery-action {
   padding: 0;
+  position: relative;
+  text-decoration: none;
   width: 2rem;
 }
 
@@ -500,6 +502,31 @@ select {
 .gallery-action:disabled {
   color: #94a3b8;
   cursor: not-allowed;
+}
+
+.gallery-action[aria-disabled="true"] {
+  color: #94a3b8;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.gallery-download {
+  color: #1d4ed8;
+}
+
+.gallery-download-clean {
+  color: #0f766e;
+  overflow: visible;
+}
+
+.gallery-download-clean .sparkle {
+  background: #ffffff;
+  border-radius: 999px;
+  height: 0.62rem;
+  position: absolute;
+  right: 0.18rem;
+  top: 0.18rem;
+  width: 0.62rem;
 }
 
 .gallery-delete {

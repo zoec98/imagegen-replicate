@@ -486,6 +486,12 @@ def test_index_exposes_gallery_filenames_for_source_selection(app_config, app_fa
     assert response.status_code == 200
     assert b'data-filename="source.png"' in response.data
     assert b'data-delete-url="/api/images/source.png/delete"' in response.data
+    assert b'href="/images/source.png/download"' in response.data
+    assert b'href="/images/source.png/download-clean"' in response.data
+    assert b'class="gallery-action gallery-download"' in response.data
+    assert b'class="gallery-action gallery-download-clean"' in response.data
+    assert b'aria-label="Download source.png"' in response.data
+    assert b'aria-label="Download clean source.png"' in response.data
     assert b'aria-label="Select source.png as source image"' in response.data
     assert b"gallery-immich" not in response.data
 
@@ -1420,7 +1426,9 @@ def test_api_images_returns_gallery_json_newest_first(app_config, app_factory):
     assert response.json == {
         "images": [
             {
+                "clean_download_url": "/images/newer.jpg/download-clean",
                 "delete_url": "/api/images/newer.jpg/delete",
+                "download_url": "/images/newer.jpg/download",
                 "filename": "newer.jpg",
                 "url": "/images/newer.jpg",
                 "metadata_url": None,
@@ -1428,7 +1436,9 @@ def test_api_images_returns_gallery_json_newest_first(app_config, app_factory):
                 "created_at": None,
             },
             {
+                "clean_download_url": "/images/older.png/download-clean",
                 "delete_url": "/api/images/older.png/delete",
+                "download_url": "/images/older.png/download",
                 "filename": "older.png",
                 "url": "/images/older.png",
                 "metadata_url": None,
@@ -1470,7 +1480,9 @@ def test_api_images_includes_embedded_metadata(app_config, app_factory):
     assert response.json == {
         "images": [
             {
+                "clean_download_url": "/images/sample.png/download-clean",
                 "delete_url": "/api/images/sample.png/delete",
+                "download_url": "/images/sample.png/download",
                 "filename": "sample.png",
                 "url": "/images/sample.png",
                 "metadata_url": "/images/sample.png/metadata",

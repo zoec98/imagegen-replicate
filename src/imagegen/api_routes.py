@@ -303,6 +303,11 @@ def _gallery_image_json(app: Flask, image: GalleryImage) -> dict[str, str | None
     payload = {
         "filename": image.filename,
         "url": image.url,
+        "download_url": url_for("image_download", filename=image.filename),
+        "clean_download_url": url_for(
+            "image_download_clean",
+            filename=image.filename,
+        ),
         "delete_url": url_for("api_delete_image", filename=image.filename),
         "metadata_url": image.metadata_url,
         "content_type": image.content_type,

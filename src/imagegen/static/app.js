@@ -979,6 +979,12 @@
     if (image.immich_upload_url) {
       figure.dataset.immichUploadUrl = image.immich_upload_url;
     }
+    if (image.download_url) {
+      figure.dataset.downloadUrl = image.download_url;
+    }
+    if (image.clean_download_url) {
+      figure.dataset.cleanDownloadUrl = image.clean_download_url;
+    }
     if (image.metadata_url) {
       figure.dataset.metadataUrl = image.metadata_url;
     }
@@ -1039,6 +1045,19 @@
       );
     }
 
+    const downloadLink = iconLink(
+      "gallery-download",
+      `Download ${image.filename}`,
+      image.download_url,
+      "M7 18a5 5 0 1 1 1-9.9A6.5 6.5 0 0 1 20.5 11 3.5 3.5 0 0 1 20 18h-5v-4h3l-6 6-6-6h3V9h4v5h3z",
+    );
+    const cleanDownloadLink = iconLink(
+      "gallery-download-clean",
+      `Download clean ${image.filename}`,
+      image.clean_download_url,
+      "M7 18a5 5 0 1 1 1-9.9A6.5 6.5 0 0 1 20.5 11 3.5 3.5 0 0 1 20 18h-5v-4h3l-6 6-6-6h3V9h4v5h3z",
+      "M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z",
+    );
     const loadButton = iconButton(
       "gallery-load",
       `Load metadata from ${image.filename}`,
@@ -1054,7 +1073,7 @@
     if (immichButton) {
       actions.append(immichButton);
     }
-    actions.append(loadButton, deleteButton);
+    actions.append(downloadLink, cleanDownloadLink, loadButton, deleteButton);
 
     const sourceButton = document.createElement("button");
     sourceButton.className = "source-select";
@@ -1083,6 +1102,36 @@
     svg.append(path);
     button.append(svg);
     return button;
+  }
+
+  function iconLink(className, label, href, pathData, sparklePathData = null) {
+    const link = document.createElement("a");
+    link.className = `gallery-action ${className}`;
+    link.href = href || "#";
+    link.setAttribute("aria-label", label);
+    if (!href) {
+      link.setAttribute("aria-disabled", "true");
+    }
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", pathData);
+    svg.append(path);
+    link.append(svg);
+
+    if (sparklePathData) {
+      const sparkle = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      sparkle.setAttribute("aria-hidden", "true");
+      sparkle.setAttribute("viewBox", "0 0 24 24");
+      sparkle.classList.add("sparkle");
+      const sparklePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      sparklePath.setAttribute("d", sparklePathData);
+      sparkle.append(sparklePath);
+      link.append(sparkle);
+    }
+    return link;
   }
 
   async function refreshGallery() {
@@ -1295,6 +1344,11 @@
       loadGalleryMetadata(figure).catch((error) => {
         showMessage(error.message || "Image metadata could not be loaded.", "error");
       });
+      return;
+    }
+    const downloadLink = event.target.closest(".gallery-download, .gallery-download-clean");
+    if (downloadLink) {
+      disarmGalleryDelete();
       return;
     }
     const deleteButton = event.target.closest(".gallery-delete");

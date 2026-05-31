@@ -200,6 +200,27 @@
                 </svg>
               </button>
               {% endif %}
+              <a
+                class="gallery-action gallery-download"
+                href="{{ url_for('image_download', filename=image.filename) }}"
+                aria-label="Download {{ image.filename }}"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M7 18a5 5 0 1 1 1-9.9A6.5 6.5 0 0 1 20.5 11 3.5 3.5 0 0 1 20 18h-5v-4h3l-6 6-6-6h3V9h4v5h3z"/>
+                </svg>
+              </a>
+              <a
+                class="gallery-action gallery-download-clean"
+                href="{{ url_for('image_download_clean', filename=image.filename) }}"
+                aria-label="Download clean {{ image.filename }}"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M7 18a5 5 0 1 1 1-9.9A6.5 6.5 0 0 1 20.5 11 3.5 3.5 0 0 1 20 18h-5v-4h3l-6 6-6-6h3V9h4v5h3z"/>
+                </svg>
+                <svg class="sparkle" aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z"/>
+                </svg>
+              </a>
               <button
                 class="gallery-action gallery-load"
                 type="button"
