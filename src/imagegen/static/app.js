@@ -836,6 +836,7 @@
       "aria-label",
       `Delete ${filename || "image"}`,
     );
+    armedDeleteButton.setAttribute("title", "Delete image");
     armedDeleteButton = null;
   }
 
@@ -850,6 +851,7 @@
     const filename = button.closest(".gallery-item")?.dataset.filename || "image";
     button.classList.add("gallery-delete-armed");
     button.setAttribute("aria-label", `Confirm delete ${filename}`);
+    button.setAttribute("title", "Confirm delete image");
     showMessage(`Click delete again to remove ${filename}.`, "info");
   }
 
@@ -870,6 +872,7 @@
       button.classList.remove("gallery-immich-failed");
       button.classList.add("gallery-immich-uploading");
       button.setAttribute("aria-label", `Uploading ${filename} to Immich`);
+      button.setAttribute("title", "Uploading to Immich");
     }
     const response = await fetch(uploadUrl, {
       method: "POST",
@@ -887,6 +890,7 @@
         button.classList.remove("gallery-immich-uploading");
         button.classList.add("gallery-immich-failed");
         button.setAttribute("aria-label", `Immich upload failed for ${filename}`);
+        button.setAttribute("title", "Upload to Immich");
       }
       throw new Error(data.error || `Could not upload ${filename} to Immich.`);
     }
@@ -895,6 +899,7 @@
       button.classList.remove("gallery-immich-uploading", "gallery-immich-failed");
       button.classList.add("gallery-immich-uploaded");
       button.setAttribute("aria-label", `${filename} uploaded to Immich`);
+      button.setAttribute("title", "Uploaded to Immich");
     }
     const status = data.status === "already_present" ? "already present" : "uploaded";
     showMessage(`${filename} ${status} in Immich.`, "success");
@@ -1027,21 +1032,13 @@
     tooltip.append(tooltipLine);
     infoWrap.append(infoButton, tooltip);
 
-    const typeIndicator = document.createElement("span");
-    typeIndicator.className = "image-type";
-    const extension = image.filename.split(".").pop() || "";
-    typeIndicator.textContent = extension.toUpperCase();
-    typeIndicator.setAttribute(
-      "aria-label",
-      `${extension.toUpperCase()} image`,
-    );
-
     let immichButton = null;
     if (image.immich_upload_url) {
       immichButton = iconButton(
         "gallery-immich",
         `Upload ${image.filename} to Immich`,
-        "M7 18a5 5 0 1 1 1-9.9A6.5 6.5 0 0 1 20.5 11 3.5 3.5 0 0 1 20 18h-5v-5h3l-6-6-6 6h3v5z",
+        "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 17h-4v-4H7l5-5 5 5h-3z",
+        "Upload to Immich",
       );
     }
 
@@ -1049,31 +1046,36 @@
       "gallery-download",
       `Download ${image.filename}`,
       image.download_url,
-      "M7 18a5 5 0 1 1 1-9.9A6.5 6.5 0 0 1 20.5 11 3.5 3.5 0 0 1 20 18h-5v-4h3l-6 6-6-6h3V9h4v5h3z",
+      "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 12h3l-5 5-5-5h3V8h4z",
+      null,
+      "Download with metadata",
     );
     const cleanDownloadLink = iconLink(
       "gallery-download-clean",
       `Download clean ${image.filename}`,
       image.clean_download_url,
-      "M7 18a5 5 0 1 1 1-9.9A6.5 6.5 0 0 1 20.5 11 3.5 3.5 0 0 1 20 18h-5v-4h3l-6 6-6-6h3V9h4v5h3z",
+      "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 12h3l-5 5-5-5h3V8h4z",
       "M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z",
+      "Download without metadata",
     );
     const loadButton = iconButton(
       "gallery-load",
       `Load metadata from ${image.filename}`,
       "M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2h6.5A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z",
+      "Load metadata",
     );
     loadButton.disabled = !image.metadata_url;
     const deleteButton = iconButton(
       "gallery-delete",
       `Delete ${image.filename}`,
       "M9 3h6l1 2h4v2H4V5h4zm-3 6h12l-.7 11H6.7z",
+      "Delete image",
     );
-    actions.append(infoWrap, typeIndicator);
+    actions.append(infoWrap, loadButton, downloadLink, cleanDownloadLink);
     if (immichButton) {
       actions.append(immichButton);
     }
-    actions.append(downloadLink, cleanDownloadLink, loadButton, deleteButton);
+    actions.append(deleteButton);
 
     const sourceButton = document.createElement("button");
     sourceButton.className = "source-select";
@@ -1088,11 +1090,12 @@
     return figure;
   }
 
-  function iconButton(className, label, pathData) {
+  function iconButton(className, label, pathData, title = label) {
     const button = document.createElement("button");
     button.className = `gallery-action ${className}`;
     button.type = "button";
     button.setAttribute("aria-label", label);
+    button.setAttribute("title", title);
 
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("aria-hidden", "true");
@@ -1104,11 +1107,19 @@
     return button;
   }
 
-  function iconLink(className, label, href, pathData, sparklePathData = null) {
+  function iconLink(
+    className,
+    label,
+    href,
+    pathData,
+    sparklePathData = null,
+    title = label,
+  ) {
     const link = document.createElement("a");
     link.className = `gallery-action ${className}`;
     link.href = href || "#";
     link.setAttribute("aria-label", label);
+    link.setAttribute("title", title);
     if (!href) {
       link.setAttribute("aria-disabled", "true");
     }

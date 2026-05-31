@@ -493,6 +493,11 @@ def test_index_exposes_gallery_filenames_for_source_selection(app_config, app_fa
     assert b'aria-label="Download source.png"' in response.data
     assert b'aria-label="Download clean source.png"' in response.data
     assert b'aria-label="Select source.png as source image"' in response.data
+    assert b'title="Load metadata"' in response.data
+    assert b'title="Download with metadata"' in response.data
+    assert b'title="Download without metadata"' in response.data
+    assert b'title="Delete image"' in response.data
+    assert b'class="image-type"' not in response.data
     assert b"gallery-immich" not in response.data
 
 
@@ -519,6 +524,7 @@ def test_index_renders_immich_upload_action_when_configured(
     )
     assert b'class="gallery-action gallery-immich"' in response.data
     assert b'aria-label="Upload source.png to Immich"' in response.data
+    assert b'title="Upload to Immich"' in response.data
 
 
 def test_image_route_serves_stored_file(app_config, app_factory):
