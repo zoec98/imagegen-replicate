@@ -14,6 +14,7 @@ from flask import Flask
 from imagegen.api_routes import register_api_routes
 from imagegen.config import AppConfig, load_config
 from imagegen.generation_log import SQLiteGenerationLog
+from imagegen.image_export import clean_tmp_exports
 from imagegen.metadata import EmbeddedImageMetadataProvider
 from imagegen.replicate_client import generate_image_urls
 from imagegen.request_store import RequestStore
@@ -60,8 +61,10 @@ def _ensure_data_directories(app_config: AppConfig) -> None:
         app_config.output_dir,
         app_config.fragment_root,
         app_config.trash_dir,
+        app_config.tmp_dir,
     ):
         directory.mkdir(parents=True, exist_ok=True)
+    clean_tmp_exports(app_config.tmp_dir)
 
 
 def _resolve_app_config(config: dict[str, Any] | None) -> AppConfig:

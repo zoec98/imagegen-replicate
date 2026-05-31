@@ -57,7 +57,7 @@ def test_download_image_writes_file_and_embedded_metadata(tmp_path):
     assert payload is not None
     assert payload["author"] == "Zoé Cordelier"
     assert payload["copyright"].endswith("Zoé Cordelier")
-    assert payload["software"] == "imagegen"
+    assert payload["software"] == "https://github.com/zoec98/imagegen-replicate"
 
 
 def test_persist_generated_images_creates_output_directory(tmp_path):

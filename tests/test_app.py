@@ -75,6 +75,17 @@ def test_create_app_creates_derived_data_directories(app_config, app_factory):
     assert app_config.output_dir.is_dir()
     assert app_config.fragment_root.is_dir()
     assert app_config.trash_dir.is_dir()
+    assert app_config.tmp_dir.is_dir()
+
+
+def test_create_app_cleans_temporary_exports(app_config, app_factory):
+    app_config.tmp_dir.mkdir(parents=True)
+    stale_export = app_config.tmp_dir / "sample-clean-old.png"
+    stale_export.write_bytes(b"stale")
+
+    app_factory()
+
+    assert not stale_export.exists()
 
 
 def test_index_renders_prompt_form(app_factory):

@@ -112,6 +112,10 @@ class AppConfig:
         return self.data_dir / "trash"
 
     @property
+    def tmp_dir(self) -> Path:
+        return self.data_dir / "tmp"
+
+    @property
     def generation_log_path(self) -> Path:
         return self.data_dir / "imagegen.sqlite3"
 
