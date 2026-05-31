@@ -1,307 +1,427 @@
 # Implementation Plan
 
-This plan is derived from `SCENARIO.md`. The work is grouped by topic:
+This plan is derived from `SCENARIO.md`.
 
-- image-generation-provider: Stories 1, 2, and 3.
-- gallery download improvements: Stories 4, 5, and 6.
+The scenario is covered by two workstreams:
 
-Those two groups cover the current scenario. Provider work owns provider
-selection, provider-specific registries, schema tooling, and pricing metadata.
-Gallery work owns stored image metadata, clean exports, and download controls.
+- image-generation-provider: provider selection, provider-specific model
+  registries, provider clients, schema helpers, and provider pricing metadata.
+- gallery download improvements: metadata-rich stored images, clean exports,
+  forced-download routes, and gallery controls.
+
+## Decisions
+
+- Use `FAL_KEY` for fal.ai credentials. Do not support `FAL_API_KEY` unless the
+  fal.ai library later proves that name is required.
+- Missing provider API keys are allowed at startup. Providers without keys are
+  not offered for generation.
+- Replicate is the first-load default provider when it is enabled. Otherwise,
+  use the first enabled provider. If none are enabled, show a clear no-provider
+  message.
+- Model aliases are unique within a provider, not globally unique.
+- Fully qualified model references use `provider:alias`, for example
+  `replicate:seedream45`.
+- Bare model aliases resolve inside the currently selected provider.
+- Page initialization may fall back to the first model for the selected provider
+  if a configured default alias is unavailable. Submitted API requests must
+  reject invalid provider/model combinations instead of falling back.
+- fal.ai text-to-image and edit endpoints that form one user-facing model are
+  linked in the fal.ai registry. The model selector shows the text/non-edit
+  entry; edit mode uses the linked edit endpoint when one exists.
+- Replicate pricing remains registry metadata. fal.ai pricing is fetched only by
+  `scripts/get_schema_falai`; no runtime or startup pricing refresh is included
+  in this plan.
+- `scripts/get_schema` is renamed to `scripts/get_schema_replicate`; no
+  compatibility wrapper remains.
+- Script helpers do not need automated tests.
+- Use `AUTHOR` as the only author/copyright metadata setting. New `.env` files
+  get `AUTHOR=Noname Changeme Nescio`.
+- Copyright is synthesized from `AUTHOR` and the generation year stored in image
+  metadata.
+- Clean downloads use unique temporary files under `<data_dir>/tmp`, are not
+  cached as gallery assets, and do not mutate stored gallery images.
+- Clicking a gallery image opens/views it. The normal download icon forces
+  download of the stored metadata-rich image. The clean download icon forces
+  download of a stripped temporary image.
 
 ## Image Generation Provider
 
-### Ticket 1: Provider-Aware Configuration
+### Ticket 1: Provider Configuration And Availability
 
 #### Scope
 
 - Add `FAL_KEY` to `.env` generation and `env.example`.
-- Represent enabled providers from available API keys.
-- Keep Replicate enabled only when `REPLICATE_API_TOKEN` is configured.
-- Keep fal.ai enabled only when `FAL_KEY` is configured.
-- Use Replicate as the first-load default provider when Replicate is enabled.
-- If Replicate is not enabled, default to the first enabled provider.
-- Provide a clear UI/server message when no generation provider is configured.
-- Preserve tests without real provider API calls.
+- Extend configuration with provider availability:
+  - Replicate is enabled when `REPLICATE_API_TOKEN` is set.
+  - fal.ai is enabled when `FAL_KEY` is set.
+- Compute the first-load provider:
+  - Replicate when enabled;
+  - otherwise the first enabled provider;
+  - otherwise no selected provider.
+- Make no-provider state explicit for routes/templates/API responses.
 
 #### Acceptance Criteria
 
-- Missing API keys are allowed at startup.
+- The app starts with no provider keys.
 - Providers without API keys are not offered for generation.
-- The app reports a clear error if no provider can be used.
-- Existing Replicate-only tests continue to pass with a fake/no-op worker.
-- `env.example` documents both provider keys.
-- `FAL_API_KEY` is not treated as an alias unless the implementation later
-  proves the fal.ai library requires it.
+- The app can report that no generation provider is configured.
+- `env.example` documents `REPLICATE_API_TOKEN` and `FAL_KEY`.
 
 #### Suggested Tests
 
 - Config loads with no provider keys.
-- Config reports Replicate enabled when `REPLICATE_API_TOKEN` is set.
-- Config reports fal.ai enabled when `FAL_KEY` is set.
+- Config reports Replicate enabled from `REPLICATE_API_TOKEN`.
+- Config reports fal.ai enabled from `FAL_KEY`.
 - Provider defaulting prefers Replicate only when Replicate is enabled.
-- Index rendering shows only enabled providers.
+- Provider defaulting falls through to fal.ai when only `FAL_KEY` is set.
 
-### Ticket 2: Provider-Aware Model Registry Shape
+### Ticket 2: Provider Registry Foundation
 
 #### Scope
 
+- Split model registries by provider.
 - Introduce provider identity in model metadata.
-- Either split registries by provider or add provider filtering to a single
-  registry.
-- Keep provider-specific model keys, versions, schemas, pricing, capabilities,
-  parameter names, defaults, limits, and output metadata distinct.
-- Model aliases are unique within a provider, not globally unique.
-- Support fully qualified model syntax such as `replicate:seedream45`.
-- Resolve bare model aliases inside the currently selected provider.
-- For page initialization only, if a configured/default model alias is missing
-  for the selected provider, choose the first model in that provider's list.
-- For submitted API requests, reject missing or invalid model aliases instead
-  of silently falling back to another model.
-- Add a pricing source field for registry pricing metadata:
-  - `provider_api`;
-  - `static`;
-  - `unknown`.
+- Keep provider-specific model keys, versions, schema URLs, pricing,
+  capabilities, parameters, defaults, limits, and output shapes distinct.
 - Keep current Replicate models represented as Replicate provider entries.
+- Keep pricing representation provider-aware:
+  - Replicate entries keep static registry pricing.
+  - fal.ai entries may use provider-API pricing when imported by helper script.
+  - unknown pricing is represented explicitly.
+- Add registry lookup helpers for:
+  - enabled provider model lists;
+  - fully qualified `provider:alias` references;
+  - bare aliases scoped to a selected provider;
+  - page-initialization fallback to first model for a provider.
 
 #### Acceptance Criteria
 
 - Model aliases are unique within a provider.
-- The UI/API can list models for one provider without leaking models from
-  another provider.
-- Existing Replicate model behavior remains unchanged for current models.
-- Pricing can be displayed with its source, or omitted clearly when unknown.
+- Duplicate aliases across providers are allowed.
+- Provider model lists do not leak models from other providers.
+- Existing Replicate registry behavior is preserved through provider-aware
+  helpers.
+- Unknown pricing is explicit and never guessed.
 
 #### Suggested Tests
 
-- Registry filters models by provider.
-- Duplicate aliases across different providers are handled intentionally.
-- Fully qualified model identifiers resolve to the exact provider/model.
-- API submissions reject bad model aliases for the selected provider.
-- Replicate entries preserve existing pricing as `static`.
-- Unknown pricing is represented explicitly rather than guessed.
+- Registry filters by provider.
+- Fully qualified model references resolve to the exact provider/model.
+- Bare aliases resolve only within the selected provider.
+- Initialization fallback chooses the first model for the provider.
+- Bad provider/model references are distinguishable from missing defaults.
 
-### Ticket 3: Provider Selector UI
+### Ticket 3: fal.ai Linked Text/Edit Registry Entries
+
+#### Scope
+
+- Extend fal.ai registry metadata so one user-facing model can link:
+  - a selectable text-to-image endpoint;
+  - an optional edit endpoint.
+- Example linked endpoints:
+  - `fal-ai/bytedance/seedream/v4.5/text-to-image`;
+  - `fal-ai/bytedance/seedream/v4.5/edit`.
+- Mark linked edit endpoints as request targets, not normal top-level selector
+  options.
+- Add registry helpers to resolve the effective endpoint for:
+  - text-to-image mode;
+  - edit mode.
+
+#### Acceptance Criteria
+
+- fal.ai text models are selectable.
+- fal.ai linked edit endpoints are available to request construction.
+- fal.ai edit endpoints are not duplicated as normal model selector choices.
+- Edit-mode resolution fails clearly when a fal.ai model has no linked edit
+  endpoint.
+
+#### Suggested Tests
+
+- fal.ai registry exposes only selectable text models for UI lists.
+- fal.ai registry resolves a linked edit endpoint when edit mode is active.
+- fal.ai registry rejects edit-mode resolution without a linked edit endpoint.
+
+### Ticket 4: Provider Schema Helper Scripts
+
+#### Scope
+
+- Rename `scripts/get_schema` to `scripts/get_schema_replicate`.
+- Do not keep a `scripts/get_schema` compatibility wrapper.
+- Add `scripts/get_schema_falai`.
+- Update README and AGENTS script references.
+
+#### Replicate Helper
+
+- Preserve existing Replicate schema extraction behavior.
+- Usage remains `scripts/get_schema_replicate owner/model`.
+
+#### fal.ai Helper
+
+- Accept fal.ai endpoint IDs such as
+  `fal-ai/bytedance/seedream/v4.5/text-to-image`.
+- Fetch or print useful registry-authoring information from fal.ai docs/API
+  pages such as
+  `https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image/api`.
+- Surface the endpoint ID used in the Python example:
+  `fal_client.submit(<endpoint_id>, arguments=...)`.
+- Surface schema information from the page's schema section.
+- Fetch pricing from the documented fal.ai Platform API during helper execution
+  when `FAL_KEY` is available.
+- Missing `.env` or missing `FAL_KEY` prints a warning and leaves pricing
+  undefined/unknown; this is not an error.
+
+#### Acceptance Criteria
+
+- `scripts/get_schema_replicate owner/model` works as the old helper did.
+- `scripts/get_schema_falai fal-ai/bytedance/seedream/v4.5/text-to-image`
+  fetches the corresponding fal.ai docs/API page.
+- fal.ai helper output identifies the endpoint ID.
+- fal.ai helper output includes enough schema information to create or update a
+  registry entry.
+- fal.ai pricing is included when available, and omitted with a warning when
+  unavailable.
+- Documentation no longer references the ambiguous generic helper.
+
+#### Suggested Checks
+
+- Manual check Replicate helper against a known model when network access is
+  intentionally allowed.
+- Manual check fal.ai helper against a known docs page when network access is
+  intentionally allowed.
+- Manual fal.ai helper check without `FAL_KEY` confirms pricing is undefined
+  with a warning.
+
+### Ticket 5: Provider Selector UI
 
 #### Scope
 
 - Add a provider selector to the top-left of the generation controls, directly
   left of the model selector.
-- Changing provider refreshes the model selector options.
-- Keep model-specific parameter controls synced with the selected provider and
-  model.
-- Do not offer providers that are disabled by missing API keys.
-- Preserve server-rendered behavior and progressive JavaScript style.
+- Render only enabled providers.
+- Render no-provider state clearly when no provider keys are configured.
+- Changing provider refreshes:
+  - model selector options;
+  - selected model fallback for page state;
+  - model-specific parameter controls;
+  - edit availability for the selected model.
+- Preserve server-rendered markup with progressive JavaScript updates.
 
 #### Acceptance Criteria
 
 - Provider is the first generation choice in the UI.
-- Changing provider changes available model options.
 - Disabled providers are not selectable.
-- Submitting an unsupported provider is rejected server-side.
-- The browser can disable generation when no provider is available, but server
-  validation remains authoritative.
+- Changing provider changes available models.
+- fal.ai edit endpoints are not shown as separate normal model choices.
+- Browser-side generation can be disabled when no provider is available.
 
 #### Suggested Tests
 
-- Index includes provider selector before model selector when providers exist.
+- Index renders provider selector before model selector when providers exist.
+- Index omits disabled providers.
+- Index renders clear no-provider state.
 - Provider/model registry JSON is provider-aware.
-- API rejects unsupported provider values.
-- API rejects a provider that is not configured.
+- JavaScript syntax check passes after dynamic selector changes.
 
-### Ticket 4: Provider-Aware Request Validation And Persistence
+### Ticket 6: Provider-Aware Generate API
 
 #### Scope
 
-- Include selected provider in generation request payloads.
+- Include provider in generation request payloads.
 - Validate provider and model together server-side.
+- Reject unsupported, disabled, or mismatched provider/model combinations.
 - Use provider-specific model metadata for parameter validation.
-- Store provider identity in request store state, SQLite request history, and
-  embedded image metadata.
-- Preserve annotated prompt behavior: stored app metadata keeps annotated
-  prompts; provider calls receive stripped prompt text.
+- Resolve fal.ai edit requests to the linked edit endpoint when edit mode is
+  active.
+- Reject fal.ai edit mode when no linked edit endpoint exists.
+- Preserve annotated prompt handling:
+  - accepted app state keeps annotated prompt;
+  - provider request receives stripped prompt.
 
 #### Acceptance Criteria
 
-- Request state includes provider.
+- Generate API accepts valid enabled provider/model combinations.
+- Generate API rejects unknown providers.
+- Generate API rejects disabled providers.
+- Generate API rejects model aliases not available for the selected provider.
+- fal.ai edit requests use the linked edit endpoint.
+- Provider/model mismatches are rejected before request state or worker jobs are
+  created.
+
+#### Suggested Tests
+
+- Valid Replicate request still succeeds.
+- Unknown provider is rejected.
+- Disabled provider is rejected.
+- Wrong-provider model alias is rejected.
+- fal.ai edit mode maps to linked edit endpoint.
+- fal.ai edit mode without linked edit endpoint is rejected.
+
+### Ticket 7: Provider Persistence
+
+#### Scope
+
+- Store provider identity in request store state.
+- Store provider identity in SQLite request history.
+- Store provider and provider model identity in embedded image metadata.
+- For fal.ai edit requests, preserve:
+  - user-facing selected model identity;
+  - effective provider endpoint used for the request.
+- Add or migrate SQLite schema as needed.
+
+#### Acceptance Criteria
+
+- Request status JSON includes provider.
 - SQLite request rows include provider.
-- Embedded metadata includes provider and provider model identity.
-- Existing Replicate requests continue to use Replicate request construction.
-- Provider/model mismatches are rejected before worker jobs are created.
+- Embedded metadata includes provider.
+- Embedded metadata can identify the effective provider endpoint.
+- Existing Replicate request history remains readable after migration.
 
 #### Suggested Tests
 
-- Generate API accepts configured provider/model combinations.
-- Generate API rejects unknown provider.
-- Generate API rejects model alias not available for selected provider.
+- Request store records provider.
 - Generation log persists provider.
-- Embedded metadata contains provider.
+- Embedded metadata includes provider and effective endpoint.
+- Schema migration preserves existing rows.
 
-### Ticket 5: Provider Client Boundary
-
-#### Scope
-
-- Extract or generalize the current Replicate generation path behind a provider
-  client boundary.
-- Keep Replicate request construction in a Replicate-specific client.
-- Add a fal.ai client wrapper with fakeable request/response behavior.
-- Normalize successful provider responses into the app's stored-image pipeline.
-- Normalize provider errors without hiding actionable provider details.
-
-#### Acceptance Criteria
-
-- Worker code calls a provider-neutral generation interface.
-- Replicate behavior remains covered by existing tests.
-- fal.ai client behavior is covered with fakes/mocks and no network calls.
-- Downloaded output images still flow through the same safe image persistence
-  and metadata embedding boundary.
-
-#### Suggested Tests
-
-- Worker dispatches to the selected provider client.
-- Replicate client tests continue to pass.
-- fal.ai client builds expected request payloads.
-- fal.ai client handles failed provider responses with useful errors.
-
-### Ticket 6: Replicate Schema Helper Rename
+### Ticket 8: Provider Client Boundary
 
 #### Scope
 
-- Rename `scripts/get_schema` to `scripts/get_schema_replicate`.
-- Update README and AGENTS references.
-- Do not keep a `scripts/get_schema` compatibility wrapper.
-- Preserve existing Replicate schema extraction behavior.
+- Extract the current Replicate generation path behind a provider-neutral
+  generation interface.
+- Keep Replicate request construction in a Replicate-specific client/module.
+- Keep worker code provider-neutral.
+- Normalize provider success into the existing stored-image pipeline.
+- Normalize provider errors without hiding actionable provider detail.
 
 #### Acceptance Criteria
 
-- `scripts/get_schema_replicate owner/model` works as the old Replicate helper
-  did.
-- Documentation no longer directs maintainers to the ambiguous generic helper.
-- The old helper name is gone; maintainers must choose a provider-specific
-  helper.
+- Worker dispatches through a provider-neutral interface.
+- Existing Replicate generation behavior remains unchanged.
+- Existing Replicate tests continue to pass.
+- Stored image persistence remains shared across providers.
 
 #### Suggested Tests
 
-- If script tests are added, use fixture HTML rather than live replicate.com.
-- Manual check: run the helper against a known model only when network access is
-  intentionally allowed.
+- Worker dispatches to Replicate through the provider interface.
+- Replicate client request construction remains covered.
+- Provider errors are propagated with useful messages.
 
-### Ticket 7: fal.ai Schema And Pricing Helper
+### Ticket 9: fal.ai Provider Client
 
 #### Scope
 
-- Add `scripts/get_schema_falai`.
-- Fetch or print useful fal.ai model schema information for registry authoring.
-- Fetch fal.ai pricing from the documented Platform API during helper execution
-  when available.
-- Mark fetched fal.ai pricing with source `provider_api`.
-- Represent missing fal.ai pricing as `unknown`.
-- Do not add runtime/startup pricing refresh in this plan.
-- Do not make live network calls from normal unit tests.
+- Add a fal.ai client wrapper.
+- Build submissions with `fal_client.submit(<endpoint_id>, arguments=...)`.
+- Use the effective endpoint resolved by provider/model validation.
+- Preserve returned fal.ai `request_id` as the provider request identifier.
+- Poll or fetch fal.ai results according to the fal.ai client flow.
+- Normalize output image URLs into the existing image persistence pipeline.
+- Keep tests fake/mocked; no real fal.ai calls in automated tests.
 
 #### Acceptance Criteria
 
-- `scripts/get_schema_falai fal-ai/example-model` has a clear usage path.
-- fal.ai pricing can be obtained from
-  `/v1/models/pricing?endpoint_id=<endpoint_id>` when credentials allow it.
-- Output includes enough information to create or update a fal.ai registry
-  entry.
-- Failure modes are explicit when credentials, endpoint IDs, or pricing data are
-  unavailable.
+- fal.ai text-to-image requests submit to the text endpoint.
+- fal.ai edit requests submit to the linked edit endpoint.
+- fal.ai result URLs are downloaded through the existing safe image persistence
+  path.
+- fal.ai errors keep actionable provider detail.
+- No automated test calls fal.ai.
 
 #### Suggested Tests
 
-- Unit-test fal.ai schema/pricing parsing with fixture JSON.
-- Unit-test missing pricing as `unknown`.
-- Unit-test provider API pricing as `provider_api`.
+- fal.ai client builds expected text-to-image submission.
+- fal.ai client builds expected edit submission.
+- fal.ai client preserves provider request ID.
+- fal.ai client normalizes successful image outputs.
+- fal.ai client reports provider failures clearly.
 
 ## Gallery Download Improvements
 
-### Ticket 8: Author And Copyright Configuration
+### Ticket 10: Author And Copyright Configuration
 
 #### Scope
 
-- Add `.env` settings for exported/stored image author and copyright metadata.
-- Use `AUTHOR` as the only author/copyright metadata setting.
-- Fill new `.env` files with placeholder author `Noname Changeme Nescio`.
-- Synthesize copyright from `AUTHOR` and the generation year.
-- Use the stored generation timestamp year, not wall-clock current year, for
-  generated image copyright.
-- Treat `AUTHOR` as required for synthetic metadata, with the placeholder making
-  initial local configuration explicit.
-- Update `env.example`, README, and AGENTS.
+- Add `AUTHOR` to `.env` generation and `env.example`.
+- Fill new `.env` files with `AUTHOR=Noname Changeme Nescio`.
+- Expose author metadata through typed application config.
+- Add a helper to synthesize copyright from:
+  - stored generation timestamp year;
+  - `AUTHOR`.
+- Update README and AGENTS with the metadata policy.
 
 #### Acceptance Criteria
 
-- Config exposes author metadata.
-- Config exposes enough information to derive copyright.
-- Documentation explains how these values are used.
+- Config exposes `AUTHOR`.
 - New `.env` files contain the placeholder `AUTHOR` value.
+- Copyright is derived from image metadata's generation year, not wall-clock
+  current year.
+- Documentation explains that `AUTHOR` drives stored metadata.
 
 #### Suggested Tests
 
 - Config loads `AUTHOR`.
-- Copyright derivation uses the generation year from image metadata.
 - New `.env` files contain `AUTHOR=Noname Changeme Nescio`.
+- Copyright derivation uses the generation year from image metadata.
 
-### Ticket 9: Store Synthetic Metadata On Generated Images
+### Ticket 11: Store Synthetic Metadata On Generated Images
 
 #### Scope
 
-- Extend existing embedded metadata writing so stored generated images include:
-  - current app prompt/application metadata;
-  - human-readable prompt/display data;
+- Extend embedded metadata writing so stored generated images include:
+  - existing application JSON metadata;
+  - prompt/display description;
   - generation timestamp;
   - author;
-  - copyright;
+  - synthesized copyright;
   - application/software identity.
 - Use Python/Pillow metadata handling; do not shell out to `exiftool`.
 - For JPEG and WebP, write supported EXIF fields.
 - For PNG, write equivalent text metadata.
-- Preserve the application JSON metadata payload needed for gallery reload.
+- Preserve app metadata needed for gallery reload.
+- Do not add fake camera metadata such as make, model, aperture, focal length,
+  ISO, or exposure.
 
 #### Acceptance Criteria
 
 - Stored generated images are the canonical metadata-rich images.
-- Existing prompt and app metadata continue to round-trip.
-- JPEG/WebP files include author/copyright where supported.
+- Existing prompt/model/parameter metadata continues to round-trip.
+- JPEG/WebP files include author and synthesized copyright where supported.
 - PNG files include equivalent text fields.
-- No fake full camera metadata is added.
+- Gallery metadata loading still works from stored files.
 
 #### Suggested Tests
 
-- JPEG synthetic metadata includes author, copyright, description/prompt, and
-  application metadata.
-- WebP synthetic metadata includes author, copyright, description/prompt, and
-  application metadata.
-- PNG text metadata includes author, copyright, description/prompt, and
-  application metadata.
-- Existing metadata provider can still load prompt/model/parameters from the
-  stored file.
+- JPEG metadata includes author, copyright, prompt description, and app payload.
+- WebP metadata includes author, copyright, prompt description, and app payload.
+- PNG text metadata includes author, copyright, prompt description, and app
+  payload.
+- Metadata provider can still load prompt/model/parameters from stored files.
 
-### Ticket 10: Clean Image Export Service
+### Ticket 12: Clean Image Export Service
 
 #### Scope
 
-- Add a Python service/helper that creates a metadata-stripped copy of a stored
-  gallery image.
-- Do not mutate the stored gallery image.
-- Remove application JSON metadata and normal EXIF/text metadata where supported.
-- Preserve image pixels and format.
+- Add a Python helper that creates a metadata-stripped copy of a stored gallery
+  image.
 - Use unique temporary files under `<data_dir>/tmp`.
 - Create `<data_dir>/tmp` at startup.
-- Do not cache clean exports.
+- Do not cache clean exports as gallery assets.
+- Do not mutate the stored gallery image.
+- Remove application JSON metadata and normal EXIF/text metadata where
+  supported.
+- Preserve image pixels and format.
 - Clean temporary files opportunistically, for example on startup and/or after
   response handling where practical.
 - Reject unsupported formats instead of converting silently.
 
 #### Acceptance Criteria
 
-- Clean export for PNG/JPEG/WebP contains no application metadata payload.
-- Clean export contains no prompt, author, or copyright metadata.
+- Clean PNG/JPEG/WebP exports contain no application metadata payload.
+- Clean exports contain no prompt, author, or copyright metadata.
 - Stored source image remains unchanged.
-- Clean exports are created under `<data_dir>/tmp` and are not cached as gallery
-  assets.
+- Clean exports are created under `<data_dir>/tmp`.
+- Clean exports do not appear in the gallery.
 - Unsupported formats return clear errors.
 
 #### Suggested Tests
@@ -310,37 +430,34 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 - Clean WebP export strips EXIF and app metadata.
 - Clean PNG export strips text chunks and app metadata.
 - Source file metadata remains intact after clean export.
+- Clean temporary files are not listed as gallery images.
 
-### Ticket 11: Download Routes
+### Ticket 13: Download Routes
 
 #### Scope
 
-- Add a route for normal stored-image download.
-- Add a route for clean download.
-- Keep existing image view/open behavior unchanged.
-- Clicking the gallery image continues to open/view the stored image.
-- The normal download route forces browser download of the metadata-rich stored
-  image.
-- The clean download route forces browser download of the stripped temporary
-  image.
+- Add a route for forced download of the stored metadata-rich image.
+- Add a route for forced download of a clean export.
+- Keep existing image open/view route unchanged.
 - Validate filenames with existing safe filename checks.
-- Serve files only from the configured output directory.
+- Serve source files only from the configured output directory.
+- Serve clean files only from app-created temporary export paths.
 - Generate clear download filenames:
   - normal download may keep `sample.jpg`;
   - clean download may use `sample-clean.jpg`.
 
 #### Acceptance Criteria
 
-- Normal download returns the stored metadata-rich image.
-- Clean download returns a stripped export without rewriting the stored image.
-- The gallery image link opens/views; it is not the forced-download control.
+- Clicking the gallery image still opens/views the stored image.
+- Normal download returns the stored image with attachment headers.
+- Clean download returns a stripped export with attachment headers.
+- Clean download does not rewrite the stored image.
 - Unsafe filenames are rejected.
 - Missing files return not found.
-- Route tests do not require browser automation.
 
 #### Suggested Tests
 
-- Normal download returns the original image bytes/metadata.
+- Normal download returns the original image.
 - Normal download uses attachment response headers.
 - Clean download returns a metadata-stripped file.
 - Clean download uses attachment response headers.
@@ -348,7 +465,7 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 - Path traversal is rejected.
 - Missing image is rejected.
 
-### Ticket 12: Gallery Download Controls And Icons
+### Ticket 14: Gallery Download Controls And Icons
 
 #### Scope
 
@@ -359,13 +476,14 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 - Do not use disk icons for these actions.
 - Keep current gallery actions compact and touch-friendly.
 - Keep trash spacing and two-step delete behavior intact.
+- Implement controls in both server-rendered gallery markup and JavaScript
+  gallery refresh rendering.
 
 #### Acceptance Criteria
 
 - Users can distinguish normal metadata-rich download from clean download.
 - Buttons have accessible labels.
-- Icons render consistently in server-rendered gallery and refreshed gallery
-  JavaScript.
+- Icons render consistently in initial page load and refreshed gallery items.
 - Text does not overlap at mobile/tablet/desktop widths.
 
 #### Suggested Tests
@@ -374,13 +492,14 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 - JavaScript syntax check passes.
 - Browser visual testing is manual/user-authorized only.
 
-### Ticket 13: Gallery Download Documentation
+### Ticket 15: Gallery Download Documentation
 
 #### Scope
 
 - Update README and AGENTS for:
   - stored images as metadata-rich canonical files;
-  - author/copyright metadata settings;
+  - `AUTHOR` metadata setting;
+  - synthesized copyright behavior;
   - clean download behavior;
   - normal download versus open/view;
   - no `exiftool` shell dependency.
@@ -395,3 +514,4 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 #### Suggested Tests
 
 - Documentation-only unless docs tooling is introduced.
+
