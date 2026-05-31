@@ -13,9 +13,10 @@ def test_ensure_env_file_creates_expected_defaults(tmp_path):
 
     content = env_path.read_text(encoding="utf-8")
     assert "REPLICATE_API_TOKEN=" in content
-    assert "IMAGEGEN_OUTPUT_DIR=data/images" in content
-    assert "IMAGEGEN_FRAGMENT_ROOT=data/fragments" in content
-    assert "IMAGEGEN_DB_PATH=data/imagegen.sqlite3" in content
+    assert "IMAGEGEN_DATA_DIR=data" in content
+    assert "IMAGEGEN_OUTPUT_DIR" not in content
+    assert "IMAGEGEN_FRAGMENT_ROOT" not in content
+    assert "IMAGEGEN_DB_PATH" not in content
     assert "IMMICH_URL=" in content
     assert "IMMICH_GALLERY_ID=" in content
     assert "IMMICH_API_KEY=" in content
@@ -29,7 +30,10 @@ def test_ensure_env_file_preserves_existing_values(tmp_path):
     env_path = tmp_path / ".env"
     env_path.write_text(
         "REPLICATE_API_TOKEN=existing-token\n"
+        "IMAGEGEN_DATA_DIR=custom-data\n"
         "IMAGEGEN_OUTPUT_DIR=custom/images\n"
+        "IMAGEGEN_FRAGMENT_ROOT=custom/fragments\n"
+        "IMAGEGEN_DB_PATH=custom/imagegen.sqlite3\n"
         "IMAGEGEN_MODEL=\n",
         encoding="utf-8",
     )
@@ -38,7 +42,10 @@ def test_ensure_env_file_preserves_existing_values(tmp_path):
 
     content = env_path.read_text(encoding="utf-8")
     assert "REPLICATE_API_TOKEN=existing-token" in content
-    assert "IMAGEGEN_OUTPUT_DIR=custom/images" in content
+    assert "IMAGEGEN_DATA_DIR=custom-data" in content
+    assert "IMAGEGEN_OUTPUT_DIR" not in content
+    assert "IMAGEGEN_FRAGMENT_ROOT" not in content
+    assert "IMAGEGEN_DB_PATH" not in content
     assert "IMAGEGEN_MODEL=seedream45" in content
     assert "IMAGEGEN_FLASK_SECRET_KEY=dev-secret-change-me" in content
     assert "IMAGEGEN_REPLICATE_POLL_SECONDS=1.0" in content
@@ -52,8 +59,10 @@ def test_write_env_example_uses_non_secret_defaults(tmp_path):
 
     content = example_path.read_text(encoding="utf-8")
     assert "REPLICATE_API_TOKEN=" in content
-    assert "IMAGEGEN_FRAGMENT_ROOT=data/fragments" in content
-    assert "IMAGEGEN_DB_PATH=data/imagegen.sqlite3" in content
+    assert "IMAGEGEN_DATA_DIR=data" in content
+    assert "IMAGEGEN_OUTPUT_DIR" not in content
+    assert "IMAGEGEN_FRAGMENT_ROOT" not in content
+    assert "IMAGEGEN_DB_PATH" not in content
     assert "IMMICH_URL=" in content
     assert "IMMICH_GALLERY_ID=" in content
     assert "IMMICH_API_KEY=" in content
@@ -62,10 +71,8 @@ def test_write_env_example_uses_non_secret_defaults(tmp_path):
 
 def test_load_config_reads_env_file(tmp_path, monkeypatch):
     monkeypatch.delenv("REPLICATE_API_TOKEN", raising=False)
-    monkeypatch.delenv("IMAGEGEN_OUTPUT_DIR", raising=False)
-    monkeypatch.delenv("IMAGEGEN_FRAGMENT_ROOT", raising=False)
+    monkeypatch.delenv("IMAGEGEN_DATA_DIR", raising=False)
     monkeypatch.delenv("IMAGEGEN_MODEL", raising=False)
-    monkeypatch.delenv("IMAGEGEN_DB_PATH", raising=False)
     monkeypatch.delenv("IMMICH_URL", raising=False)
     monkeypatch.delenv("IMMICH_GALLERY_ID", raising=False)
     monkeypatch.delenv("IMMICH_API_KEY", raising=False)
@@ -75,9 +82,7 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     env_path = tmp_path / ".env"
     env_path.write_text(
         "REPLICATE_API_TOKEN=test-token\n"
-        "IMAGEGEN_OUTPUT_DIR=custom/images\n"
-        "IMAGEGEN_FRAGMENT_ROOT=custom/fragments\n"
-        "IMAGEGEN_DB_PATH=custom/imagegen.sqlite3\n"
+        "IMAGEGEN_DATA_DIR=custom-data\n"
         "IMMICH_URL=https://immich.example.test/\n"
         "IMMICH_GALLERY_ID=album-123\n"
         "IMMICH_API_KEY=immich-key\n"
@@ -91,9 +96,11 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     config = load_config(env_path)
 
     assert config.replicate_api_token == "test-token"
-    assert config.output_dir == tmp_path / "custom/images"
-    assert config.fragment_root == tmp_path / "custom/fragments"
-    assert config.generation_log_path == tmp_path / "custom/imagegen.sqlite3"
+    assert config.data_dir == tmp_path / "custom-data"
+    assert config.output_dir == tmp_path / "custom-data/images"
+    assert config.fragment_root == tmp_path / "custom-data/fragments"
+    assert config.trash_dir == tmp_path / "custom-data/trash"
+    assert config.generation_log_path == tmp_path / "custom-data/imagegen.sqlite3"
     assert config.immich_url == "https://immich.example.test"
     assert config.immich_gallery_id == "album-123"
     assert config.immich_api_key == "immich-key"

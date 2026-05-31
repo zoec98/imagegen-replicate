@@ -32,6 +32,7 @@ class RecordingGenerationLog:
 def test_run_generation_request_succeeded_updates_request(app_config):
     store = RequestStore()
     source_path = app_config.output_dir / "source.png"
+    source_path.parent.mkdir(parents=True)
     source_path.write_bytes(b"image")
     record = store.create(
         prompt="a red house",

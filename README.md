@@ -62,7 +62,7 @@ Image edit sources are selected from local gallery images. Source images are sub
 
 ## Prompt Palettes
 
-Prompt palettes are reusable text fragments stored as plain text files. By default, palette files live under `data/fragments`; set `IMAGEGEN_FRAGMENT_ROOT` to use a different directory.
+Prompt palettes are reusable text fragments stored as plain text files. By default, palette files live under `data/fragments`. Set `IMAGEGEN_DATA_DIR` to move all runtime data, including generated images, palettes, trash, and SQLite history.
 
 Each directory under the fragment root is one singular palette, such as `character` or `style`. Each `.txt` file is one fragment. Filenames store spaces as underscores, and the UI displays underscores as spaces.
 
@@ -106,6 +106,8 @@ Loading metadata requires metadata embedded by this app. If metadata is missing 
 ## Storage
 
 Generated files are downloaded from Replicate into `data/images` by default. Supported local image formats are PNG, JPEG, and WebP. GIF files are not accepted as source images or stored generation results.
+
+Set `IMAGEGEN_DATA_DIR` to move the runtime data root. The app derives generated images, palette fragments, gallery trash, and SQLite history from that one directory.
 
 The app embeds generated-image metadata directly into PNG, JPEG, and WebP files. Metadata includes the model, prompt, parameters, source URL, creation time, and related generation identifiers. New generated images do not use JSON sidecar files.
 

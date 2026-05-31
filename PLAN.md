@@ -34,8 +34,8 @@ with a trash workflow and consolidates configurable storage under one data root.
   derived from `data_dir`.
 - Ensure these paths exist on startup/app initialization.
 - Update `.env` generation and `env.example`.
-- Decide migration behavior for old `.env` files:
-  - fail clearly with documentation if old names are present.
+- When updating old `.env` files, remove the deprecated managed path settings
+  and keep or add `IMAGEGEN_DATA_DIR`.
 
 ### Acceptance Criteria
 
@@ -45,14 +45,16 @@ with a trash workflow and consolidates configurable storage under one data root.
   `fragment_root`, and `trash_dir` from `data_dir`.
 - Relative and absolute `IMAGEGEN_DATA_DIR` values both work.
 - Tests cover default path derivation and custom data directory derivation.
-- Any old-name compatibility or rejection behavior is explicit and tested.
+- Deprecated path settings are removed from managed `.env` files explicitly and
+  covered by tests.
 
 ### Suggested Tests
 
 - `ensure_env_file()` writes `IMAGEGEN_DATA_DIR=data`.
 - `write_env_example()` writes `IMAGEGEN_DATA_DIR=data`.
 - `load_config()` with `IMAGEGEN_DATA_DIR=custom-data` derives all fixed paths.
-- Existing direct construction of `AppConfig` in tests includes `trash_dir`.
+- `create_app()` creates the derived data, image, fragment, and trash
+  directories.
 
 ## Ticket 2: Move Example Data To `data-example`
 

@@ -68,6 +68,15 @@ def test_create_app_returns_flask_app(app_factory):
     assert app.name == "imagegen.app"
 
 
+def test_create_app_creates_derived_data_directories(app_config, app_factory):
+    app_factory()
+
+    assert app_config.data_dir.is_dir()
+    assert app_config.output_dir.is_dir()
+    assert app_config.fragment_root.is_dir()
+    assert app_config.trash_dir.is_dir()
+
+
 def test_index_renders_prompt_form(app_factory):
     client = app_factory().test_client()
 
@@ -439,10 +448,12 @@ def test_api_app_version_matches_rendered_checksum(app_factory):
     assert response.json == {"app_checksum": checksum}
 
 
-def test_index_lists_existing_images(tmp_path, app_factory):
-    (tmp_path / "first.png").write_bytes(b"not really an image")
-    (tmp_path / "animated.gif").write_bytes(b"gif")
-    (tmp_path / "ignore.txt").write_text("ignore", encoding="utf-8")
+def test_index_lists_existing_images(app_config, app_factory):
+    output_dir = app_config.output_dir
+    output_dir.mkdir(parents=True)
+    (output_dir / "first.png").write_bytes(b"not really an image")
+    (output_dir / "animated.gif").write_bytes(b"gif")
+    (output_dir / "ignore.txt").write_text("ignore", encoding="utf-8")
     client = app_factory().test_client()
 
     response = client.get("/")
@@ -454,8 +465,9 @@ def test_index_lists_existing_images(tmp_path, app_factory):
     assert b"ignore.txt" not in response.data
 
 
-def test_index_exposes_gallery_filenames_for_source_selection(tmp_path, app_factory):
-    (tmp_path / "source.png").write_bytes(b"image")
+def test_index_exposes_gallery_filenames_for_source_selection(app_config, app_factory):
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "source.png").write_bytes(b"image")
     client = app_factory().test_client()
 
     response = client.get("/")
@@ -468,11 +480,11 @@ def test_index_exposes_gallery_filenames_for_source_selection(tmp_path, app_fact
 
 
 def test_index_renders_immich_upload_action_when_configured(
-    tmp_path,
     app_config,
     app_factory,
 ):
-    (tmp_path / "source.png").write_bytes(b"image")
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "source.png").write_bytes(b"image")
     immich_config = replace(
         app_config,
         immich_url="https://immich.example.test",
@@ -492,8 +504,9 @@ def test_index_renders_immich_upload_action_when_configured(
     assert b'aria-label="Upload source.png to Immich"' in response.data
 
 
-def test_image_route_serves_stored_file(tmp_path, app_factory):
-    (tmp_path / "sample.png").write_bytes(b"image-bytes")
+def test_image_route_serves_stored_file(app_config, app_factory):
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "sample.png").write_bytes(b"image-bytes")
     client = app_factory().test_client()
 
     response = client.get("/images/sample.png")
@@ -502,13 +515,13 @@ def test_image_route_serves_stored_file(tmp_path, app_factory):
     assert response.data == b"image-bytes"
 
 
-def test_image_route_uses_env_relative_output_dir(tmp_path, monkeypatch):
+def test_image_route_uses_env_relative_data_dir(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     output_dir = tmp_path / "data" / "images"
     output_dir.mkdir(parents=True)
     (output_dir / "sample.png").write_bytes(b"image-bytes")
     (tmp_path / ".env").write_text(
-        "IMAGEGEN_OUTPUT_DIR=data/images\n"
+        "IMAGEGEN_DATA_DIR=data\n"
         "IMAGEGEN_MODEL=seedream45\n"
         "IMAGEGEN_FLASK_SECRET_KEY=test-secret\n",
         encoding="utf-8",
@@ -529,8 +542,9 @@ def test_image_route_blocks_unsafe_paths(app_factory):
     assert response.status_code == 404
 
 
-def test_image_route_blocks_gif_files(tmp_path, app_factory):
-    (tmp_path / "animated.gif").write_bytes(b"gif")
+def test_image_route_blocks_gif_files(app_config, app_factory):
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "animated.gif").write_bytes(b"gif")
     client = app_factory().test_client()
 
     response = client.get("/images/animated.gif")
@@ -538,8 +552,9 @@ def test_image_route_blocks_gif_files(tmp_path, app_factory):
     assert response.status_code == 404
 
 
-def test_image_view_renders_full_image_page(tmp_path, app_factory):
-    (tmp_path / "sample.png").write_bytes(b"image-bytes")
+def test_image_view_renders_full_image_page(app_config, app_factory):
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "sample.png").write_bytes(b"image-bytes")
     client = app_factory().test_client()
 
     response = client.get("/images/sample.png/view")
@@ -549,11 +564,12 @@ def test_image_view_renders_full_image_page(tmp_path, app_factory):
 
 
 def write_sample_png(path):
+    path.parent.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (8, 8), (255, 0, 0)).save(path, "PNG")
 
 
-def test_image_metadata_route_serves_embedded_metadata(tmp_path, app_factory):
-    image_path = tmp_path / "sample.png"
+def test_image_metadata_route_serves_embedded_metadata(app_config, app_factory):
+    image_path = app_config.output_dir / "sample.png"
     write_sample_png(image_path)
     metadata = {
         "content_type": "image/png",
@@ -572,8 +588,11 @@ def test_image_metadata_route_serves_embedded_metadata(tmp_path, app_factory):
     assert response.json == metadata
 
 
-def test_image_metadata_route_404s_for_missing_embedded_metadata(tmp_path, app_factory):
-    write_sample_png(tmp_path / "sample.png")
+def test_image_metadata_route_404s_for_missing_embedded_metadata(
+    app_config,
+    app_factory,
+):
+    write_sample_png(app_config.output_dir / "sample.png")
     client = app_factory().test_client()
 
     response = client.get("/images/sample.png/metadata")
@@ -827,8 +846,9 @@ def test_api_generate_starts_configured_worker(app_factory):
     ]
 
 
-def test_api_generate_accepts_existing_source_images(tmp_path, app_factory):
-    (tmp_path / "source.png").write_bytes(b"image")
+def test_api_generate_accepts_existing_source_images(app_config, app_factory):
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "source.png").write_bytes(b"image")
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
     token = extract_csrf_token(index)
@@ -892,8 +912,12 @@ def test_api_generate_rejects_edit_mode_without_source_images(app_factory):
     assert response.json == {"error": "edit_mode requires at least one source image."}
 
 
-def test_api_generate_rejects_source_images_outside_edit_mode(tmp_path, app_factory):
-    (tmp_path / "source.png").write_bytes(b"image")
+def test_api_generate_rejects_source_images_outside_edit_mode(
+    app_config,
+    app_factory,
+):
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "source.png").write_bytes(b"image")
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
     token = extract_csrf_token(index)
@@ -915,11 +939,12 @@ def test_api_generate_rejects_source_images_outside_edit_mode(tmp_path, app_fact
 
 
 def test_api_generate_rejects_edit_mode_for_non_edit_model(
-    tmp_path,
+    app_config,
     app_factory,
     monkeypatch,
 ):
-    (tmp_path / "source.png").write_bytes(b"image")
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "source.png").write_bytes(b"image")
     monkeypatch.setitem(
         api_routes.MODEL_REGISTRY,
         "text-only",
@@ -965,8 +990,9 @@ def test_api_generate_rejects_missing_source_image(app_factory):
     assert response.json == {"error": "Source image not found: missing.png."}
 
 
-def test_api_generate_rejects_gif_source_image(tmp_path, app_factory):
-    (tmp_path / "source.gif").write_bytes(b"gif")
+def test_api_generate_rejects_gif_source_image(app_config, app_factory):
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "source.gif").write_bytes(b"gif")
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
     token = extract_csrf_token(index)
@@ -1076,11 +1102,11 @@ def test_api_generate_rejects_disable_safety_checker_override(app_factory):
 
 
 def test_api_images_exposes_immich_upload_url_only_when_configured(
-    tmp_path,
     app_config,
     app_factory,
 ):
-    (tmp_path / "sample.png").write_bytes(b"image")
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "sample.png").write_bytes(b"image")
     disabled = app_factory().test_client().get("/api/images")
     immich_config = replace(
         app_config,
@@ -1100,8 +1126,9 @@ def test_api_images_exposes_immich_upload_url_only_when_configured(
     )
 
 
-def test_api_immich_upload_requires_configuration(tmp_path, app_factory):
-    (tmp_path / "sample.png").write_bytes(b"image")
+def test_api_immich_upload_requires_configuration(app_config, app_factory):
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "sample.png").write_bytes(b"image")
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
     token = extract_csrf_token(index)
@@ -1117,8 +1144,9 @@ def test_api_immich_upload_requires_configuration(tmp_path, app_factory):
     assert response.json == {"error": "Immich upload is not configured."}
 
 
-def test_api_immich_upload_requires_csrf(tmp_path, app_config, app_factory):
-    (tmp_path / "sample.png").write_bytes(b"image")
+def test_api_immich_upload_requires_csrf(app_config, app_factory):
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "sample.png").write_bytes(b"image")
     immich_config = replace(
         app_config,
         immich_url="https://immich.example.test",
@@ -1166,7 +1194,6 @@ def test_api_immich_upload_rejects_missing_or_unsafe_filename(
 
 
 def test_api_immich_upload_calls_configured_backend_client(
-    tmp_path,
     app_config,
     app_factory,
 ):
@@ -1178,7 +1205,8 @@ def test_api_immich_upload_calls_configured_backend_client(
             self.paths.append(image_path)
             return ImmichUploadResult(status="uploaded", asset_id="asset-123")
 
-    (tmp_path / "sample.png").write_bytes(b"image")
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "sample.png").write_bytes(b"image")
     immich_config = replace(
         app_config,
         immich_url="https://immich.example.test",
@@ -1202,11 +1230,10 @@ def test_api_immich_upload_calls_configured_backend_client(
 
     assert response.status_code == 200
     assert response.json == {"filename": "sample.png", "status": "uploaded"}
-    assert immich_client.paths == [tmp_path / "sample.png"]
+    assert immich_client.paths == [app_config.output_dir / "sample.png"]
 
 
 def test_api_immich_upload_treats_already_present_as_success(
-    tmp_path,
     app_config,
     app_factory,
 ):
@@ -1214,7 +1241,8 @@ def test_api_immich_upload_treats_already_present_as_success(
         def upload_image(self, image_path):
             return ImmichUploadResult(status="already_present", asset_id="asset-123")
 
-    (tmp_path / "sample.png").write_bytes(b"image")
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "sample.png").write_bytes(b"image")
     immich_config = replace(
         app_config,
         immich_url="https://immich.example.test",
@@ -1240,7 +1268,6 @@ def test_api_immich_upload_treats_already_present_as_success(
 
 
 def test_api_immich_upload_returns_sanitized_error(
-    tmp_path,
     app_config,
     app_factory,
 ):
@@ -1248,7 +1275,8 @@ def test_api_immich_upload_returns_sanitized_error(
         def upload_image(self, image_path):
             raise ImmichUploadError("Immich upload failed with status 403.")
 
-    (tmp_path / "sample.png").write_bytes(b"image")
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "sample.png").write_bytes(b"image")
     immich_config = replace(
         app_config,
         immich_url="https://immich.example.test",
@@ -1300,11 +1328,13 @@ def test_api_generation_unknown_request_id_returns_json_404(app_factory):
     assert response.json == {"error": "Generation request not found."}
 
 
-def test_api_images_returns_gallery_json_newest_first(tmp_path, app_factory):
-    older = tmp_path / "older.png"
-    newer = tmp_path / "newer.jpg"
-    gif = tmp_path / "animated.gif"
-    ignored = tmp_path / "ignored.txt"
+def test_api_images_returns_gallery_json_newest_first(app_config, app_factory):
+    output_dir = app_config.output_dir
+    output_dir.mkdir(parents=True)
+    older = output_dir / "older.png"
+    newer = output_dir / "newer.jpg"
+    gif = output_dir / "animated.gif"
+    ignored = output_dir / "ignored.txt"
     older.write_bytes(b"older")
     newer.write_bytes(b"newer")
     gif.write_bytes(b"gif")
@@ -1348,8 +1378,8 @@ def test_api_images_returns_empty_gallery(app_factory):
     assert response.json == {"images": []}
 
 
-def test_api_images_includes_embedded_metadata(tmp_path, app_factory):
-    image_path = tmp_path / "sample.png"
+def test_api_images_includes_embedded_metadata(app_config, app_factory):
+    image_path = app_config.output_dir / "sample.png"
     write_sample_png(image_path)
     write_embedded_metadata(
         image_path,
@@ -1381,8 +1411,9 @@ def test_api_images_includes_embedded_metadata(tmp_path, app_factory):
     }
 
 
-def test_api_delete_image_removes_valid_image(tmp_path, app_factory):
-    image_path = tmp_path / "sample.png"
+def test_api_delete_image_removes_valid_image(app_config, app_factory):
+    image_path = app_config.output_dir / "sample.png"
+    image_path.parent.mkdir(parents=True)
     image_path.write_bytes(b"image")
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
@@ -1400,8 +1431,9 @@ def test_api_delete_image_removes_valid_image(tmp_path, app_factory):
     assert not image_path.exists()
 
 
-def test_api_delete_image_rejects_path_traversal(tmp_path, app_factory):
-    image_path = tmp_path / "sample.png"
+def test_api_delete_image_rejects_path_traversal(app_config, app_factory):
+    image_path = app_config.output_dir / "sample.png"
+    image_path.parent.mkdir(parents=True)
     image_path.write_bytes(b"image")
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
@@ -1435,8 +1467,9 @@ def test_api_delete_image_rejects_missing_image(app_factory):
     assert response.json == {"error": "Image not found."}
 
 
-def test_api_delete_image_requires_csrf(tmp_path, app_factory):
-    image_path = tmp_path / "sample.png"
+def test_api_delete_image_requires_csrf(app_config, app_factory):
+    image_path = app_config.output_dir / "sample.png"
+    image_path.parent.mkdir(parents=True)
     image_path.write_bytes(b"image")
     client = app_factory().test_client()
     client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})

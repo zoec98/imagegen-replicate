@@ -29,19 +29,9 @@ ENV_SETTINGS: tuple[EnvSetting, ...] = (
         comment="Replicate API token. Leave empty until you are ready to call Replicate.",
     ),
     EnvSetting(
-        name="IMAGEGEN_OUTPUT_DIR",
-        default="data/images",
-        comment="Directory where downloaded generated images and metadata are stored.",
-    ),
-    EnvSetting(
-        name="IMAGEGEN_FRAGMENT_ROOT",
-        default="data/fragments",
-        comment="Directory where prompt palette fragment files are stored.",
-    ),
-    EnvSetting(
-        name="IMAGEGEN_DB_PATH",
-        default="data/imagegen.sqlite3",
-        comment="SQLite database path for durable generation request history.",
+        name="IMAGEGEN_DATA_DIR",
+        default="data",
+        comment="Directory where runtime data, images, palettes, trash, and SQLite live.",
     ),
     EnvSetting(
         name="IMMICH_URL",
@@ -83,13 +73,17 @@ ENV_SETTINGS: tuple[EnvSetting, ...] = (
     ),
 )
 
+DEPRECATED_ENV_SETTING_NAMES = {
+    "IMAGEGEN_OUTPUT_DIR",
+    "IMAGEGEN_DB_PATH",
+    "IMAGEGEN_FRAGMENT_ROOT",
+}
+
 
 @dataclass(frozen=True)
 class AppConfig:
     replicate_api_token: str
-    output_dir: Path
-    fragment_root: Path
-    generation_log_path: Path
+    data_dir: Path
     immich_url: str
     immich_gallery_id: str
     immich_api_key: str
@@ -98,6 +92,22 @@ class AppConfig:
     flask_secret_key: str
     replicate_poll_seconds: float
     replicate_timeout_seconds: float
+
+    @property
+    def output_dir(self) -> Path:
+        return self.data_dir / "images"
+
+    @property
+    def fragment_root(self) -> Path:
+        return self.data_dir / "fragments"
+
+    @property
+    def trash_dir(self) -> Path:
+        return self.data_dir / "trash"
+
+    @property
+    def generation_log_path(self) -> Path:
+        return self.data_dir / "imagegen.sqlite3"
 
     @property
     def immich_enabled(self) -> bool:
@@ -143,25 +153,13 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
         msg = f"Unknown IMAGEGEN_MODEL {model_alias!r}. Expected one of: {choices}."
         raise ValueError(msg)
 
-    output_dir = Path(os.getenv("IMAGEGEN_OUTPUT_DIR", "data/images")).expanduser()
-    if not output_dir.is_absolute():
-        output_dir = env_file.parent / output_dir
-    fragment_root = Path(
-        os.getenv("IMAGEGEN_FRAGMENT_ROOT", "data/fragments")
-    ).expanduser()
-    if not fragment_root.is_absolute():
-        fragment_root = env_file.parent / fragment_root
-    generation_log_path = Path(
-        os.getenv("IMAGEGEN_DB_PATH", "data/imagegen.sqlite3")
-    ).expanduser()
-    if not generation_log_path.is_absolute():
-        generation_log_path = env_file.parent / generation_log_path
+    data_dir = Path(os.getenv("IMAGEGEN_DATA_DIR", "data")).expanduser()
+    if not data_dir.is_absolute():
+        data_dir = env_file.parent / data_dir
 
     return AppConfig(
         replicate_api_token=os.getenv("REPLICATE_API_TOKEN", "").strip(),
-        output_dir=output_dir,
-        fragment_root=fragment_root,
-        generation_log_path=generation_log_path,
+        data_dir=data_dir,
         immich_url=os.getenv("IMMICH_URL", "").strip().rstrip("/"),
         immich_gallery_id=os.getenv("IMMICH_GALLERY_ID", "").strip(),
         immich_api_key=os.getenv("IMMICH_API_KEY", "").strip(),
@@ -180,7 +178,7 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
 
 
 def _with_required_settings(existing_lines: list[str]) -> list[str]:
-    lines = list(existing_lines)
+    lines = _without_deprecated_settings(existing_lines)
 
     for setting in ENV_SETTINGS:
         index = _find_setting_line(lines, setting.name)
@@ -200,6 +198,24 @@ def _with_required_settings(existing_lines: list[str]) -> list[str]:
         if previous_line != comment:
             lines.insert(index, comment)
 
+    return lines
+
+
+def _without_deprecated_settings(existing_lines: list[str]) -> list[str]:
+    lines: list[str] = []
+    skip_next_blank = False
+    for line in existing_lines:
+        key = _line_key(line)
+        if key in DEPRECATED_ENV_SETTING_NAMES:
+            if lines and lines[-1].startswith("# "):
+                lines.pop()
+            skip_next_blank = True
+            continue
+        if skip_next_blank and not line.strip():
+            skip_next_blank = False
+            continue
+        skip_next_blank = False
+        lines.append(line)
     return lines
 
 

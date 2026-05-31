@@ -38,7 +38,7 @@ def register_routes(app: Flask) -> None:
         return render_template(
             "index.html",
             images=list_gallery_images(
-                Path(app.config["IMAGEGEN_OUTPUT_DIR"]),
+                app_config.output_dir,
                 image_url=lambda filename: url_for("image_file", filename=filename),
                 metadata_url=lambda filename: url_for(
                     "image_metadata",
@@ -80,7 +80,10 @@ def register_routes(app: Flask) -> None:
         safe_name = safe_image_filename(filename)
         if safe_name is None:
             abort(404)
-        return send_from_directory(app.config["IMAGEGEN_OUTPUT_DIR"], safe_name)
+        return send_from_directory(
+            app.config["IMAGEGEN_APP_CONFIG"].output_dir,
+            safe_name,
+        )
 
     @app.get("/images/<path:filename>/view")
     def image_view(filename: str):
@@ -94,7 +97,7 @@ def register_routes(app: Flask) -> None:
         safe_name = safe_image_filename(filename)
         if safe_name is None:
             abort(404)
-        image_path = Path(app.config["IMAGEGEN_OUTPUT_DIR"]) / safe_name
+        image_path = app.config["IMAGEGEN_APP_CONFIG"].output_dir / safe_name
         metadata = app.config["IMAGEGEN_METADATA_PROVIDER"].get(image_path)
         if not metadata.exists:
             abort(404)

@@ -127,7 +127,7 @@ Image-edit requests must submit selected source images through the top-level `so
 
 ## Prompt Palettes
 
-Style, character, and other palettes are reusable prompt fragments. Store fragments as plain text files under the configured fragment root, `IMAGEGEN_FRAGMENT_ROOT`, which defaults to:
+Style, character, and other palettes are reusable prompt fragments. Store fragments as plain text files under the fragment root derived from `IMAGEGEN_DATA_DIR`, which defaults to:
 
 ```text
 data/fragments
@@ -185,7 +185,7 @@ The server is authoritative for generation submission. It accepts either a plain
 
 Provider prompt stripping happens server-side immediately before constructing the model-provider request. The provider receives annotation content without app-specific syntax. The app must preserve annotated prompts in request status, SQLite history, and embedded image metadata. `request_sent_json` stores the provider-ready payload for reproducibility.
 
-Palette routes and UI code must use `PaletteRepository`; do not read or write fragment files directly from templates or ad hoc route code. Palette write routes require CSRF. Palette read routes may be non-mutating JSON routes, but still validate names before filesystem access and must not expose files outside `IMAGEGEN_FRAGMENT_ROOT`.
+Palette routes and UI code must use `PaletteRepository`; do not read or write fragment files directly from templates or ad hoc route code. Palette write routes require CSRF. Palette read routes may be non-mutating JSON routes, but still validate names before filesystem access and must not expose files outside the configured fragment root.
 
 External filesystem edits are picked up on page refresh. Do not add live reload or stale palette menu checks unless explicitly requested. The UI may create, update, and delete entries inside existing palette directories, but creating or deleting whole palette directories remains a manual filesystem task.
 

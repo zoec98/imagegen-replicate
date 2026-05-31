@@ -53,9 +53,7 @@ class FailingCreatePredictionsApi:
 def app_config(tmp_path):
     return AppConfig(
         replicate_api_token="test-token",
-        output_dir=tmp_path,
-        fragment_root=tmp_path / "fragments",
-        generation_log_path=tmp_path / "imagegen.sqlite3",
+        data_dir=tmp_path,
         immich_url="",
         immich_gallery_id="",
         immich_api_key="",

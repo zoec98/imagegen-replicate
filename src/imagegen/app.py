@@ -24,12 +24,12 @@ from imagegen.worker import ThreadedGenerationWorker
 
 def create_app(config: dict[str, Any] | None = None) -> Flask:
     app_config = _resolve_app_config(config)
+    _ensure_data_directories(app_config)
     app = Flask(__name__)
     app.secret_key = app_config.flask_secret_key
     app.config.update(
         IMAGEGEN_APP_CONFIG=app_config,
         IMAGEGEN_METADATA_PROVIDER=EmbeddedImageMetadataProvider(),
-        IMAGEGEN_OUTPUT_DIR=app_config.output_dir,
     )
     if config:
         app.config.update(config)
@@ -52,6 +52,16 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     register_routes(app)
     register_api_routes(app)
     return app
+
+
+def _ensure_data_directories(app_config: AppConfig) -> None:
+    for directory in (
+        app_config.data_dir,
+        app_config.output_dir,
+        app_config.fragment_root,
+        app_config.trash_dir,
+    ):
+        directory.mkdir(parents=True, exist_ok=True)
 
 
 def _resolve_app_config(config: dict[str, Any] | None) -> AppConfig:

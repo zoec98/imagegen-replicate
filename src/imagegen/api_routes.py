@@ -8,8 +8,6 @@ worker without changing browser-facing route names.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from flask import Flask, jsonify, request, url_for
 
 from imagegen.app_version import app_checksum
@@ -54,7 +52,7 @@ def register_api_routes(app: Flask) -> None:
             validated = validate_generation_payload(
                 payload,
                 model=selected_model,
-                output_dir=Path(app.config["IMAGEGEN_OUTPUT_DIR"]),
+                output_dir=app_config.output_dir,
             )
         except ValidationError as error:
             return jsonify({"error": str(error)}), 400
@@ -89,7 +87,7 @@ def register_api_routes(app: Flask) -> None:
     @app.get("/api/images")
     def api_images():
         images = list_gallery_images(
-            Path(app.config["IMAGEGEN_OUTPUT_DIR"]),
+            app.config["IMAGEGEN_APP_CONFIG"].output_dir,
             image_url=lambda filename: url_for("image_file", filename=filename),
             metadata_url=lambda filename: url_for(
                 "image_metadata",
@@ -177,7 +175,7 @@ def register_api_routes(app: Flask) -> None:
         safe_name = safe_image_filename(filename)
         if safe_name is None:
             return jsonify({"error": "Image not found."}), 404
-        image_path = Path(app.config["IMAGEGEN_OUTPUT_DIR"]) / safe_name
+        image_path = app.config["IMAGEGEN_APP_CONFIG"].output_dir / safe_name
         if not image_path.is_file():
             return jsonify({"error": "Image not found."}), 404
         try:
@@ -192,7 +190,7 @@ def register_api_routes(app: Flask) -> None:
         safe_name = safe_image_filename(filename)
         if safe_name is None:
             return jsonify({"error": "Image not found."}), 404
-        image_path = Path(app.config["IMAGEGEN_OUTPUT_DIR"]) / safe_name
+        image_path = app.config["IMAGEGEN_APP_CONFIG"].output_dir / safe_name
         if not image_path.is_file():
             return jsonify({"error": "Image not found."}), 404
         image_path.unlink()
