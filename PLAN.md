@@ -15,11 +15,12 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 
 #### Scope
 
-- Add `FAL_KEY` or the provider key name chosen by the fal.ai client library to
-  `.env` generation and `env.example`.
+- Add `FAL_KEY` to `.env` generation and `env.example`.
 - Represent enabled providers from available API keys.
 - Keep Replicate enabled only when `REPLICATE_API_TOKEN` is configured.
-- Keep fal.ai enabled only when the fal.ai key is configured.
+- Keep fal.ai enabled only when `FAL_KEY` is configured.
+- Use Replicate as the first-load default provider when Replicate is enabled.
+- If Replicate is not enabled, default to the first enabled provider.
 - Provide a clear UI/server message when no generation provider is configured.
 - Preserve tests without real provider API calls.
 
@@ -30,12 +31,15 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 - The app reports a clear error if no provider can be used.
 - Existing Replicate-only tests continue to pass with a fake/no-op worker.
 - `env.example` documents both provider keys.
+- `FAL_API_KEY` is not treated as an alias unless the implementation later
+  proves the fal.ai library requires it.
 
 #### Suggested Tests
 
 - Config loads with no provider keys.
 - Config reports Replicate enabled when `REPLICATE_API_TOKEN` is set.
-- Config reports fal.ai enabled when the fal.ai key is set.
+- Config reports fal.ai enabled when `FAL_KEY` is set.
+- Provider defaulting prefers Replicate only when Replicate is enabled.
 - Index rendering shows only enabled providers.
 
 ### Ticket 2: Provider-Aware Model Registry Shape
@@ -47,6 +51,13 @@ Gallery work owns stored image metadata, clean exports, and download controls.
   registry.
 - Keep provider-specific model keys, versions, schemas, pricing, capabilities,
   parameter names, defaults, limits, and output metadata distinct.
+- Model aliases are unique within a provider, not globally unique.
+- Support fully qualified model syntax such as `replicate:seedream45`.
+- Resolve bare model aliases inside the currently selected provider.
+- For page initialization only, if a configured/default model alias is missing
+  for the selected provider, choose the first model in that provider's list.
+- For submitted API requests, reject missing or invalid model aliases instead
+  of silently falling back to another model.
 - Add a pricing source field for registry pricing metadata:
   - `provider_api`;
   - `static`;
@@ -65,6 +76,8 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 
 - Registry filters models by provider.
 - Duplicate aliases across different providers are handled intentionally.
+- Fully qualified model identifiers resolve to the exact provider/model.
+- API submissions reject bad model aliases for the selected provider.
 - Replicate entries preserve existing pricing as `static`.
 - Unknown pricing is represented explicitly rather than guessed.
 
@@ -156,8 +169,7 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 
 - Rename `scripts/get_schema` to `scripts/get_schema_replicate`.
 - Update README and AGENTS references.
-- Either remove `scripts/get_schema` or replace it with a compatibility message
-  that points to provider-specific helpers.
+- Do not keep a `scripts/get_schema` compatibility wrapper.
 - Preserve existing Replicate schema extraction behavior.
 
 #### Acceptance Criteria
@@ -165,8 +177,8 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 - `scripts/get_schema_replicate owner/model` works as the old Replicate helper
   did.
 - Documentation no longer directs maintainers to the ambiguous generic helper.
-- The old helper name does not silently fetch Replicate schemas for all
-  provider work.
+- The old helper name is gone; maintainers must choose a provider-specific
+  helper.
 
 #### Suggested Tests
 
@@ -180,9 +192,11 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 
 - Add `scripts/get_schema_falai`.
 - Fetch or print useful fal.ai model schema information for registry authoring.
-- Fetch fal.ai pricing from the documented Platform API when available.
+- Fetch fal.ai pricing from the documented Platform API during helper execution
+  when available.
 - Mark fetched fal.ai pricing with source `provider_api`.
 - Represent missing fal.ai pricing as `unknown`.
+- Do not add runtime/startup pricing refresh in this plan.
 - Do not make live network calls from normal unit tests.
 
 #### Acceptance Criteria
@@ -208,24 +222,27 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 #### Scope
 
 - Add `.env` settings for exported/stored image author and copyright metadata.
-- Decide whether copyright is configured directly or derived from author and
-  generation year.
-- Keep missing values explicit: either fail clearly when required for metadata
-  writing or omit with clear UI/server status.
+- Use `AUTHOR` as the only author/copyright metadata setting.
+- Fill new `.env` files with placeholder author `Noname Changeme Nescio`.
+- Synthesize copyright from `AUTHOR` and the generation year.
+- Use the stored generation timestamp year, not wall-clock current year, for
+  generated image copyright.
+- Treat `AUTHOR` as required for synthetic metadata, with the placeholder making
+  initial local configuration explicit.
 - Update `env.example`, README, and AGENTS.
 
 #### Acceptance Criteria
 
 - Config exposes author metadata.
-- Config exposes copyright metadata or enough information to derive it.
+- Config exposes enough information to derive copyright.
 - Documentation explains how these values are used.
-- Missing required metadata does not produce misleading synthetic metadata.
+- New `.env` files contain the placeholder `AUTHOR` value.
 
 #### Suggested Tests
 
-- Config loads author/copyright values.
-- Config handles absent values as documented.
-- Copyright derivation uses the generation year when that approach is chosen.
+- Config loads `AUTHOR`.
+- Copyright derivation uses the generation year from image metadata.
+- New `.env` files contain `AUTHOR=Noname Changeme Nescio`.
 
 ### Ticket 9: Store Synthetic Metadata On Generated Images
 
@@ -271,6 +288,11 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 - Do not mutate the stored gallery image.
 - Remove application JSON metadata and normal EXIF/text metadata where supported.
 - Preserve image pixels and format.
+- Use unique temporary files under `<data_dir>/tmp`.
+- Create `<data_dir>/tmp` at startup.
+- Do not cache clean exports.
+- Clean temporary files opportunistically, for example on startup and/or after
+  response handling where practical.
 - Reject unsupported formats instead of converting silently.
 
 #### Acceptance Criteria
@@ -278,6 +300,8 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 - Clean export for PNG/JPEG/WebP contains no application metadata payload.
 - Clean export contains no prompt, author, or copyright metadata.
 - Stored source image remains unchanged.
+- Clean exports are created under `<data_dir>/tmp` and are not cached as gallery
+  assets.
 - Unsupported formats return clear errors.
 
 #### Suggested Tests
@@ -294,6 +318,11 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 - Add a route for normal stored-image download.
 - Add a route for clean download.
 - Keep existing image view/open behavior unchanged.
+- Clicking the gallery image continues to open/view the stored image.
+- The normal download route forces browser download of the metadata-rich stored
+  image.
+- The clean download route forces browser download of the stripped temporary
+  image.
 - Validate filenames with existing safe filename checks.
 - Serve files only from the configured output directory.
 - Generate clear download filenames:
@@ -304,6 +333,7 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 
 - Normal download returns the stored metadata-rich image.
 - Clean download returns a stripped export without rewriting the stored image.
+- The gallery image link opens/views; it is not the forced-download control.
 - Unsafe filenames are rejected.
 - Missing files return not found.
 - Route tests do not require browser automation.
@@ -311,7 +341,9 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 #### Suggested Tests
 
 - Normal download returns the original image bytes/metadata.
+- Normal download uses attachment response headers.
 - Clean download returns a metadata-stripped file.
+- Clean download uses attachment response headers.
 - Clean download filename includes `-clean`.
 - Path traversal is rejected.
 - Missing image is rejected.
@@ -363,26 +395,3 @@ Gallery work owns stored image metadata, clean exports, and download controls.
 #### Suggested Tests
 
 - Documentation-only unless docs tooling is introduced.
-
-## Open Questions
-
-- Should fal.ai use environment variable `FAL_KEY`, `FAL_API_KEY`, or both with
-  one canonical internal config name?
-- If both Replicate and fal.ai keys are present, which provider should be
-  selected by default on first page load?
-- Should provider/model aliases be globally unique, or unique only within each
-  provider?
-- Should `scripts/get_schema` be removed entirely, or kept as a compatibility
-  wrapper that prints an error pointing to `scripts/get_schema_replicate` and
-  `scripts/get_schema_falai`?
-- Should fal.ai pricing be fetched during schema-helper use only, or should the
-  app have a runtime/cache refresh path for pricing?
-- Should author/copyright metadata be required for generation, or should missing
-  values allow generation while omitting those fields?
-- What exact `.env` names should be used for author and copyright metadata?
-- Should copyright be configured literally, derived from author plus generation
-  year, or support both?
-- For clean download, should the app stream an in-memory stripped image, write a
-  temporary file under the data directory, or cache clean exports?
-- Should normal download be a separate button from opening the image in a new
-  tab, or is the existing image link sufficient once the clean button exists?
