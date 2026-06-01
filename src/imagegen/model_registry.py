@@ -141,7 +141,7 @@ SEEDREAM45 = ReplicateModel(
                 "is not supported in Seedream 4.5."
             ),
             type="select",
-            default="2K",
+            default="4K",
             choices=("2K", "4K"),
             order=2,
         ),
@@ -152,7 +152,7 @@ SEEDREAM45 = ReplicateModel(
                 "match the input image's aspect ratio."
             ),
             type="select",
-            default="match_input_image",
+            default="3:4",
             choices=(
                 "match_input_image",
                 "1:1",
