@@ -1,3 +1,11 @@
+"""Model registry shape and policy tests.
+
+Behaviors protected:
+- Every configured model has a valid registry shape.
+- Model parameters expose coherent types, defaults, choices, and bounds.
+- Fixed inputs and edit/source-image metadata follow application policy.
+"""
+
 from imagegen.model_registry import MODEL_REGISTRY
 
 

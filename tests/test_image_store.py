@@ -1,3 +1,11 @@
+"""Generated image storage tests.
+
+Behaviors protected:
+- Generated image downloads reject unsafe content types and oversized responses.
+- Accepted image outputs are stored locally with embedded generation metadata.
+- Batch persistence creates the output directory and stores each output safely.
+"""
+
 from io import BytesIO
 
 import httpx

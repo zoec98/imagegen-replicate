@@ -1,3 +1,10 @@
+"""Generated image metadata provider tests.
+
+Behaviors protected:
+- Metadata objects report existence only when generated-image fields are present.
+- The metadata provider reads embedded metadata and ignores JSON sidecars.
+"""
+
 from PIL import Image
 
 from imagegen.metadata import EmbeddedImageMetadataProvider, ImageMetadata

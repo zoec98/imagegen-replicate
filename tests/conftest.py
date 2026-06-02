@@ -1,3 +1,10 @@
+"""Shared test fixtures.
+
+Behaviors protected:
+- Test apps use isolated configuration and data directories.
+- Route tests do not start real generation work unless they explicitly inject it.
+"""
+
 import pytest
 
 from imagegen.app import create_app

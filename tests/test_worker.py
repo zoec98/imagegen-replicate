@@ -1,3 +1,11 @@
+"""Generation worker behavior tests.
+
+Behaviors protected:
+- Generation workers update request state for success, failure, and timeout outcomes.
+- Worker runs persist lifecycle and generated asset history.
+- Background worker start returns before generation work completes.
+"""
+
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Event
@@ -7,26 +15,6 @@ from imagegen.image_store import StoredImage
 from imagegen.replicate_client import ReplicatePredictionTimeout, ReplicateResult
 from imagegen.request_store import RequestStore
 from imagegen.worker import ThreadedGenerationWorker, run_generation_request
-
-
-class RecordingGenerationLog:
-    def __init__(self):
-        self.calls = []
-
-    def initialize(self):
-        self.calls.append(("initialize",))
-
-    def create_request(self, *args, **kwargs):
-        self.calls.append(("create_request", args, kwargs))
-
-    def mark_started(self, request_id):
-        self.calls.append(("mark_started", request_id))
-
-    def mark_finished(self, request_id, **kwargs):
-        self.calls.append(("mark_finished", request_id, kwargs))
-
-    def add_result(self, request_id, **kwargs):
-        self.calls.append(("add_result", request_id, kwargs))
 
 
 def test_run_generation_request_succeeded_updates_request(app_config):
@@ -92,7 +80,14 @@ def test_run_generation_request_timeout_updates_timeout(app_config):
 def test_run_generation_request_logs_lifecycle_and_results(app_config):
     store = RequestStore()
     record = store.create(prompt="a red house", parameters={})
-    generation_log = RecordingGenerationLog()
+    generation_log = SQLiteGenerationLog(app_config.generation_log_path)
+    generation_log.initialize()
+    generation_log.create_request(
+        record,
+        model_alias="seedream45",
+        model="bytedance/seedream-4.5",
+        replicate_input={"prompt": "a red house"},
+    )
     stored_image = StoredImage(
         path=app_config.output_dir / "seedream45-prediction-123-01.png",
         source_url="https://example.test/image.png",
@@ -117,20 +112,22 @@ def test_run_generation_request_logs_lifecycle_and_results(app_config):
         generation_log,
     )
 
-    assert generation_log.calls[0] == ("mark_started", record.request_id)
-    assert generation_log.calls[1] == (
-        "mark_finished",
-        record.request_id,
-        {
-            "status": "succeeded",
-            "prediction_id": "prediction-123",
-            "logs": ["created", "finished"],
-        },
-    )
-    assert generation_log.calls[2][0:2] == ("add_result", record.request_id)
-    assert generation_log.calls[2][2]["sequence"] == 1
-    assert generation_log.calls[2][2]["image"] is stored_image
-    assert generation_log.calls[2][2]["logs"] == ["created", "finished"]
+    result = generation_log.get_logged_result(record.request_id)
+    assets = generation_log.list_logged_assets(record.request_id)
+    assert result is not None
+    assert result.status == "succeeded"
+    assert result.started_at
+    assert result.completed_at
+    assert result.prediction_id == "prediction-123"
+    assert result.logs == ["created", "finished"]
+    assert result.elapsed_seconds is not None
+    assert result.elapsed_seconds >= 0
+    assert len(assets) == 1
+    assert assets[0].sequence == 1
+    assert assets[0].filename == "seedream45-prediction-123-01.png"
+    assert assets[0].source_url == "https://example.test/image.png"
+    assert assets[0].content_type == "image/png"
+    assert assets[0].size_bytes == 123
 
 
 def test_run_generation_request_persists_multiple_assets(app_config):
@@ -180,12 +177,12 @@ def test_run_generation_request_persists_multiple_assets(app_config):
         generation_log,
     )
 
-    result = generation_log.get_result(record.request_id)
-    assets = generation_log.list_assets(record.request_id)
+    result = generation_log.get_logged_result(record.request_id)
+    assets = generation_log.list_logged_assets(record.request_id)
     assert result is not None
-    assert result["status"] == "succeeded"
-    assert result["prediction_id"] == "prediction-123"
-    assert [asset["filename"] for asset in assets] == [
+    assert result.status == "succeeded"
+    assert result.prediction_id == "prediction-123"
+    assert [asset.filename for asset in assets] == [
         "seedream45-prediction-123-01.png",
         "seedream45-prediction-123-02.png",
     ]
@@ -194,7 +191,14 @@ def test_run_generation_request_persists_multiple_assets(app_config):
 def test_run_generation_request_logs_failure(app_config):
     store = RequestStore()
     record = store.create(prompt="a red house", parameters={})
-    generation_log = RecordingGenerationLog()
+    generation_log = SQLiteGenerationLog(app_config.generation_log_path)
+    generation_log.initialize()
+    generation_log.create_request(
+        record,
+        model_alias="seedream45",
+        model="bytedance/seedream-4.5",
+        replicate_input={"prompt": "a red house"},
+    )
 
     def fake_generate(prompt, config, *, parameters, source_image_paths):
         raise RuntimeError("Replicate failed.")
@@ -207,14 +211,13 @@ def test_run_generation_request_logs_failure(app_config):
         generation_log,
     )
 
-    assert generation_log.calls == [
-        ("mark_started", record.request_id),
-        (
-            "mark_finished",
-            record.request_id,
-            {"status": "failed", "error": "Replicate failed."},
-        ),
-    ]
+    result = generation_log.get_logged_result(record.request_id)
+    assert result is not None
+    assert result.status == "failed"
+    assert result.started_at
+    assert result.completed_at
+    assert result.error == "Replicate failed."
+    assert generation_log.list_logged_assets(record.request_id) == []
 
 
 def test_run_generation_request_uses_request_model(app_config):

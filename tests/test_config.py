@@ -1,3 +1,11 @@
+"""Configuration and metadata policy tests.
+
+Behaviors protected:
+- Environment files are created with useful defaults without overwriting local values.
+- Runtime configuration derives paths, selected model, secrets, and service settings.
+- Metadata policy rejects invalid authors and derives copyright years.
+"""
+
 import os
 
 import pytest

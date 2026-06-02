@@ -1,4 +1,12 @@
-from dataclasses import dataclass
+"""Replicate provider boundary tests.
+
+Behaviors protected:
+- Replicate payloads include registry defaults, fixed inputs, prompts, and source images.
+- Replicate predictions are created, polled, timed out, and failed through the provider boundary.
+- Successful outputs are normalized and handed to local image persistence with metadata.
+"""
+
+from dataclasses import dataclass, replace
 
 import pytest
 
@@ -7,9 +15,7 @@ from imagegen.model_registry import MODEL_REGISTRY
 from imagegen.replicate_client import (
     ReplicatePredictionError,
     ReplicatePredictionTimeout,
-    build_prediction_input,
     generate_image_urls,
-    normalize_output_urls,
 )
 
 
@@ -77,29 +83,52 @@ def expected_default_inputs(model, *, prompt):
     return defaults
 
 
-def test_build_prediction_input_includes_defaults_and_fixed_inputs():
+def config_for_model(tmp_path, alias):
+    model = MODEL_REGISTRY[alias]
+    return replace(app_config(tmp_path), model_alias=alias, model=model)
+
+
+def test_provider_payload_includes_defaults_and_fixed_inputs(tmp_path):
     model = MODEL_REGISTRY["seedream45"]
+    api = FakePredictionsApi(
+        FakePrediction(id="abc123", status="succeeded", output=[]),
+        [],
+    )
 
-    payload = build_prediction_input("a red house", model)
+    generate_image_urls(
+        "a red house",
+        config_for_model(tmp_path, "seedream45"),
+        predictions_api=api,
+        persist_images=lambda urls, **kwargs: [],
+    )
 
+    payload = api.create_calls[0]["input"]
     assert payload["prompt"] == "a red house"
     assert payload == expected_default_inputs(model, prompt="a red house")
     assert payload["disable_safety_checker"] is True
     assert model.source_image_parameter not in payload
 
 
-def test_build_prediction_input_applies_validated_parameters():
-    payload = build_prediction_input(
+def test_provider_payload_applies_validated_parameters(tmp_path):
+    api = FakePredictionsApi(
+        FakePrediction(id="abc123", status="succeeded", output=[]),
+        [],
+    )
+
+    generate_image_urls(
         "a red house",
-        MODEL_REGISTRY["seedream45"],
+        config_for_model(tmp_path, "seedream45"),
         parameters={
             "size": "4K",
             "aspect_ratio": "1:1",
             "sequential_image_generation": "auto",
             "max_images": 3,
         },
+        predictions_api=api,
+        persist_images=lambda urls, **kwargs: [],
     )
 
+    payload = api.create_calls[0]["input"]
     assert payload["prompt"] == "a red house"
     assert payload["size"] == "4K"
     assert payload["aspect_ratio"] == "1:1"
@@ -108,66 +137,115 @@ def test_build_prediction_input_applies_validated_parameters():
     assert payload["disable_safety_checker"] is True
 
 
-def test_build_prediction_input_applies_source_image_inputs():
-    payload = build_prediction_input(
-        "edit this",
-        MODEL_REGISTRY["seedream45"],
-        source_image_inputs=["source.png"],
+def test_provider_payload_fixed_inputs_override_parameters(tmp_path):
+    api = FakePredictionsApi(
+        FakePrediction(id="abc123", status="succeeded", output=[]),
+        [],
     )
 
-    assert payload["prompt"] == "edit this"
-    assert payload["image_input"] == ["source.png"]
-    assert payload["disable_safety_checker"] is True
-
-
-def test_build_prediction_input_fixed_inputs_override_parameters():
-    payload = build_prediction_input(
+    generate_image_urls(
         "a red house",
-        MODEL_REGISTRY["seedream45"],
+        config_for_model(tmp_path, "seedream45"),
         parameters={"disable_safety_checker": False},
+        predictions_api=api,
+        persist_images=lambda urls, **kwargs: [],
     )
 
+    assert api.create_calls[0]["input"]["disable_safety_checker"] is True
+
+
+def test_provider_payload_applies_source_image_inputs(tmp_path):
+    source_path = tmp_path / "source.png"
+    source_path.write_bytes(b"source-bytes")
+    api = FakePredictionsApi(
+        FakePrediction(id="abc123", status="succeeded", output=[]),
+        [],
+    )
+
+    generate_image_urls(
+        "edit this",
+        config_for_model(tmp_path, "seedream45"),
+        source_image_paths=[source_path],
+        predictions_api=api,
+        persist_images=lambda urls, **kwargs: [],
+    )
+
+    payload = api.create_calls[0]["input"]
+    assert payload["prompt"] == "edit this"
+    assert len(payload["image_input"]) == 1
+    assert payload["image_input"][0].name == str(source_path)
+    assert payload["image_input"][0].closed is True
     assert payload["disable_safety_checker"] is True
 
 
-def test_build_prediction_input_uses_model_specific_source_image_field():
-    payload = build_prediction_input(
-        "edit this",
-        MODEL_REGISTRY["flux-flex"],
-        parameters={"guidance": 5.5},
-        source_image_inputs=["source.png"],
+def test_provider_payload_uses_model_specific_source_image_field(tmp_path):
+    source_path = tmp_path / "source.png"
+    source_path.write_bytes(b"source-bytes")
+    api = FakePredictionsApi(
+        FakePrediction(id="abc123", status="succeeded", output=[]),
+        [],
     )
 
+    generate_image_urls(
+        "edit this",
+        config_for_model(tmp_path, "flux-flex"),
+        parameters={"guidance": 5.5},
+        source_image_paths=[source_path],
+        predictions_api=api,
+        persist_images=lambda urls, **kwargs: [],
+    )
+
+    payload = api.create_calls[0]["input"]
     assert payload["prompt"] == "edit this"
-    assert payload["input_images"] == ["source.png"]
+    assert len(payload["input_images"]) == 1
+    assert payload["input_images"][0].name == str(source_path)
     assert payload["guidance"] == 5.5
     assert payload["output_format"] == "webp"
     assert "image_input" not in payload
     assert "disable_safety_checker" not in payload
 
 
-def test_build_prediction_input_uses_single_source_image_field():
-    payload = build_prediction_input(
-        "edit this",
-        MODEL_REGISTRY["qwen-2512"],
-        source_image_inputs=["source.png"],
+def test_provider_payload_uses_single_source_image_field(tmp_path):
+    source_path = tmp_path / "source.png"
+    source_path.write_bytes(b"source-bytes")
+    api = FakePredictionsApi(
+        FakePrediction(id="abc123", status="succeeded", output=[]),
+        [],
     )
 
-    assert payload["image"] == "source.png"
+    generate_image_urls(
+        "edit this",
+        config_for_model(tmp_path, "qwen-2512"),
+        source_image_paths=[source_path],
+        predictions_api=api,
+        persist_images=lambda urls, **kwargs: [],
+    )
+
+    payload = api.create_calls[0]["input"]
+    assert payload["image"].name == str(source_path)
+    assert payload["image"].closed is True
     assert payload["disable_safety_checker"] is True
 
 
-def test_build_prediction_input_omits_flux_resolution_for_custom_dimensions():
-    payload = build_prediction_input(
+def test_provider_payload_omits_flux_resolution_for_custom_dimensions(tmp_path):
+    api = FakePredictionsApi(
+        FakePrediction(id="abc123", status="succeeded", output=[]),
+        [],
+    )
+
+    generate_image_urls(
         "edit this",
-        MODEL_REGISTRY["flux-flex"],
+        config_for_model(tmp_path, "flux-flex"),
         parameters={
             "aspect_ratio": "custom",
             "width": 1024,
             "height": 768,
         },
+        predictions_api=api,
+        persist_images=lambda urls, **kwargs: [],
     )
 
+    payload = api.create_calls[0]["input"]
     assert payload["aspect_ratio"] == "custom"
     assert payload["width"] == 1024
     assert payload["height"] == 768
@@ -315,15 +393,60 @@ def test_generate_image_urls_times_out(tmp_path):
         )
 
 
-def test_normalize_output_urls_handles_common_shapes():
+@pytest.mark.parametrize(
+    ("provider_output", "expected_urls"),
+    [
+        (None, []),
+        ("https://example.com/file.png", ["https://example.com/file.png"]),
+    ],
+)
+def test_generate_image_urls_normalizes_common_provider_output_shapes(
+    tmp_path,
+    provider_output,
+    expected_urls,
+):
+    api = FakePredictionsApi(
+        FakePrediction(id="abc123", status="succeeded", output=provider_output),
+        [],
+    )
+    persisted = []
+
+    def fake_persist(urls, **kwargs):
+        persisted.append(urls)
+        return []
+
+    result = generate_image_urls(
+        "a red house",
+        app_config(tmp_path),
+        predictions_api=api,
+        persist_images=fake_persist,
+    )
+
+    assert result.output_urls == expected_urls
+    assert persisted == [expected_urls]
+
+
+def test_generate_image_urls_normalizes_nested_provider_output_objects(tmp_path):
     class UrlObject:
         url = "https://example.com/file.webp"
 
-    assert normalize_output_urls(None) == []
-    assert normalize_output_urls("https://example.com/file.png") == [
-        "https://example.com/file.png"
-    ]
-    assert normalize_output_urls(["https://example.com/a.png", UrlObject()]) == [
+    api = FakePredictionsApi(
+        FakePrediction(
+            id="abc123",
+            status="succeeded",
+            output=["https://example.com/a.png", UrlObject()],
+        ),
+        [],
+    )
+
+    result = generate_image_urls(
+        "a red house",
+        app_config(tmp_path),
+        predictions_api=api,
+        persist_images=lambda urls, **kwargs: [],
+    )
+
+    assert result.output_urls == [
         "https://example.com/a.png",
         "https://example.com/file.webp",
     ]

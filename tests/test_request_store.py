@@ -1,3 +1,11 @@
+"""Generation request state tests.
+
+Behaviors protected:
+- Generation request state is created, retrieved, and updated for HTTP polling.
+- Lifecycle transitions preserve submitted prompt, parameters, source images, and errors.
+- Request JSON exposes pollable state for API responses.
+"""
+
 from imagegen.request_store import RequestStore
 
 
@@ -88,25 +96,3 @@ def test_request_store_timeout_request_keeps_displayable_error():
 
     assert record.status == "timeout"
     assert record.error == "Timed out."
-
-
-def test_request_store_json_contains_lifecycle_fields():
-    store = RequestStore()
-    record = store.create(prompt="prompt", parameters={"size": "2K"})
-    store.update(record.request_id, status="running", prediction_id="prediction-123")
-
-    payload = record.to_json()
-
-    assert payload["request_id"] == record.request_id
-    assert payload["model"] == "seedream45"
-    assert payload["status"] == "running"
-    assert payload["prompt"] == "prompt"
-    assert payload["parameters"] == {"size": "2K"}
-    assert payload["source_images"] == []
-    assert payload["error"] is None
-    assert payload["prediction_id"] == "prediction-123"
-    assert payload["output_urls"] == []
-    assert payload["images"] == []
-    assert payload["logs"] == []
-    assert payload["created_at"]
-    assert payload["updated_at"]

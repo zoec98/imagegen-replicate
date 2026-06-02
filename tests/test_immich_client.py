@@ -1,3 +1,11 @@
+"""Immich upload boundary tests.
+
+Behaviors protected:
+- Immich uploads send local image assets and attach them to the configured album.
+- Duplicate Immich responses map to success where appropriate.
+- Immich failures return sanitized application errors.
+"""
+
 import httpx
 import pytest
 

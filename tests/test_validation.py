@@ -1,3 +1,11 @@
+"""Generation payload validation tests.
+
+Behaviors protected:
+- Generation payload validation accepts valid prompts, defaults, and source images.
+- Invalid prompts, parameters, edit modes, and source-image submissions are rejected.
+- Model-specific constraints and fixed server inputs are enforced before queuing.
+"""
+
 from dataclasses import replace
 
 import pytest

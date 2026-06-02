@@ -7,7 +7,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol, cast
 
 from imagegen.image_store import StoredImage
 from imagegen.request_store import GenerationRequest, RequestStatus
@@ -47,6 +47,41 @@ class GenerationLog(Protocol):
         logs: list[str] | None = None,
         error: str | None = None,
     ) -> None: ...
+
+
+@dataclass(frozen=True)
+class LoggedGenerationRequest:
+    request_id: str
+    sent_at: str
+    model_alias: str
+    model: str
+    prompt: str
+    request_sent: dict[str, object]
+    parameters: dict[str, object]
+    source_images: list[str]
+
+
+@dataclass(frozen=True)
+class LoggedGenerationResult:
+    request_id: str
+    status: RequestStatus
+    logs: list[str]
+    started_at: str | None = None
+    completed_at: str | None = None
+    prediction_id: str | None = None
+    error: str | None = None
+    elapsed_seconds: float | None = None
+
+
+@dataclass(frozen=True)
+class LoggedGenerationAsset:
+    request_id: str
+    sequence: int
+    filename: str
+    source_url: str
+    content_type: str
+    size_bytes: int
+    created_at: str
 
 
 @dataclass(frozen=True)
@@ -228,6 +263,50 @@ class SQLiteGenerationLog:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def get_logged_request(self, request_id: str) -> LoggedGenerationRequest | None:
+        row = self.get_request(request_id)
+        if row is None:
+            return None
+        return LoggedGenerationRequest(
+            request_id=str(row["id"]),
+            sent_at=str(row["sent_at"]),
+            model_alias=str(row["model_alias"]),
+            model=str(row["model"]),
+            prompt=str(row["prompt"]),
+            request_sent=_dict_json(row["request_sent_json"]),
+            parameters=_dict_json(row["parameters_json"]),
+            source_images=_string_list_json(row["source_image_filenames_json"]),
+        )
+
+    def get_logged_result(self, request_id: str) -> LoggedGenerationResult | None:
+        row = self.get_result(request_id)
+        if row is None:
+            return None
+        return LoggedGenerationResult(
+            request_id=str(row["request_id"]),
+            started_at=_optional_string(row["started_at"]),
+            completed_at=_optional_string(row["completed_at"]),
+            status=_request_status(row["status"]),
+            prediction_id=_optional_string(row["prediction_id"]),
+            logs=_string_list_json(row["logs_json"]),
+            error=_optional_string(row["error"]),
+            elapsed_seconds=_optional_float(row["elapsed_seconds"]),
+        )
+
+    def list_logged_assets(self, request_id: str) -> list[LoggedGenerationAsset]:
+        return [
+            LoggedGenerationAsset(
+                request_id=str(row["request_id"]),
+                sequence=int(row["sequence"]),
+                filename=str(row["filename"]),
+                source_url=str(row["source_url"]),
+                content_type=str(row["content_type"]),
+                size_bytes=int(row["size_bytes"]),
+                created_at=str(row["created_at"]),
+            )
+            for row in self.list_assets(request_id)
+        ]
+
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path)
         connection.row_factory = sqlite3.Row
@@ -366,6 +445,46 @@ def _table_exists(connection: sqlite3.Connection, table: str) -> bool:
 
 def _json(value: object) -> str:
     return json.dumps(value, sort_keys=True)
+
+
+def _dict_json(value: object) -> dict[str, object]:
+    decoded = _decode_json(value)
+    if isinstance(decoded, dict):
+        return decoded
+    return {}
+
+
+def _string_list_json(value: object) -> list[str]:
+    decoded = _decode_json(value)
+    if isinstance(decoded, list):
+        return [str(item) for item in decoded]
+    return []
+
+
+def _decode_json(value: object) -> Any:
+    if not isinstance(value, str):
+        return None
+    return json.loads(value)
+
+
+def _optional_string(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _optional_float(value: object) -> float | None:
+    if value is None:
+        return None
+    return float(value)
+
+
+def _request_status(value: object) -> RequestStatus:
+    status = str(value)
+    if status in {"queued", "running", "succeeded", "failed", "timeout"}:
+        return cast(RequestStatus, status)
+    msg = f"Unknown generation request status: {status}."
+    raise RuntimeError(msg)
 
 
 def _now() -> str:

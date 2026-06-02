@@ -1,3 +1,11 @@
+"""Prompt palette repository tests.
+
+Behaviors protected:
+- Palette listing exposes only valid fragment directories, names, and content.
+- Palette CRUD validates names and content before filesystem access.
+- Fragment paths stay inside the configured fragment root.
+"""
+
 import pytest
 
 from imagegen.palettes import (

@@ -1,3 +1,10 @@
+"""CSRF session behavior tests.
+
+Behaviors protected:
+- CSRF tokens are created and reused in the user's session.
+- CSRF sessions are bound to the client IP that loaded the page.
+"""
+
 from imagegen.security import (
     CSRF_CLIENT_IP_SESSION_KEY,
     CSRF_SESSION_KEY,

@@ -1,4 +1,11 @@
-import json
+"""Durable generation history tests.
+
+Behaviors protected:
+- Generation history initializes and migrates durable SQLite storage.
+- Requests store recreatable provider payloads and submitted source metadata.
+- Lifecycle updates persist status, timing, provider ids, logs, errors, and assets.
+"""
+
 import sqlite3
 
 from imagegen.generation_log import SQLiteGenerationLog
@@ -134,18 +141,18 @@ def test_create_request_persists_recreatable_payload(tmp_path):
         replicate_input=replicate_input,
     )
 
-    row = log.get_request(record.request_id)
-    result = log.get_result(record.request_id)
-    assert row is not None
+    request = log.get_logged_request(record.request_id)
+    result = log.get_logged_result(record.request_id)
+    assert request is not None
     assert result is not None
-    assert result["status"] == "queued"
-    assert json.loads(result["logs_json"]) == []
-    assert row["model_alias"] == "seedream45"
-    assert row["model"] == "bytedance/seedream-4.5"
-    assert row["prompt"] == "edit this"
-    assert json.loads(row["request_sent_json"]) == replicate_input
-    assert json.loads(row["parameters_json"]) == {"size": "2K"}
-    assert json.loads(row["source_image_filenames_json"]) == ["source.png"]
+    assert result.status == "queued"
+    assert result.logs == []
+    assert request.model_alias == "seedream45"
+    assert request.model == "bytedance/seedream-4.5"
+    assert request.prompt == "edit this"
+    assert request.request_sent == replicate_input
+    assert request.parameters == {"size": "2K"}
+    assert request.source_images == ["source.png"]
 
 
 def test_lifecycle_updates_status_and_elapsed_time(tmp_path):
@@ -167,16 +174,17 @@ def test_lifecycle_updates_status_and_elapsed_time(tmp_path):
         logs=["created", "finished"],
     )
 
-    request_row = log.get_request(record.request_id)
-    row = log.get_result(record.request_id)
-    assert request_row is not None
-    assert row is not None
-    assert row["status"] == "succeeded"
-    assert row["started_at"]
-    assert row["completed_at"]
-    assert row["prediction_id"] == "prediction-123"
-    assert json.loads(row["logs_json"]) == ["created", "finished"]
-    assert row["elapsed_seconds"] >= 0
+    request = log.get_logged_request(record.request_id)
+    result = log.get_logged_result(record.request_id)
+    assert request is not None
+    assert result is not None
+    assert result.status == "succeeded"
+    assert result.started_at
+    assert result.completed_at
+    assert result.prediction_id == "prediction-123"
+    assert result.logs == ["created", "finished"]
+    assert result.elapsed_seconds is not None
+    assert result.elapsed_seconds >= 0
 
 
 def test_failed_request_persists_error_detail(tmp_path):
@@ -193,11 +201,11 @@ def test_failed_request_persists_error_detail(tmp_path):
     log.mark_started(record.request_id)
     log.mark_finished(record.request_id, status="failed", error="Replicate failed.")
 
-    row = log.get_result(record.request_id)
-    assert row is not None
-    assert row["status"] == "failed"
-    assert row["error"] == "Replicate failed."
-    assert log.list_assets(record.request_id) == []
+    result = log.get_logged_result(record.request_id)
+    assert result is not None
+    assert result.status == "failed"
+    assert result.error == "Replicate failed."
+    assert log.list_logged_assets(record.request_id) == []
 
 
 def test_add_result_persists_stored_image_metadata(tmp_path):
@@ -226,22 +234,15 @@ def test_add_result_persists_stored_image_metadata(tmp_path):
         logs=["done"],
     )
 
-    result = log.get_result(record.request_id)
-    rows = log.list_assets(record.request_id)
-    assert result is not None
-    assert rows == [
-        {
-            "id": 1,
-            "result_id": result["id"],
-            "request_id": record.request_id,
-            "sequence": 1,
-            "filename": "seedream45-prediction-123-01.png",
-            "source_url": "https://example.com/out.png",
-            "content_type": "image/png",
-            "size_bytes": 123,
-            "created_at": "2026-05-30T12:00:00+00:00",
-        }
-    ]
+    assets = log.list_logged_assets(record.request_id)
+    assert assets
+    assert assets[0].request_id == record.request_id
+    assert assets[0].sequence == 1
+    assert assets[0].filename == "seedream45-prediction-123-01.png"
+    assert assets[0].source_url == "https://example.com/out.png"
+    assert assets[0].content_type == "image/png"
+    assert assets[0].size_bytes == 123
+    assert assets[0].created_at == "2026-05-30T12:00:00+00:00"
 
 
 def test_multiple_assets_share_one_lifecycle_row(tmp_path):
@@ -269,9 +270,9 @@ def test_multiple_assets_share_one_lifecycle_row(tmp_path):
             ),
         )
 
-    result = log.get_result(record.request_id)
-    assets = log.list_assets(record.request_id)
+    result = log.get_logged_result(record.request_id)
+    assets = log.list_logged_assets(record.request_id)
     assert result is not None
-    assert result["status"] == "succeeded"
-    assert [asset["sequence"] for asset in assets] == [1, 2]
-    assert {asset["result_id"] for asset in assets} == {result["id"]}
+    assert result.status == "succeeded"
+    assert [asset.sequence for asset in assets] == [1, 2]
+    assert {asset.request_id for asset in assets} == {record.request_id}

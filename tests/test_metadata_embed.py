@@ -1,3 +1,11 @@
+"""Embedded image metadata tests.
+
+Behaviors protected:
+- Embedded metadata round-trips for PNG, JPEG, and WebP images.
+- Human-readable metadata fields are written for external tools.
+- Unsupported or metadata-free images fail safely.
+"""
+
 from io import BytesIO
 
 import pytest
@@ -13,7 +21,6 @@ from imagegen.metadata_embed import (
     SOFTWARE_TAG,
     XP_AUTHOR_TAG,
     XP_COMMENT_TAG,
-    human_description,
     read_embedded_metadata,
     write_embedded_metadata,
 )
@@ -117,8 +124,15 @@ def test_embedded_metadata_writes_human_exif_description(
     assert exif[DATETIME_ORIGINAL_TAG] == "2026:05:30 12:00:00"
 
 
-def test_human_description_handles_missing_optional_fields():
-    assert human_description({}) == "Generated image."
+def test_embedded_metadata_writes_generic_description_for_minimal_metadata(tmp_path):
+    image_path = tmp_path / "sample.png"
+    write_sample_image(image_path, "PNG")
+
+    write_embedded_metadata(image_path, {})
+
+    with Image.open(image_path) as reloaded:
+        assert reloaded.info["Description"] == "Generated image."
+        assert reloaded.info["ImageDescription"] == "Generated image."
 
 
 def test_write_embedded_metadata_rejects_unsupported_file(tmp_path):

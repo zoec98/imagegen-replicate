@@ -1,3 +1,11 @@
+"""Prompt annotation behavior tests.
+
+Behaviors protected:
+- Valid prompt annotations parse and strip to provider-ready prompt text.
+- Plain prompts remain valid and unchanged.
+- Invalid, nested, unterminated, or malformed annotations are rejected.
+"""
+
 import pytest
 
 from imagegen.prompt_annotations import (

@@ -1,3 +1,10 @@
+"""Clean image export tests.
+
+Behaviors protected:
+- Clean image exports strip embedded metadata without mutating stored gallery files.
+- Clean exports are written outside the gallery and stay hidden from gallery listings.
+"""
+
 from PIL import Image
 
 from imagegen.image_export import clean_image_export
