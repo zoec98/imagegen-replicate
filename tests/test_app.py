@@ -47,6 +47,17 @@ def extract_palette_data(response):
     return json.loads(response.data[start:end].decode("utf-8"))
 
 
+def expected_response_parameters(model, overrides=None):
+    parameters = {
+        parameter.name: parameter.default
+        for parameter in model.parameters
+        if parameter.name not in {"prompt", model.source_image_parameter}
+        and parameter.default not in {"", ()}
+    }
+    parameters.update(overrides or {})
+    return parameters
+
+
 def test_app_checksum_changes_when_asset_content_changes(tmp_path):
     template = tmp_path / "index.html"
     script = tmp_path / "app.js"
@@ -683,6 +694,7 @@ def test_image_metadata_route_404s_for_missing_embedded_metadata(
 
 
 def test_api_generate_accepts_json_and_returns_request_id(app_factory):
+    model = MODEL_REGISTRY["seedream45"]
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
     token = extract_csrf_token(index)
@@ -707,12 +719,10 @@ def test_api_generate_accepts_json_and_returns_request_id(app_factory):
     assert response.json["status"] == "queued"
     assert response.json["prompt"] == "a small red house"
     assert response.json["source_images"] == []
-    assert response.json["parameters"] == {
-        "aspect_ratio": "match_input_image",
-        "max_images": 1,
-        "sequential_image_generation": "disabled",
-        "size": "2K",
-    }
+    assert response.json["parameters"] == expected_response_parameters(
+        model,
+        {"size": "2K"},
+    )
     assert response.json["images"] == []
 
 
@@ -845,6 +855,7 @@ def test_api_generate_rejects_invalid_annotation_before_request_creation(app_fac
 
 def test_api_generate_logs_recreatable_request_payload(app_factory):
     app = app_factory()
+    model = MODEL_REGISTRY["seedream45"]
     client = app.test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
     token = extract_csrf_token(index)
@@ -871,12 +882,9 @@ def test_api_generate_logs_recreatable_request_payload(app_factory):
     assert row["model"] == "bytedance/seedream-4.5"
     assert row["prompt"] == "a small red house"
     assert json.loads(row["request_sent_json"]) == {
-        "aspect_ratio": "match_input_image",
-        "disable_safety_checker": True,
-        "max_images": 1,
+        **expected_response_parameters(model, {"size": "2K"}),
+        **model.fixed_inputs,
         "prompt": "a small red house",
-        "sequential_image_generation": "disabled",
-        "size": "2K",
     }
 
 

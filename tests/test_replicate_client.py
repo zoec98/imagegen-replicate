@@ -66,16 +66,26 @@ def app_config(tmp_path):
     )
 
 
+def expected_default_inputs(model, *, prompt):
+    defaults = {
+        parameter.name: parameter.default
+        for parameter in model.parameters
+        if parameter.name != model.source_image_parameter and parameter.default != ""
+    }
+    defaults["prompt"] = prompt
+    defaults.update(model.fixed_inputs)
+    return defaults
+
+
 def test_build_prediction_input_includes_defaults_and_fixed_inputs():
-    payload = build_prediction_input("a red house", MODEL_REGISTRY["seedream45"])
+    model = MODEL_REGISTRY["seedream45"]
+
+    payload = build_prediction_input("a red house", model)
 
     assert payload["prompt"] == "a red house"
-    assert payload["size"] == "2K"
-    assert payload["aspect_ratio"] == "match_input_image"
-    assert payload["sequential_image_generation"] == "disabled"
-    assert payload["max_images"] == 1
+    assert payload == expected_default_inputs(model, prompt="a red house")
     assert payload["disable_safety_checker"] is True
-    assert "image_input" not in payload
+    assert model.source_image_parameter not in payload
 
 
 def test_build_prediction_input_applies_validated_parameters():

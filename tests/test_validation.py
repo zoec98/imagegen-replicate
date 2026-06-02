@@ -10,20 +10,26 @@ from imagegen.validation import (
 )
 
 
+def expected_default_parameters(model):
+    return {
+        parameter.name: parameter.default
+        for parameter in model.parameters
+        if parameter.name not in {"prompt", model.source_image_parameter}
+        and parameter.default not in {"", ()}
+    }
+
+
 def test_validate_generation_payload_accepts_defaults(tmp_path):
+    model = MODEL_REGISTRY["seedream45"]
+
     result = validate_generation_payload(
         {"prompt": "a small red house"},
-        model=MODEL_REGISTRY["seedream45"],
+        model=model,
         output_dir=tmp_path,
     )
 
     assert result.prompt == "a small red house"
-    assert result.parameters == {
-        "aspect_ratio": "match_input_image",
-        "max_images": 1,
-        "sequential_image_generation": "disabled",
-        "size": "2K",
-    }
+    assert result.parameters == expected_default_parameters(model)
     assert result.source_images == []
     assert result.edit_mode is False
 
