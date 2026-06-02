@@ -222,6 +222,8 @@ Keep JavaScript progressive and focused. Server-rendered Flask/Jinja pages are p
 
 Maintain meaningful tests. Add tests with each behavior change unless the change is documentation-only or purely mechanical.
 
+Write tests in the style of GOOS / outside-in TDD. Start from observable behavior, not implementation details. A good test should survive refactoring.
+
 Prioritize tests for:
 
 - Request payload construction per model.
@@ -233,6 +235,39 @@ Prioritize tests for:
 - Flask route success and error paths.
 
 Tests must not call the real Replicate API by default.
+
+Testing rules:
+
+- Start from observable behavior, not implementation details.
+- Prefer tests through public APIs, CLI commands, HTTP endpoints, or domain-level interfaces.
+- Do not test private methods directly.
+- Do not assert exact internal call sequences unless the protocol is the behavior.
+- Use mocks only at architectural boundaries: filesystem, network, database, clock, random, and external services.
+- Avoid one-test-per-function.
+- Prefer examples that describe user-visible or business-visible behavior.
+- A good test should survive refactoring.
+- If a test would break after renaming, extracting, or moving internal functions without changing behavior, rewrite it.
+- Use red-green-refactor:
+  1. Add one failing test for missing behavior.
+  2. Implement the smallest change.
+  3. Refactor only with tests green.
+- Before writing tests, list the behaviors worth protecting in the test file comments.
+- After writing tests, review them and delete tests that only pin implementation details.
+
+## Refactoring Policy
+
+When asked to refactor, do not change code immediately. First create or update [REFACTOR.md](REFACTOR.md).
+
+For each module under review:
+
+- State its intended responsibility at the top of the module in a comment block.
+- State the same intended responsibility in `REFACTOR.md`.
+- List functions/classes that do not match that responsibility.
+- Identify duplicated behavior, near-duplicate code, and concepts implemented in multiple places.
+- Propose moves, extractions, merges, or renames.
+- Do not change code yet.
+- For each proposed refactoring, list the behavior tests needed before the change.
+- These tests must cover observable behavior and must not depend on the current internal structure.
 
 ## Documentation Expectations
 
