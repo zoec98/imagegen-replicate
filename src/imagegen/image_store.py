@@ -15,7 +15,7 @@ import httpx
 
 from imagegen.metadata_embed import write_embedded_metadata
 from imagegen.metadata_policy import synthesize_copyright
-from imagegen.model_registry import ReplicateModel
+from imagegen.model_registry import ProviderId, ReplicateModel
 
 
 SOFTWARE_NAME = "https://github.com/zoec98/imagegen-replicate"
@@ -47,6 +47,9 @@ def persist_generated_images(
     *,
     output_dir: Path,
     model: ReplicateModel,
+    provider: ProviderId = "replicate",
+    model_alias: str | None = None,
+    provider_model: str | None = None,
     prompt: str,
     prediction_id: str,
     prediction_input: dict[str, object],
@@ -62,6 +65,9 @@ def persist_generated_images(
                 url,
                 output_dir=output_dir,
                 model=model,
+                provider=provider,
+                model_alias=model_alias,
+                provider_model=provider_model,
                 prompt=prompt,
                 prediction_id=prediction_id,
                 sequence=sequence,
@@ -81,6 +87,9 @@ def download_image(
     *,
     output_dir: Path,
     model: ReplicateModel,
+    provider: ProviderId = "replicate",
+    model_alias: str | None = None,
+    provider_model: str | None = None,
     prompt: str,
     prediction_id: str,
     sequence: int,
@@ -112,8 +121,9 @@ def download_image(
     created_at = datetime.now(UTC).isoformat()
     metadata = {
         "created_at": created_at,
-        "model_alias": model.alias,
-        "model": model.replicate_model,
+        "provider": provider,
+        "model_alias": model_alias or model.alias,
+        "model": provider_model or model.replicate_model,
         "prediction_id": prediction_id,
         "sequence": sequence,
         "prompt": prompt,

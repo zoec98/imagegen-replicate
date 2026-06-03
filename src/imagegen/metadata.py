@@ -7,12 +7,14 @@ from pathlib import Path
 from typing import Protocol
 
 from imagegen.metadata_embed import read_embedded_metadata
+from imagegen.model_registry import ProviderId
 
 
 @dataclass(frozen=True)
 class ImageMetadata:
     content_type: str | None = None
     created_at: str | None = None
+    provider: ProviderId | None = None
     model_alias: str | None = None
     model: str | None = None
     prompt: str | None = None
@@ -23,6 +25,7 @@ class ImageMetadata:
         return (
             self.content_type is not None
             or self.created_at is not None
+            or self.provider is not None
             or self.model_alias is not None
             or self.model is not None
             or self.prompt is not None
@@ -37,6 +40,8 @@ class ImageMetadata:
             "model": self.model,
             "prompt": self.prompt,
         }
+        if self.provider is not None:
+            payload["provider"] = self.provider
         if self.parameters is not None:
             payload["parameters"] = self.parameters
         return payload
@@ -61,6 +66,7 @@ def image_metadata_from_dict(metadata: dict[str, object]) -> ImageMetadata:
     return ImageMetadata(
         content_type=_metadata_string(metadata, "content_type"),
         created_at=_metadata_string(metadata, "created_at"),
+        provider=_metadata_provider(metadata),
         model_alias=_metadata_string(metadata, "model_alias"),
         model=_metadata_string(metadata, "model"),
         prompt=_metadata_string(metadata, "prompt"),
@@ -71,3 +77,10 @@ def image_metadata_from_dict(metadata: dict[str, object]) -> ImageMetadata:
 def _metadata_string(metadata: dict[str, object], key: str) -> str | None:
     value = metadata.get(key)
     return value if isinstance(value, str) else None
+
+
+def _metadata_provider(metadata: dict[str, object]) -> ProviderId | None:
+    value = metadata.get("provider")
+    if value in {"replicate", "falai"}:
+        return value
+    return None

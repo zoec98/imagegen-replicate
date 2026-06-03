@@ -32,7 +32,7 @@ def test_initialize_creates_schema_idempotently(tmp_path):
     assert "schema_version" in tables
     with sqlite3.connect(log.path) as connection:
         version = connection.execute("SELECT version FROM schema_version").fetchone()[0]
-    assert version == 2
+    assert version == 3
 
 
 def test_initialize_migrates_v1_schema(tmp_path):
@@ -67,10 +67,50 @@ def test_initialize_migrates_v1_schema(tmp_path):
         connection.row_factory = sqlite3.Row
         version = connection.execute("SELECT version FROM schema_version").fetchone()[0]
         row = connection.execute(
-            "SELECT prompt FROM generation_requests WHERE id = 'old'"
+            "SELECT prompt, provider FROM generation_requests WHERE id = 'old'"
         ).fetchone()
-    assert version == 2
+    assert version == 3
     assert row["prompt"] == ""
+    assert row["provider"] == "replicate"
+
+
+def test_initialize_migrates_v2_schema_with_provider_backfill(tmp_path):
+    log = SQLiteGenerationLog(tmp_path / "imagegen.sqlite3")
+    log.path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(log.path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE schema_version (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                version INTEGER NOT NULL
+            );
+            INSERT INTO schema_version VALUES (1, 2);
+            CREATE TABLE generation_requests (
+                id TEXT PRIMARY KEY,
+                sent_at TEXT NOT NULL,
+                model_alias TEXT NOT NULL,
+                model TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                request_sent_json TEXT NOT NULL,
+                parameters_json TEXT NOT NULL,
+                source_image_filenames_json TEXT NOT NULL
+            );
+            INSERT INTO generation_requests
+            VALUES ('old', '2026-05-30T12:00:00+00:00',
+                'seedream45', 'bytedance/seedream-4.5', 'prompt', '{}', '{}', '[]');
+            """
+        )
+
+    log.initialize()
+
+    with sqlite3.connect(log.path) as connection:
+        connection.row_factory = sqlite3.Row
+        version = connection.execute("SELECT version FROM schema_version").fetchone()[0]
+        row = connection.execute(
+            "SELECT provider FROM generation_requests WHERE id = 'old'"
+        ).fetchone()
+    assert version == 3
+    assert row["provider"] == "replicate"
 
 
 def test_initialize_rebuilds_unversioned_lab_schema(tmp_path):
@@ -109,6 +149,7 @@ def test_initialize_rebuilds_unversioned_lab_schema(tmp_path):
     assert columns == [
         "id",
         "sent_at",
+        "provider",
         "model_alias",
         "model",
         "prompt",
@@ -149,12 +190,39 @@ def test_create_request_persists_recreatable_payload(tmp_path):
     assert result is not None
     assert result.status == "queued"
     assert result.logs == []
+    assert request.provider == "replicate"
     assert request.model_alias == "seedream45"
     assert request.model == "bytedance/seedream-4.5"
     assert request.prompt == "edit this"
     assert request.request_sent == replicate_input
     assert request.parameters == {"size": "2K"}
     assert request.source_images == ["source.png"]
+
+
+def test_create_request_persists_provider_for_falai_rows(tmp_path):
+    log = SQLiteGenerationLog(tmp_path / "imagegen.sqlite3")
+    log.initialize()
+    record = RequestStore().create(
+        provider="falai",
+        prompt="edit this",
+        parameters={},
+        source_images=["source.png"],
+        edit_mode=True,
+        model_alias="seedream45",
+    )
+
+    log.create_request(
+        record,
+        model_alias="seedream45",
+        model="fal-ai/bytedance/seedream/v4.5/edit",
+        replicate_input={"prompt": "edit this", "image_urls": ["source.png"]},
+    )
+
+    request = log.get_logged_request(record.request_id)
+    assert request is not None
+    assert request.provider == "falai"
+    assert request.model_alias == "seedream45"
+    assert request.model == "fal-ai/bytedance/seedream/v4.5/edit"
 
 
 def test_lifecycle_updates_status_and_elapsed_time(tmp_path):

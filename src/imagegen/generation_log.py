@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Protocol, cast
 
 from imagegen.image_store import StoredImage
+from imagegen.model_registry import ProviderId
 from imagegen.request_store import GenerationRequest, RequestStatus
 
 
@@ -53,6 +54,7 @@ class GenerationLog(Protocol):
 class LoggedGenerationRequest:
     request_id: str
     sent_at: str
+    provider: ProviderId
     model_alias: str
     model: str
     prompt: str
@@ -116,6 +118,7 @@ class SQLiteGenerationLog:
                 INSERT INTO generation_requests (
                     id,
                     sent_at,
+                    provider,
                     model_alias,
                     model,
                     prompt,
@@ -123,11 +126,12 @@ class SQLiteGenerationLog:
                     parameters_json,
                     source_image_filenames_json
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.request_id,
                     record.created_at.isoformat(),
+                    record.provider,
                     model_alias,
                     model,
                     record.prompt,
@@ -270,6 +274,7 @@ class SQLiteGenerationLog:
         return LoggedGenerationRequest(
             request_id=str(row["id"]),
             sent_at=str(row["sent_at"]),
+            provider=_provider_id(row["provider"]),
             model_alias=str(row["model_alias"]),
             model=str(row["model"]),
             prompt=str(row["prompt"]),
@@ -313,7 +318,7 @@ class SQLiteGenerationLog:
         return connection
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -324,6 +329,7 @@ CREATE TABLE IF NOT EXISTS schema_version (
 CREATE TABLE IF NOT EXISTS generation_requests (
     id TEXT PRIMARY KEY,
     sent_at TEXT NOT NULL,
+    provider TEXT NOT NULL,
     model_alias TEXT NOT NULL,
     model TEXT NOT NULL,
     prompt TEXT NOT NULL,
@@ -381,6 +387,10 @@ def _prepare_schema(connection: sqlite3.Connection) -> None:
         return
     if version == 1:
         _migrate_schema_v1_to_v2(connection)
+        _migrate_schema_v2_to_v3(connection)
+        return
+    if version == 2:
+        _migrate_schema_v2_to_v3(connection)
         return
     if version is not None:
         msg = f"Unsupported generation log schema version: {version}."
@@ -420,6 +430,15 @@ def _migrate_schema_v1_to_v2(connection: sqlite3.Connection) -> None:
     if "prompt" not in columns:
         connection.execute(
             "ALTER TABLE generation_requests ADD COLUMN prompt TEXT NOT NULL DEFAULT ''"
+        )
+
+
+def _migrate_schema_v2_to_v3(connection: sqlite3.Connection) -> None:
+    columns = _table_columns(connection, "generation_requests")
+    if "provider" not in columns:
+        connection.execute(
+            "ALTER TABLE generation_requests "
+            "ADD COLUMN provider TEXT NOT NULL DEFAULT 'replicate'"
         )
     connection.execute(
         """
@@ -484,6 +503,14 @@ def _request_status(value: object) -> RequestStatus:
     if status in {"queued", "running", "succeeded", "failed", "timeout"}:
         return cast(RequestStatus, status)
     msg = f"Unknown generation request status: {status}."
+    raise RuntimeError(msg)
+
+
+def _provider_id(value: object) -> ProviderId:
+    provider = str(value)
+    if provider in {"replicate", "falai"}:
+        return cast(ProviderId, provider)
+    msg = f"Unknown generation provider: {provider}."
     raise RuntimeError(msg)
 
 

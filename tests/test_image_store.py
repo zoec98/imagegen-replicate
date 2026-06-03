@@ -59,10 +59,12 @@ def test_download_image_writes_file_and_embedded_metadata(tmp_path):
     metadata = EmbeddedImageMetadataProvider().get(stored.path)
     assert metadata.content_type == "image/jpeg"
     assert metadata.created_at == stored.created_at
+    assert metadata.provider == "replicate"
     assert metadata.parameters is not None
     assert metadata.parameters["disable_safety_checker"] is True
     payload = read_embedded_metadata(stored.path)
     assert payload is not None
+    assert payload["provider"] == "replicate"
     assert payload["author"] == "Zoé Cordelier"
     assert payload["copyright"].endswith("Zoé Cordelier")
     assert payload["software"] == "https://github.com/zoec98/imagegen-replicate"

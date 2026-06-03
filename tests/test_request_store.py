@@ -30,6 +30,7 @@ def test_request_store_creates_and_gets_queued_request():
     assert record.output_urls == []
     assert record.images == []
     assert store.get(record.request_id) is record
+    assert record.to_json()["provider"] == "replicate"
 
 
 def test_request_store_unknown_request_returns_none():

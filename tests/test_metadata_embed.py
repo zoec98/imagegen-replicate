@@ -39,6 +39,7 @@ def decode_xp_text(value):
 def sample_metadata():
     return {
         "created_at": "2026-05-30T12:00:00+00:00",
+        "provider": "replicate",
         "model_alias": "seedream45",
         "model": "bytedance/seedream-4.5",
         "prediction_id": "abc123",

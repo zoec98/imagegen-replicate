@@ -37,6 +37,7 @@ def test_api_generate_accepts_json_and_returns_request_id(app_factory):
         f"/api/generation/{response.json['request_id']}"
     )
     assert response.json["poll_seconds"] == 1.0
+    assert response.json["provider"] == "replicate"
     assert response.json["model"] == "seedream45"
     assert response.json["status"] == "queued"
     assert response.json["prompt"] == "a small red house"
