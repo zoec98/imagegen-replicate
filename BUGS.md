@@ -1,0 +1,2 @@
+- Loading an EDIT model generated image does not re-enable the edit mode, and the source image selections are lost.
+- 
