@@ -28,6 +28,7 @@ from imagegen.model_registry import (
     ModelPricing,
     ModelParameter,
     ProviderInfo,
+    ProviderModel,
     ReplicateModel,
     default_model_for_provider,
     list_models_for_provider,
@@ -86,11 +87,7 @@ def register_routes(app: Flask) -> None:
             app_config=app_config,
             parameters=[
                 parameter
-                for parameter in sorted(
-                    target.parameters if target is not None else (),
-                    key=lambda item: item.order if item.order is not None else 999,
-                )
-                if parameter.name not in {"prompt"}
+                for parameter in _target_parameters(selected_provider_model, target)
             ],
             prompt="",
             csrf_token=ensure_csrf_token(),
@@ -224,16 +221,30 @@ def _provider_model_json(model) -> dict[str, object]:
         ),
         "custom_dimensions": _custom_dimensions_json(target.custom_dimensions),
         "pricing": [_pricing_json(pricing) for pricing in target.pricing],
-        "parameters": _target_parameter_json(target),
+        "parameters": _target_parameter_json(model, target),
     }
 
 
-def _target_parameter_json(target: GenerationTarget) -> list[dict[str, object]]:
+def _target_parameter_json(
+    model: ProviderModel,
+    target: GenerationTarget,
+) -> list[dict[str, object]]:
+    return [_parameter_json(parameter) for parameter in _target_parameters(model, target)]
+
+
+def _target_parameters(
+    model: ProviderModel | None,
+    target: GenerationTarget | None,
+) -> list[ModelParameter]:
+    if model is None or target is None:
+        return []
     source_parameter = (
-        target.source_images.provider_field if target.source_images is not None else None
+        target.source_images.provider_field
+        if target.source_images is not None
+        else _replicate_edit_source_parameter(model)
     )
     return [
-        _parameter_json(parameter)
+        parameter
         for parameter in sorted(
             target.parameters,
             key=lambda item: item.order if item.order is not None else 999,
@@ -241,6 +252,14 @@ def _target_parameter_json(target: GenerationTarget) -> list[dict[str, object]]:
         if parameter.name not in {"prompt", source_parameter}
         and parameter.name not in target.fixed_inputs
     ]
+
+
+def _replicate_edit_source_parameter(model: ProviderModel) -> str | None:
+    if model.provider != "replicate":
+        return None
+    if model.edit_target is None or model.edit_target.source_images is None:
+        return None
+    return model.edit_target.source_images.provider_field
 
 
 def _pricing_json(pricing: ModelPricing) -> dict[str, object]:

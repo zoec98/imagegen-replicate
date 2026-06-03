@@ -58,6 +58,7 @@ def test_index_renders_prompt_form(app_factory):
     assert b'name="size"' in response.data
     assert b'name="aspect_ratio"' in response.data
     assert b'name="max_images"' in response.data
+    assert b'name="image_input"' not in response.data
     assert b"disable_safety_checker" not in response.data
     assert b"Generate" in response.data
 
@@ -79,6 +80,9 @@ def test_index_exposes_model_registry_metadata(app_factory):
     assert seedream["provider_model"] == "bytedance/seedream-4.5"
     assert seedream["edit_capable"] is True
     assert seedream["source_image_max"] == 14
+    assert "image_input" not in {
+        parameter["name"] for parameter in seedream["parameters"]
+    }
     assert seedream["pricing"] == [
         {
             "price": "$0.04",
