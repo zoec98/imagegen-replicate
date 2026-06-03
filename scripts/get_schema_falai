@@ -1,26 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$#" -lt 1 ]; then
-    printf 'usage: %s [options] endpoint-or-url\n' "$0" >&2
-    printf 'options:\n' >&2
-    printf '  --linked-edit endpoint-or-url   Explicit linked edit endpoint.\n' >&2
-    printf '  --text-signifier value          Text endpoint suffix to replace when deriving a linked edit endpoint.\n' >&2
-    printf '  --edit-signifier value          Edit endpoint suffix to use when deriving a linked edit endpoint.\n' >&2
-    printf '  --no-linked-edit                Do not check a linked edit endpoint.\n' >&2
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+    printf 'usage: %s text-api-url [edit-api-url]\n' "$0" >&2
     printf 'examples:\n' >&2
-    printf '  %s fal-ai/bytedance/seedream/v4.5/text-to-image\n' "$0" >&2
-    printf '  %s --linked-edit openai/gpt-image-2/edit openai/gpt-image-2\n' "$0" >&2
-    printf '  %s --text-signifier text-to-image --edit-signifier edit bytedance/seedream/v4.5/text-to-image\n' "$0" >&2
-    printf '  %s bytedance/seedream/v4.5/text-to-image\n' "$0" >&2
     printf '  %s https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image/api\n' "$0" >&2
+    printf '  %s https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image/api https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/edit/api\n' "$0" >&2
+    exit 0
+fi
+
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+    printf 'usage: %s text-api-url [edit-api-url]\n' "$0" >&2
+    printf 'examples:\n' >&2
+    printf '  %s https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image/api\n' "$0" >&2
+    printf '  %s https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image/api https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/edit/api\n' "$0" >&2
     exit 2
 fi
 
 uv run python - "$@" <<'PY'
 from __future__ import annotations
 
-import argparse
 import html
 import json
 import os
@@ -43,7 +42,6 @@ class FalPage:
 
 @dataclass(frozen=True)
 class FalSchema:
-    path: str
     input_name: str | None
     input_schema: dict[str, Any] | None
     output_name: str | None
@@ -51,154 +49,46 @@ class FalSchema:
 
 
 def main() -> int:
-    args = parse_args()
-    primary_endpoint = normalize_endpoint(args.endpoint)
-    endpoints = [primary_endpoint]
-    linked_edit = linked_edit_endpoint(
-        primary_endpoint,
-        explicit=args.linked_edit,
-        text_signifier=args.text_signifier,
-        edit_signifier=args.edit_signifier,
-        enabled=not args.no_linked_edit,
-    )
-    if linked_edit:
-        endpoints.append(linked_edit)
+    urls = [validate_api_url(arg) for arg in sys.argv[1:]]
 
     print("# fal.ai Schema")
     print()
-    print(f"- Requested endpoint: `{primary_endpoint}`")
-    if len(endpoints) > 1:
-        print(f"- Linked edit endpoint checked: `{endpoints[1]}`")
+    print(f"- Text API URL: <{urls[0]}>")
+    if len(urls) > 1:
+        print(f"- Linked edit API URL: <{urls[1]}>")
     else:
-        print("- Linked edit endpoint checked: none")
+        print("- Linked edit API URL: none")
     print()
 
-    for index, endpoint in enumerate(endpoints):
+    for index, url in enumerate(urls):
         if index:
             print("---")
             print()
-        try:
-            page = fetch_endpoint_page(endpoint)
-        except SystemExit as error:
-            if endpoint != primary_endpoint:
-                print(f"## Linked Endpoint: `{endpoint}`")
-                print()
-                print(f"- Warning: could not fetch linked endpoint: {error}")
-                print()
-                continue
-            raise
+        page = fetch_endpoint_page(url)
         print_page_summary(page, paired=index > 0)
 
     return 0
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        prog="scripts/get_schema_falai",
-        description="Fetch fal.ai endpoint docs, schema, pricing, and linked edit endpoint information.",
-    )
-    parser.add_argument("endpoint", help="fal.ai endpoint id, shortened endpoint path, docs URL, or local HTML file")
-    parser.add_argument("--linked-edit", help="explicit linked edit endpoint id, shortened path, docs URL, or local HTML file")
-    parser.add_argument(
-        "--text-signifier",
-        default=None,
-        help="text endpoint suffix to replace when deriving a linked edit endpoint",
-    )
-    parser.add_argument(
-        "--edit-signifier",
-        default=None,
-        help="edit endpoint suffix to use when deriving a linked edit endpoint",
-    )
-    parser.add_argument(
-        "--no-linked-edit",
-        action="store_true",
-        help="do not check for a linked edit endpoint",
-    )
-    return parser.parse_args(sys.argv[1:])
-
-
-def linked_edit_endpoint(
-    primary_endpoint: str,
-    *,
-    explicit: str | None,
-    text_signifier: str,
-    edit_signifier: str,
-    enabled: bool,
-) -> str | None:
-    if not enabled:
-        return None
-    if explicit:
-        return normalize_endpoint(explicit)
-    if text_signifier is None and edit_signifier is None:
-        if primary_endpoint.endswith("/text-to-image"):
-            return primary_endpoint.removesuffix("/text-to-image") + "/edit"
-        return None
-    if not text_signifier or not edit_signifier:
-        raise SystemExit(
-            "--text-signifier and --edit-signifier must be provided together "
-            "when deriving a linked edit endpoint"
-        )
-
-    text_signifier = text_signifier.strip("/")
-    edit_signifier = edit_signifier.strip("/")
-    if text_signifier and primary_endpoint.endswith(f"/{text_signifier}"):
-        return primary_endpoint.removesuffix(f"/{text_signifier}") + f"/{edit_signifier}"
-    if text_signifier and primary_endpoint.endswith(text_signifier):
-        return primary_endpoint.removesuffix(text_signifier).rstrip("/") + f"/{edit_signifier}"
-    raise SystemExit(
-        f"endpoint `{primary_endpoint}` does not end with text signifier `{text_signifier}`"
-    )
-
-
-def normalize_endpoint(value: str) -> str:
+def validate_api_url(value: str) -> str:
     value = value.strip()
     if not value:
-        raise SystemExit("endpoint or URL must not be empty")
+        raise SystemExit("API URL must not be empty")
 
     parsed = urlparse(value)
-    if parsed.scheme in {"http", "https"}:
-        match = re.search(r"/models/(.+?)(?:/api)?/?$", parsed.path)
-        if not match:
-            raise SystemExit(f"could not extract fal.ai endpoint from URL: {value}")
-        value = match.group(1)
-    elif Path(value).exists():
-        page = Path(value).read_text(encoding="utf-8", errors="replace")
-        endpoint = jsonld_endpoint(page)
-        if endpoint is None:
-            raise SystemExit(f"could not extract fal.ai endpoint from local file: {value}")
-        return endpoint
-
-    value = value.strip("/")
-    if value.startswith("models/"):
-        value = value.removeprefix("models/").removesuffix("/api").strip("/")
-    if not value.startswith("fal-ai/"):
-        value = f"fal-ai/{value}"
-    if "/" not in value.removeprefix("fal-ai/"):
-        raise SystemExit(f"endpoint must include a fal.ai model path, got: {value}")
+    if parsed.scheme not in {"http", "https"} or parsed.netloc != "fal.ai":
+        raise SystemExit(f"expected a https://fal.ai/.../api URL, got: {value}")
+    if not re.search(r"/models/.+/api/?$", parsed.path):
+        raise SystemExit(f"expected a fal.ai model API docs URL ending in /api, got: {value}")
     return value
 
 
-def fetch_endpoint_page(endpoint: str) -> FalPage:
-    url = docs_url(endpoint)
-    try:
-        page = fetch(url)
-    except SystemExit:
-        fallback_url = docs_url(endpoint, api=False)
-        page = fetch(fallback_url)
-        url = fallback_url
-
+def fetch_endpoint_page(url: str) -> FalPage:
+    page = fetch(url)
     embedded_endpoint = jsonld_endpoint(page)
-    if embedded_endpoint and embedded_endpoint != endpoint:
-        print(
-            f"Warning: page JSON-LD endpoint `{embedded_endpoint}` differs from requested `{endpoint}`.",
-            file=sys.stderr,
-        )
-    return FalPage(endpoint=embedded_endpoint or endpoint, url=url, page=page)
-
-
-def docs_url(endpoint: str, *, api: bool = True) -> str:
-    suffix = "/api" if api else ""
-    return f"https://fal.ai/models/{endpoint}{suffix}"
+    if embedded_endpoint is None:
+        raise SystemExit(f"could not extract fal.ai endpoint from page JSON-LD: {url}")
+    return FalPage(endpoint=embedded_endpoint, url=url, page=page)
 
 
 def fetch(url: str) -> str:
@@ -235,7 +125,6 @@ def print_page_summary(page: FalPage, *, paired: bool) -> None:
     if schema is None:
         print("- Warning: no embedded OpenAPI schema found for this endpoint.")
     else:
-        print(f"- OpenAPI path: `{schema.path}`")
         if schema.input_name:
             print(f"- Input schema: `{schema.input_name}`")
         if schema.output_name:
@@ -300,7 +189,6 @@ def extract_endpoint_schema(page: str, endpoint: str) -> FalSchema | None:
     input_schema = schemas.get(input_name) if input_name else None
     output_schema = schemas.get(output_name) if output_name else None
     return FalSchema(
-        path=path,
         input_name=input_name,
         input_schema=input_schema if isinstance(input_schema, dict) else None,
         output_name=output_name,
@@ -566,7 +454,7 @@ def print_registry_hints(endpoint: str, schema: FalSchema | None, *, paired: boo
         print("- Link role: `edit-endpoint`")
     elif endpoint.endswith("/text-to-image"):
         print(f"- Suggested alias: `{suggested_alias(endpoint)}`")
-        print("- Suggested linked edit endpoint: use script output header or `--linked-edit`")
+        print("- Suggested linked edit endpoint: pass the edit API URL as the second script argument")
     if schema and schema.input_schema:
         fixed_inputs = fixed_provider_inputs(schema.input_schema)
         if fixed_inputs:

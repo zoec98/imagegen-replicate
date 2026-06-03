@@ -146,6 +146,6 @@ Developer scripts live in [scripts/](scripts):
 - `scripts/run-dev.sh`
 - `scripts/run-dev.cmd`
 - `scripts/get_schema_replicate bytedance/seedream-4.5`
-- `scripts/get_schema_falai fal-ai/bytedance/seedream/v4.5/text-to-image`
+- `scripts/get_schema_falai https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image/api`
 
 See [AGENTS.md](AGENTS.md) for project structure, testing expectations, Replicate integration rules, UI guidance, and guardrails.

@@ -1,1124 +1,183 @@
-"""Configured Replicate models for imagegen."""
+"""Provider-aware model registry facade."""
 
-from dataclasses import dataclass
-from typing import Literal
+from __future__ import annotations
 
+from imagegen.model_registry_base import (
+    CustomDimensionsControl,
+    GenerationTarget,
+    ModelMode,
+    ModelParameter,
+    ModelPricing,
+    ProviderId,
+    ProviderInfo,
+    ProviderModel,
+    ReplicateModel,
+    SourceImageBinding,
+)
+from imagegen.model_registry_falai import MODEL_REGISTRY as FALAI_MODEL_REGISTRY
+from imagegen.model_registry_replicate import (
+    DEFAULT_MODEL_ALIAS,
+    MODEL_REGISTRY,
+)
 
-ParameterType = Literal["array", "boolean", "integer", "number", "select", "string"]
-ModelMode = Literal["text-to-image", "image-edit"]
-ParameterSemanticType = Literal["seed"]
-
-
-@dataclass(frozen=True)
-class ModelPricing:
-    price: str
-    title: str
-    description: str
-    type: str
-    metric: str
-    metric_count: int
-
-
-@dataclass(frozen=True)
-class CustomDimensionsControl:
-    activation_parameter: str
-    activation_value: object
-    scale_parameter: str
-    width_parameter: str
-    height_parameter: str
-
-
-@dataclass(frozen=True)
-class ModelParameter:
-    name: str
-    description: str
-    type: ParameterType
-    default: object
-    choices: tuple[object, ...] = ()
-    minimum: float | int | None = None
-    maximum: float | int | None = None
-    order: int | None = None
-    semantic_type: ParameterSemanticType | None = None
-
-
-@dataclass(frozen=True)
-class ReplicateModel:
-    alias: str
-    display_name: str
-    documentation_url: str
-    replicate_model: str
-    edit_capable: bool
-    fixed_inputs: dict[str, object]
-    default_width: int
-    default_height: int
-    modes: tuple[ModelMode, ...]
-    parameters: tuple[ModelParameter, ...]
-    source_image_parameter: str | None = None
-    source_image_max: int = 14
-    custom_dimensions: CustomDimensionsControl | None = None
-    pricing: tuple[ModelPricing, ...] = ()
+__all__ = [
+    "DEFAULT_MODEL_ALIAS",
+    "MODEL_REGISTRY",
+    "PROVIDERS",
+    "PROVIDER_REGISTRIES",
+    "CustomDimensionsControl",
+    "GenerationTarget",
+    "ModelParameter",
+    "ModelPricing",
+    "ProviderId",
+    "ProviderInfo",
+    "ProviderModel",
+    "RegistryLookupError",
+    "ReplicateModel",
+    "SourceImageBinding",
+    "default_model_for_provider",
+    "list_models_for_provider",
+    "list_providers",
+    "resolve_generation_target",
+    "resolve_model",
+    "resolve_model_ref",
+]
 
 
-def _param(
-    name: str,
-    description: str,
-    type: ParameterType,
-    default: object = "",
+PROVIDERS: tuple[ProviderInfo, ...] = (
+    ProviderInfo(id="replicate", display_name="Replicate"),
+    ProviderInfo(id="falai", display_name="fal.ai"),
+)
+
+class RegistryLookupError(ValueError):
+    """Raised when a provider/model registry reference cannot be resolved."""
+
+
+def list_providers() -> tuple[ProviderInfo, ...]:
+    return PROVIDERS
+
+
+def list_models_for_provider(provider: ProviderId) -> tuple[ProviderModel, ...]:
+    registry = _provider_registry(provider)
+    return tuple(
+        model
+        for model in sorted(registry.values(), key=lambda item: item.alias)
+        if model.selectable
+    )
+
+
+def resolve_model(provider: ProviderId, alias: str) -> ProviderModel:
+    registry = _provider_registry(provider)
+    model = registry.get(alias)
+    if model is None:
+        choices = ", ".join(sorted(registry))
+        raise RegistryLookupError(
+            f"Unknown model `{alias}` for provider `{provider}`. Expected one of: {choices}."
+        )
+    return model
+
+
+def resolve_model_ref(
+    model_ref: str,
     *,
-    choices: tuple[object, ...] = (),
-    minimum: float | int | None = None,
-    maximum: float | int | None = None,
-    order: int | None = None,
-    semantic_type: ParameterSemanticType | None = None,
-) -> ModelParameter:
-    return ModelParameter(
-        name=name,
-        description=description,
-        type=type,
-        default=default,
-        choices=choices,
-        minimum=minimum,
-        maximum=maximum,
-        order=order,
-        semantic_type=semantic_type,
+    selected_provider: ProviderId | None = None,
+) -> ProviderModel:
+    if ":" in model_ref:
+        provider, alias = model_ref.split(":", 1)
+        return resolve_model(_provider_id(provider), alias)
+    if selected_provider is None:
+        raise RegistryLookupError(
+            "Bare model aliases require a selected provider."
+        )
+    return resolve_model(selected_provider, model_ref)
+
+
+def resolve_generation_target(
+    provider: ProviderId,
+    alias: str,
+    *,
+    edit_mode: bool,
+) -> GenerationTarget:
+    model = resolve_model(provider, alias)
+    if edit_mode:
+        if model.edit_target is None:
+            raise RegistryLookupError(
+                f"Model `{provider}:{alias}` does not support image edit mode."
+            )
+        return model.edit_target
+    return model.text_target
+
+
+def default_model_for_provider(provider: ProviderId) -> ProviderModel | None:
+    models = list_models_for_provider(provider)
+    if not models:
+        return None
+    if provider == "replicate" and DEFAULT_MODEL_ALIAS in PROVIDER_REGISTRIES[provider]:
+        return PROVIDER_REGISTRIES[provider][DEFAULT_MODEL_ALIAS]
+    return models[0]
+
+
+def _provider_registry(provider: ProviderId) -> dict[str, ProviderModel]:
+    try:
+        return PROVIDER_REGISTRIES[provider]
+    except KeyError as error:
+        raise RegistryLookupError(f"Unknown provider `{provider}`.") from error
+
+
+def _provider_id(value: str) -> ProviderId:
+    if value in {"replicate", "falai"}:
+        return value
+    raise RegistryLookupError(f"Unknown provider `{value}`.")
+
+
+def _provider_model_from_replicate(model: ReplicateModel) -> ProviderModel:
+    text_target = _target_from_replicate(model, mode="text-to-image")
+    edit_target = (
+        _target_from_replicate(model, mode="image-edit")
+        if model.edit_capable
+        else None
+    )
+    return ProviderModel(
+        provider="replicate",
+        alias=model.alias,
+        display_name=model.display_name,
+        text_target=text_target,
+        edit_target=edit_target,
     )
 
 
-def _price(price: str, description: str) -> ModelPricing:
-    return ModelPricing(
-        price=price,
-        title="per output image",
-        description=description,
-        type="per-unit",
-        metric="image_output_count",
-        metric_count=1,
+def _target_from_replicate(
+    model: ReplicateModel,
+    *,
+    mode: ModelMode,
+) -> GenerationTarget:
+    return GenerationTarget(
+        provider="replicate",
+        alias=model.alias,
+        display_name=model.display_name,
+        provider_model=model.replicate_model,
+        documentation_url=model.documentation_url,
+        runtime_url=f"https://replicate.com/{model.replicate_model}",
+        mode=mode,
+        parameters=model.parameters,
+        fixed_inputs=model.fixed_inputs,
+        source_images=(
+            SourceImageBinding(
+                provider_field=model.source_image_parameter,
+                max_count=model.source_image_max,
+            )
+            if mode == "image-edit" and model.source_image_parameter
+            else None
+        ),
+        pricing=model.pricing,
+        custom_dimensions=model.custom_dimensions,
     )
 
 
-SEEDREAM45 = ReplicateModel(
-    alias="seedream45",
-    display_name="Seedream 4.5",
-    documentation_url="https://replicate.com/bytedance/seedream-4.5/api/schema",
-    replicate_model="bytedance/seedream-4.5",
-    edit_capable=True,
-    fixed_inputs={"disable_safety_checker": True},
-    default_width=2048,
-    default_height=2048,
-    modes=("text-to-image", "image-edit"),
-    source_image_parameter="image_input",
-    pricing=(
-        ModelPricing(
-            price="$0.04",
-            title="per output image",
-            description="or 25 images for $1",
-            type="per-unit",
-            metric="image_output_count",
-            metric_count=1,
-        ),
-    ),
-    parameters=(
-        ModelParameter(
-            name="prompt",
-            description="Text prompt for image generation.",
-            type="string",
-            default="",
-            order=0,
-        ),
-        ModelParameter(
-            name="image_input",
-            description=(
-                "Input image(s) for image-to-image generation. List of 1-14 "
-                "images for single or multi-reference generation."
-            ),
-            type="array",
-            default=(),
-            order=1,
-        ),
-        ModelParameter(
-            name="size",
-            description=(
-                "Image resolution: 2K (2048px) or 4K (4096px). 1K resolution "
-                "is not supported in Seedream 4.5."
-            ),
-            type="select",
-            default="4K",
-            choices=("2K", "4K"),
-            order=2,
-        ),
-        ModelParameter(
-            name="aspect_ratio",
-            description=(
-                "Image aspect ratio. Use match_input_image to automatically "
-                "match the input image's aspect ratio."
-            ),
-            type="select",
-            default="3:4",
-            choices=(
-                "match_input_image",
-                "1:1",
-                "4:3",
-                "3:4",
-                "16:9",
-                "9:16",
-                "3:2",
-                "2:3",
-                "21:9",
-            ),
-            order=3,
-        ),
-        ModelParameter(
-            name="sequential_image_generation",
-            description=(
-                "Group image generation mode. disabled generates one image; "
-                "auto lets the model decide whether to generate related images."
-            ),
-            type="select",
-            default="disabled",
-            choices=("disabled", "auto"),
-            order=4,
-        ),
-        ModelParameter(
-            name="max_images",
-            description=(
-                "Maximum images to generate when sequential_image_generation "
-                "is auto. Total input and generated images cannot exceed 15."
-            ),
-            type="integer",
-            default=1,
-            minimum=1,
-            maximum=15,
-            order=5,
-        ),
-    ),
-)
-
-
-FLUX_FLEX = ReplicateModel(
-    alias="flux-flex",
-    display_name="Flux 2 Flex",
-    documentation_url="https://replicate.com/black-forest-labs/flux-2-flex/api/schema",
-    replicate_model="black-forest-labs/flux-2-flex",
-    edit_capable=True,
-    fixed_inputs={},
-    default_width=1024,
-    default_height=1024,
-    modes=("text-to-image", "image-edit"),
-    source_image_parameter="input_images",
-    source_image_max=10,
-    pricing=(
-        ModelPricing(
-            price="$0.06",
-            title="per input image megapixel",
-            description="or around 16 megapixels for $1",
-            type="per-unit",
-            metric="image_input_megapixel_count",
-            metric_count=1,
-        ),
-        ModelPricing(
-            price="$0.06",
-            title="per output image megapixel",
-            description="or around 16 megapixels for $1",
-            type="per-unit",
-            metric="image_output_megapixel_count",
-            metric_count=1,
-        ),
-    ),
-    parameters=(
-        ModelParameter(
-            name="prompt",
-            description="Text prompt for image generation.",
-            type="string",
-            default="",
-            order=0,
-        ),
-        ModelParameter(
-            name="input_images",
-            description=(
-                "Input images for image-to-image generation. List of up to "
-                "10 jpeg, png, gif, or webp images according to the upstream schema."
-            ),
-            type="array",
-            default=(),
-            order=1,
-        ),
-        ModelParameter(
-            name="aspect_ratio",
-            description=(
-                "Aspect ratio for the generated image. Use match_input_image "
-                "to match the first input image's aspect ratio."
-            ),
-            type="select",
-            default="1:1",
-            choices=(
-                "match_input_image",
-                "custom",
-                "1:1",
-                "16:9",
-                "3:2",
-                "2:3",
-                "4:5",
-                "5:4",
-                "9:16",
-                "3:4",
-                "4:3",
-            ),
-            order=2,
-        ),
-        ModelParameter(
-            name="resolution",
-            description="Resolution in megapixels.",
-            type="select",
-            default="1 MP",
-            choices=("match_input_image", "0.5 MP", "1 MP", "2 MP", "4 MP"),
-            order=3,
-        ),
-        ModelParameter(
-            name="width",
-            description="Width when aspect_ratio is custom. Rounded to a multiple of 16.",
-            type="integer",
-            default="",
-            minimum=256,
-            maximum=2048,
-            order=4,
-        ),
-        ModelParameter(
-            name="height",
-            description="Height when aspect_ratio is custom. Rounded to a multiple of 16.",
-            type="integer",
-            default="",
-            minimum=256,
-            maximum=2048,
-            order=5,
-        ),
-        ModelParameter(
-            name="safety_tolerance",
-            description="Safety tolerance, 1 is most strict and 5 is most permissive.",
-            type="integer",
-            default=2,
-            minimum=1,
-            maximum=5,
-            order=6,
-        ),
-        ModelParameter(
-            name="seed",
-            description="Random seed. Set for reproducible generation.",
-            type="integer",
-            default="",
-            order=7,
-            semantic_type="seed",
-        ),
-        ModelParameter(
-            name="prompt_upsampling",
-            description="Automatically modify the prompt for more creative generation.",
-            type="boolean",
-            default=True,
-            order=8,
-        ),
-        ModelParameter(
-            name="steps",
-            description="Number of inference steps.",
-            type="integer",
-            default=30,
-            minimum=1,
-            maximum=50,
-            order=9,
-        ),
-        ModelParameter(
-            name="guidance",
-            description="Guidance scale for generation.",
-            type="number",
-            default=4.5,
-            minimum=1.5,
-            maximum=10,
-            order=10,
-        ),
-        ModelParameter(
-            name="output_format",
-            description="Format of the output images.",
-            type="select",
-            default="webp",
-            choices=("webp", "jpg", "png"),
-            order=11,
-        ),
-        ModelParameter(
-            name="output_quality",
-            description="Quality when saving output images, from 0 to 100.",
-            type="integer",
-            default=80,
-            minimum=0,
-            maximum=100,
-            order=12,
-        ),
-    ),
-    custom_dimensions=CustomDimensionsControl(
-        activation_parameter="aspect_ratio",
-        activation_value="custom",
-        scale_parameter="resolution",
-        width_parameter="width",
-        height_parameter="height",
-    ),
-)
-
-
-OPENAI_GPT_IMAGE_2 = ReplicateModel(
-    alias="gpt-image-2",
-    display_name="GPT Image 2",
-    documentation_url="https://replicate.com/openai/gpt-image-2/api/schema",
-    replicate_model="openai/gpt-image-2",
-    edit_capable=True,
-    fixed_inputs={},
-    default_width=2048,
-    default_height=2048,
-    modes=("text-to-image", "image-edit"),
-    source_image_parameter="input_images",
-    source_image_max=10,
-    pricing=(
-        _price("$0.128", "or around 78 images for $10"),
-        _price("$0.012", "or around 83 images for $1"),
-        _price("$0.047", "or around 21 images for $1"),
-        _price("$0.128", "or around 78 images for $10"),
-    ),
-    parameters=(
-        _param("prompt", "A text description of the desired image.", "string", order=0),
-        _param(
-            "input_images",
-            "A list of images to use as input for the generation.",
-            "array",
-            (),
-            order=3,
-        ),
-        _param(
-            "aspect_ratio",
-            "The aspect ratio of the generated image.",
-            "select",
-            "1:1",
-            choices=("1:1", "3:2", "2:3"),
-            order=2,
-        ),
-        _param(
-            "number_of_images",
-            "Number of images to generate.",
-            "integer",
-            1,
-            minimum=1,
-            maximum=10,
-            order=4,
-        ),
-        _param(
-            "quality",
-            "The quality of the generated image.",
-            "select",
-            "auto",
-            choices=("low", "medium", "high", "auto"),
-            order=5,
-        ),
-        _param(
-            "background",
-            "Set whether the background is transparent, opaque, or automatic.",
-            "select",
-            "auto",
-            choices=("auto", "transparent", "opaque"),
-            order=6,
-        ),
-        _param(
-            "output_compression",
-            "Compression level.",
-            "integer",
-            90,
-            minimum=0,
-            maximum=100,
-            order=7,
-        ),
-        _param(
-            "output_format",
-            "Output format.",
-            "select",
-            "webp",
-            choices=("png", "jpeg", "webp"),
-            order=8,
-        ),
-        _param(
-            "moderation",
-            "Content moderation level.",
-            "select",
-            "auto",
-            choices=("auto", "low"),
-            order=9,
-        ),
-    ),
-)
-
-
-OPENAI_GPT_IMAGE_15 = ReplicateModel(
-    alias="gpt-image-15",
-    display_name="GPT Image 1.5",
-    documentation_url="https://replicate.com/openai/gpt-image-1.5/api/schema",
-    replicate_model="openai/gpt-image-1.5",
-    edit_capable=True,
-    fixed_inputs={},
-    default_width=2048,
-    default_height=2048,
-    modes=("text-to-image", "image-edit"),
-    source_image_parameter="input_images",
-    source_image_max=10,
-    pricing=(
-        _price("$0.136", "or around 73 images for $10"),
-        _price("$0.013", "or around 76 images for $1"),
-        _price("$0.05", "or 20 images for $1"),
-        _price("$0.136", "or around 73 images for $10"),
-    ),
-    parameters=(
-        _param("prompt", "A text description of the desired image.", "string", order=0),
-        _param(
-            "input_images",
-            "A list of images to use as input for the generation.",
-            "array",
-            (),
-            order=4,
-        ),
-        _param(
-            "aspect_ratio",
-            "The aspect ratio of the generated image.",
-            "select",
-            "1:1",
-            choices=("1:1", "3:2", "2:3"),
-            order=2,
-        ),
-        _param(
-            "input_fidelity",
-            "Control how closely input image style and features are matched.",
-            "select",
-            "low",
-            choices=("low", "high"),
-            order=3,
-        ),
-        _param(
-            "number_of_images",
-            "Number of images to generate.",
-            "integer",
-            1,
-            minimum=1,
-            maximum=10,
-            order=5,
-        ),
-        _param(
-            "quality",
-            "The quality of the generated image.",
-            "select",
-            "auto",
-            choices=("low", "medium", "high", "auto"),
-            order=6,
-        ),
-        _param(
-            "background",
-            "Set whether the background is transparent, opaque, or automatic.",
-            "select",
-            "auto",
-            choices=("auto", "transparent", "opaque"),
-            order=7,
-        ),
-        _param(
-            "output_compression",
-            "Compression level.",
-            "integer",
-            90,
-            minimum=0,
-            maximum=100,
-            order=8,
-        ),
-        _param(
-            "output_format",
-            "Output format.",
-            "select",
-            "webp",
-            choices=("png", "jpeg", "webp"),
-            order=9,
-        ),
-        _param(
-            "moderation",
-            "Content moderation level.",
-            "select",
-            "auto",
-            choices=("auto", "low"),
-            order=10,
-        ),
-    ),
-)
-
-
-NANO_BANANA_2 = ReplicateModel(
-    alias="nano-banana-2",
-    display_name="Nano Banana 2",
-    documentation_url="https://replicate.com/google/nano-banana-2/api/schema",
-    replicate_model="google/nano-banana-2",
-    edit_capable=True,
-    fixed_inputs={},
-    default_width=4096,
-    default_height=4096,
-    modes=("text-to-image", "image-edit"),
-    source_image_parameter="image_input",
-    source_image_max=14,
-    pricing=(
-        _price("$0.067", "or around 14 images for $1"),
-        _price("$0.101", "or around 99 images for $10"),
-        _price("$0.151", "or around 66 images for $10"),
-    ),
-    parameters=(
-        _param(
-            "prompt",
-            "A text description of the image you want to generate.",
-            "string",
-            order=0,
-        ),
-        _param(
-            "image_input",
-            "Input images to transform or use as reference.",
-            "array",
-            (),
-            order=1,
-        ),
-        _param(
-            "aspect_ratio",
-            "Aspect ratio of the generated image.",
-            "select",
-            "match_input_image",
-            choices=(
-                "match_input_image",
-                "1:1",
-                "1:4",
-                "1:8",
-                "2:3",
-                "3:2",
-                "3:4",
-                "4:1",
-                "4:3",
-                "4:5",
-                "5:4",
-                "8:1",
-                "9:16",
-                "16:9",
-                "21:9",
-            ),
-            order=2,
-        ),
-        _param(
-            "resolution",
-            "Resolution of the generated image.",
-            "select",
-            "1K",
-            choices=("1K", "2K", "4K"),
-            order=3,
-        ),
-        _param(
-            "google_search",
-            "Use Google Web Search grounding.",
-            "boolean",
-            False,
-            order=4,
-        ),
-        _param(
-            "image_search",
-            "Use Google Image Search grounding.",
-            "boolean",
-            False,
-            order=5,
-        ),
-        _param(
-            "output_format",
-            "Format of the output image.",
-            "select",
-            "jpg",
-            choices=("jpg", "png"),
-            order=6,
-        ),
-    ),
-)
-
-
-NANO_BANANA_PRO = ReplicateModel(
-    alias="nano-banana-pro",
-    display_name="Nano Banana Pro",
-    documentation_url="https://replicate.com/google/nano-banana-pro/api/schema",
-    replicate_model="google/nano-banana-pro",
-    edit_capable=True,
-    fixed_inputs={},
-    default_width=4096,
-    default_height=4096,
-    modes=("text-to-image", "image-edit"),
-    source_image_parameter="image_input",
-    source_image_max=14,
-    pricing=(
-        _price("$0.15", "or around 66 images for $10"),
-        _price("$0.15", "or around 66 images for $10"),
-        _price("$0.30", "or around 33 images for $10"),
-        _price("$0.035", "or around 28 images for $1"),
-    ),
-    parameters=(
-        _param(
-            "prompt",
-            "A text description of the image you want to generate.",
-            "string",
-            order=0,
-        ),
-        _param(
-            "image_input",
-            "Input images to transform or use as reference.",
-            "array",
-            (),
-            order=1,
-        ),
-        _param(
-            "aspect_ratio",
-            "Aspect ratio of the generated image.",
-            "select",
-            "match_input_image",
-            choices=(
-                "match_input_image",
-                "1:1",
-                "2:3",
-                "3:2",
-                "3:4",
-                "4:3",
-                "4:5",
-                "5:4",
-                "9:16",
-                "16:9",
-                "21:9",
-            ),
-            order=2,
-        ),
-        _param(
-            "resolution",
-            "Resolution of the generated image.",
-            "select",
-            "2K",
-            choices=("1K", "2K", "4K"),
-            order=3,
-        ),
-        _param(
-            "output_format",
-            "Format of the output image.",
-            "select",
-            "jpg",
-            choices=("jpg", "png"),
-            order=4,
-        ),
-        _param(
-            "safety_filter_level",
-            "Safety filter level.",
-            "select",
-            "block_only_high",
-            choices=(
-                "block_low_and_above",
-                "block_medium_and_above",
-                "block_only_high",
-            ),
-            order=5,
-        ),
-        _param(
-            "allow_fallback_model",
-            "Fallback to another model if Nano Banana Pro is at capacity.",
-            "boolean",
-            False,
-            order=6,
-        ),
-    ),
-)
-
-
-GROK_IMAGINE = ReplicateModel(
-    alias="grok-imagine",
-    display_name="Grok Imagine",
-    documentation_url="https://replicate.com/xai/grok-imagine-image/api/schema",
-    replicate_model="xai/grok-imagine-image",
-    edit_capable=True,
-    fixed_inputs={},
-    default_width=1024,
-    default_height=1024,
-    modes=("text-to-image", "image-edit"),
-    source_image_parameter="image",
-    source_image_max=1,
-    pricing=(_price("$0.02", "or 50 images for $1"),),
-    parameters=(
-        _param(
-            "prompt",
-            "Text prompt for image generation or editing.",
-            "string",
-            order=0,
-        ),
-        _param(
-            "image",
-            "Input image for editing.",
-            "string",
-            order=1,
-        ),
-        _param(
-            "aspect_ratio",
-            "Aspect ratio of the generated image.",
-            "select",
-            "1:1",
-            choices=(
-                "1:1",
-                "16:9",
-                "9:16",
-                "4:3",
-                "3:4",
-                "3:2",
-                "2:3",
-                "2:1",
-                "1:2",
-                "19.5:9",
-                "9:19.5",
-                "20:9",
-                "9:20",
-                "auto",
-            ),
-            order=2,
-        ),
-    ),
-)
-
-
-IMAGEN_4_ULTRA = ReplicateModel(
-    alias="imagen-4-ultra",
-    display_name="Imagen 4 Ultra",
-    documentation_url="https://replicate.com/google/imagen-4-ultra/api/schema",
-    replicate_model="google/imagen-4-ultra",
-    edit_capable=False,
-    fixed_inputs={},
-    default_width=2048,
-    default_height=2048,
-    modes=("text-to-image",),
-    pricing=(_price("$0.06", "or around 16 images for $1"),),
-    parameters=(
-        _param("prompt", "Text prompt for image generation.", "string", order=0),
-        _param(
-            "aspect_ratio",
-            "Aspect ratio of the generated image.",
-            "select",
-            "1:1",
-            choices=("1:1", "9:16", "16:9", "3:4", "4:3"),
-            order=1,
-        ),
-        _param(
-            "image_size",
-            "Resolution of the generated image.",
-            "select",
-            "1K",
-            choices=("1K", "2K"),
-            order=2,
-        ),
-        _param(
-            "safety_filter_level",
-            "Safety filter level.",
-            "select",
-            "block_only_high",
-            choices=(
-                "block_low_and_above",
-                "block_medium_and_above",
-                "block_only_high",
-            ),
-            order=3,
-        ),
-        _param(
-            "output_format",
-            "Format of the output image.",
-            "select",
-            "jpg",
-            choices=("jpg", "png"),
-            order=4,
-        ),
-    ),
-)
-
-
-IMAGEN_4 = ReplicateModel(
-    alias="imagen-4",
-    display_name="Imagen 4",
-    documentation_url="https://replicate.com/google/imagen-4/api/schema",
-    replicate_model="google/imagen-4",
-    edit_capable=False,
-    fixed_inputs={},
-    default_width=2048,
-    default_height=2048,
-    modes=("text-to-image",),
-    pricing=(_price("$0.04", "or 25 images for $1"),),
-    parameters=IMAGEN_4_ULTRA.parameters,
-)
-
-
-IMAGEN_4_FAST = ReplicateModel(
-    alias="imagen-4-fast",
-    display_name="Imagen 4 Fast",
-    documentation_url="https://replicate.com/google/imagen-4-fast/api/schema",
-    replicate_model="google/imagen-4-fast",
-    edit_capable=False,
-    fixed_inputs={},
-    default_width=1024,
-    default_height=1024,
-    modes=("text-to-image",),
-    pricing=(_price("$0.02", "or 50 images for $1"),),
-    parameters=(
-        _param("prompt", "Text prompt for image generation.", "string", order=0),
-        _param(
-            "aspect_ratio",
-            "Aspect ratio of the generated image.",
-            "select",
-            "1:1",
-            choices=("1:1", "9:16", "16:9", "3:4", "4:3"),
-            order=1,
-        ),
-        _param(
-            "safety_filter_level",
-            "Safety filter level.",
-            "select",
-            "block_only_high",
-            choices=(
-                "block_low_and_above",
-                "block_medium_and_above",
-                "block_only_high",
-            ),
-            order=2,
-        ),
-        _param(
-            "output_format",
-            "Format of the output image.",
-            "select",
-            "jpg",
-            choices=("jpg", "png"),
-            order=3,
-        ),
-    ),
-)
-
-
-WAN_27_PRO = ReplicateModel(
-    alias="wan-27-pro",
-    display_name="Wan 2.7 Image Pro",
-    documentation_url="https://replicate.com/wan-video/wan-2.7-image-pro/api/schema",
-    replicate_model="wan-video/wan-2.7-image-pro",
-    edit_capable=True,
-    fixed_inputs={},
-    default_width=4096,
-    default_height=4096,
-    modes=("text-to-image", "image-edit"),
-    source_image_parameter="images",
-    source_image_max=9,
-    pricing=(_price("$0.03", "or around 33 images for $1"),),
-    parameters=(
-        _param(
-            "prompt",
-            "Text prompt for image generation or editing.",
-            "string",
-            order=0,
-        ),
-        _param(
-            "images",
-            "Input images for editing, style transfer, or multi-reference generation.",
-            "array",
-            (),
-            order=1,
-        ),
-        _param(
-            "size",
-            "Output image resolution.",
-            "select",
-            "2K",
-            choices=(
-                "1K",
-                "2K",
-                "4K",
-                "1024*1024",
-                "2048*2048",
-                "4096*4096",
-                "1280*720",
-                "720*1280",
-                "2048*1152",
-                "1152*2048",
-                "4096*2304",
-                "2304*4096",
-                "1024*768",
-                "768*1024",
-                "2048*1536",
-                "1536*2048",
-                "4096*3072",
-                "3072*4096",
-            ),
-            order=2,
-        ),
-        _param(
-            "num_outputs",
-            "Number of images to generate.",
-            "integer",
-            1,
-            minimum=1,
-            maximum=4,
-            order=3,
-        ),
-        _param(
-            "image_set_mode",
-            "Generate a coherent set of related images from a single prompt.",
-            "boolean",
-            False,
-            order=4,
-        ),
-        _param(
-            "thinking_mode",
-            "Enable enhanced reasoning for improved image quality.",
-            "boolean",
-            True,
-            order=5,
-        ),
-        _param(
-            "seed",
-            "Random seed for reproducible generation.",
-            "integer",
-            "",
-            order=6,
-            semantic_type="seed",
-        ),
-    ),
-)
-
-
-QWEN_2512 = ReplicateModel(
-    alias="qwen-2512",
-    display_name="Qwen Image 2512",
-    documentation_url="https://replicate.com/qwen/qwen-image-2512/api/schema",
-    replicate_model="qwen/qwen-image-2512",
-    edit_capable=True,
-    fixed_inputs={"disable_safety_checker": True},
-    default_width=2048,
-    default_height=2048,
-    modes=("text-to-image", "image-edit"),
-    source_image_parameter="image",
-    source_image_max=1,
-    custom_dimensions=CustomDimensionsControl(
-        activation_parameter="aspect_ratio",
-        activation_value="custom",
-        scale_parameter="",
-        width_parameter="width",
-        height_parameter="height",
-    ),
-    pricing=(_price("$0.02", "or 50 images for $1"),),
-    parameters=(
-        _param("prompt", "Text prompt for image generation.", "string", order=0),
-        _param(
-            "negative_prompt",
-            "Negative prompt for image generation.",
-            "string",
-            " ",
-            order=1,
-        ),
-        _param(
-            "image",
-            "Input image for image-to-image generation.",
-            "string",
-            order=2,
-        ),
-        _param(
-            "strength",
-            "Strength for image-to-image generation.",
-            "number",
-            0.8,
-            minimum=0,
-            maximum=1,
-            order=3,
-        ),
-        _param(
-            "aspect_ratio",
-            "Aspect ratio for the generated image.",
-            "select",
-            "16:9",
-            choices=("1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "custom"),
-            order=4,
-        ),
-        _param(
-            "width",
-            "Width when aspect_ratio is custom.",
-            "integer",
-            "",
-            minimum=256,
-            maximum=2048,
-            order=5,
-        ),
-        _param(
-            "height",
-            "Height when aspect_ratio is custom.",
-            "integer",
-            "",
-            minimum=256,
-            maximum=2048,
-            order=6,
-        ),
-        _param(
-            "guidance",
-            "Guidance for generated image.",
-            "number",
-            4,
-            minimum=0,
-            maximum=10,
-            order=7,
-        ),
-        _param(
-            "num_inference_steps",
-            "Number of denoising steps.",
-            "integer",
-            40,
-            minimum=20,
-            maximum=50,
-            order=8,
-        ),
-        _param(
-            "go_fast",
-            "Use the model with additional optimizations for faster generation.",
-            "boolean",
-            True,
-            order=9,
-        ),
-        _param(
-            "seed",
-            "Random seed. Set for reproducible generation.",
-            "integer",
-            "",
-            order=10,
-            semantic_type="seed",
-        ),
-        _param(
-            "output_format",
-            "Format of the output images.",
-            "select",
-            "webp",
-            choices=("webp", "jpg", "png"),
-            order=11,
-        ),
-        _param(
-            "output_quality",
-            "Quality when saving the output images.",
-            "integer",
-            95,
-            minimum=0,
-            maximum=100,
-            order=12,
-        ),
-    ),
-)
-
-
-MODEL_REGISTRY: dict[str, ReplicateModel] = {
-    FLUX_FLEX.alias: FLUX_FLEX,
-    GROK_IMAGINE.alias: GROK_IMAGINE,
-    IMAGEN_4.alias: IMAGEN_4,
-    IMAGEN_4_FAST.alias: IMAGEN_4_FAST,
-    IMAGEN_4_ULTRA.alias: IMAGEN_4_ULTRA,
-    NANO_BANANA_2.alias: NANO_BANANA_2,
-    NANO_BANANA_PRO.alias: NANO_BANANA_PRO,
-    OPENAI_GPT_IMAGE_15.alias: OPENAI_GPT_IMAGE_15,
-    OPENAI_GPT_IMAGE_2.alias: OPENAI_GPT_IMAGE_2,
-    QWEN_2512.alias: QWEN_2512,
-    SEEDREAM45.alias: SEEDREAM45,
-    WAN_27_PRO.alias: WAN_27_PRO,
+PROVIDER_REGISTRIES: dict[ProviderId, dict[str, ProviderModel]] = {
+    "replicate": {
+        alias: _provider_model_from_replicate(model)
+        for alias, model in MODEL_REGISTRY.items()
+    },
+    "falai": FALAI_MODEL_REGISTRY,
 }
-
-
-DEFAULT_MODEL_ALIAS = SEEDREAM45.alias

@@ -6,7 +6,18 @@ Behaviors protected:
 - Fixed inputs and edit/source-image metadata follow application policy.
 """
 
-from imagegen.model_registry import MODEL_REGISTRY
+import pytest
+
+from imagegen.model_registry import (
+    MODEL_REGISTRY,
+    RegistryLookupError,
+    default_model_for_provider,
+    list_models_for_provider,
+    list_providers,
+    resolve_generation_target,
+    resolve_model,
+    resolve_model_ref,
+)
 
 
 VALID_MODES = {"text-to-image", "image-edit"}
@@ -80,3 +91,87 @@ def test_custom_dimension_controls_reference_model_parameters():
         assert control.height_parameter in parameter_names
         if control.scale_parameter:
             assert control.scale_parameter in parameter_names
+
+
+def test_provider_registry_lists_supported_providers():
+    providers = {provider.id: provider.display_name for provider in list_providers()}
+
+    assert providers == {
+        "replicate": "Replicate",
+        "falai": "fal.ai",
+    }
+
+
+def test_provider_model_lists_are_scoped_by_provider():
+    replicate_models = list_models_for_provider("replicate")
+    falai_models = list_models_for_provider("falai")
+
+    assert {model.alias for model in replicate_models} == set(MODEL_REGISTRY)
+    assert "seedream45" in {model.alias for model in replicate_models}
+    assert "seedream45" in {model.alias for model in falai_models}
+    assert {model.provider for model in replicate_models} == {"replicate"}
+    assert {model.provider for model in falai_models} == {"falai"}
+
+
+def test_duplicate_aliases_resolve_inside_selected_provider():
+    replicate = resolve_model("replicate", "seedream45")
+    falai = resolve_model("falai", "seedream45")
+
+    assert replicate.alias == falai.alias
+    assert replicate.provider == "replicate"
+    assert falai.provider == "falai"
+    assert replicate.text_target.provider_model == "bytedance/seedream-4.5"
+    assert falai.text_target.provider_model == (
+        "fal-ai/bytedance/seedream/v4.5/text-to-image"
+    )
+
+
+def test_fully_qualified_and_bare_model_refs_resolve_by_provider():
+    assert resolve_model_ref("replicate:seedream45").provider == "replicate"
+    assert resolve_model_ref("falai:seedream45").provider == "falai"
+    assert (
+        resolve_model_ref("seedream45", selected_provider="falai").text_target.provider_model
+        == "fal-ai/bytedance/seedream/v4.5/text-to-image"
+    )
+
+    with pytest.raises(RegistryLookupError, match="Bare model aliases"):
+        resolve_model_ref("seedream45")
+
+
+def test_generation_target_resolution_keeps_provider_parameters_distinct():
+    replicate = resolve_generation_target("replicate", "seedream45", edit_mode=False)
+    falai = resolve_generation_target("falai", "seedream45", edit_mode=False)
+
+    assert replicate.provider_model == "bytedance/seedream-4.5"
+    assert falai.provider_model == "fal-ai/bytedance/seedream/v4.5/text-to-image"
+    assert {parameter.name for parameter in replicate.parameters} != {
+        parameter.name for parameter in falai.parameters
+    }
+    assert replicate.fixed_inputs == {"disable_safety_checker": True}
+    assert falai.fixed_inputs == {
+        "enable_safety_checker": False,
+        "sync_mode": False,
+    }
+
+
+def test_falai_edit_target_uses_linked_endpoint_not_selector_duplicate():
+    models = list_models_for_provider("falai")
+    seedream = resolve_model("falai", "seedream45")
+    edit_target = resolve_generation_target("falai", "seedream45", edit_mode=True)
+
+    assert [model.alias for model in models].count("seedream45") == 1
+    assert seedream.edit_capable
+    assert edit_target.provider_model == "fal-ai/bytedance/seedream/v4.5/edit"
+    assert edit_target.source_images is not None
+    assert edit_target.source_images.provider_field == "image_urls"
+    assert edit_target.source_images.max_count == 10
+
+
+def test_edit_target_resolution_fails_when_provider_model_has_no_edit_endpoint():
+    with pytest.raises(RegistryLookupError, match="does not support image edit"):
+        resolve_generation_target("falai", "ernie-image", edit_mode=True)
+
+
+def test_default_model_for_provider_prefers_replicate_default_only_for_replicate():
+    assert default_model_for_provider("replicate").alias == "seedream45"
+    assert default_model_for_provider("falai").provider == "falai"
