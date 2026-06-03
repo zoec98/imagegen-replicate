@@ -141,12 +141,15 @@ def test_fully_qualified_and_bare_model_refs_resolve_by_provider():
 def test_generation_target_resolution_keeps_provider_parameters_distinct():
     replicate = resolve_generation_target("replicate", "seedream45", edit_mode=False)
     falai = resolve_generation_target("falai", "seedream45", edit_mode=False)
+    replicate_parameters = {parameter.name for parameter in replicate.parameters}
+    falai_parameters = {parameter.name for parameter in falai.parameters}
 
     assert replicate.provider_model == "bytedance/seedream-4.5"
     assert falai.provider_model == "fal-ai/bytedance/seedream/v4.5/text-to-image"
-    assert {parameter.name for parameter in replicate.parameters} != {
-        parameter.name for parameter in falai.parameters
-    }
+    assert "size" in replicate_parameters
+    assert "image_size" not in replicate_parameters
+    assert "image_size" in falai_parameters
+    assert "size" not in falai_parameters
     assert replicate.fixed_inputs == {"disable_safety_checker": True}
     assert falai.fixed_inputs == {
         "enable_safety_checker": False,
@@ -158,13 +161,23 @@ def test_falai_edit_target_uses_linked_endpoint_not_selector_duplicate():
     models = list_models_for_provider("falai")
     seedream = resolve_model("falai", "seedream45")
     edit_target = resolve_generation_target("falai", "seedream45", edit_mode=True)
+    selectable_endpoint_ids = {model.text_target.provider_model for model in models}
 
     assert [model.alias for model in models].count("seedream45") == 1
+    assert "fal-ai/bytedance/seedream/v4.5/edit" not in selectable_endpoint_ids
     assert seedream.edit_capable
     assert edit_target.provider_model == "fal-ai/bytedance/seedream/v4.5/edit"
     assert edit_target.source_images is not None
     assert edit_target.source_images.provider_field == "image_urls"
     assert edit_target.source_images.max_count == 10
+
+
+def test_falai_text_mode_resolves_selectable_endpoint():
+    target = resolve_generation_target("falai", "seedream45", edit_mode=False)
+
+    assert target.mode == "text-to-image"
+    assert target.provider_model == "fal-ai/bytedance/seedream/v4.5/text-to-image"
+    assert target.source_images is None
 
 
 def test_edit_target_resolution_fails_when_provider_model_has_no_edit_endpoint():
