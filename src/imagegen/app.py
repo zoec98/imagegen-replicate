@@ -13,10 +13,10 @@ from flask import Flask
 
 from imagegen.api_routes import register_api_routes
 from imagegen.config import AppConfig, load_config
+from imagegen.generation_provider import default_generation_providers
 from imagegen.generation_log import SQLiteGenerationLog
 from imagegen.image_export import clean_tmp_exports
 from imagegen.metadata import EmbeddedImageMetadataProvider
-from imagegen.replicate_client import generate_image_urls
 from imagegen.request_store import RequestStore
 from imagegen.routes import register_routes
 from imagegen.security import no_cors_response
@@ -46,7 +46,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
             store=request_store,
             app_config=app_config,
             generation_log=generation_log,
-            generate=generate_image_urls,
+            providers=default_generation_providers(),
         ),
     )
     app.after_request(no_cors_response)

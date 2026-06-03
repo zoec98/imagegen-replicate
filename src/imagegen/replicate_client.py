@@ -9,13 +9,13 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, BinaryIO, Protocol
 
 import replicate
 
 from imagegen.config import AppConfig
+from imagegen.generation_types import GenerationResult
 from imagegen.image_store import StoredImage, persist_generated_images
 from imagegen.model_registry import ReplicateModel
 from imagegen.prompt_annotations import strip_prompt_annotations
@@ -42,14 +42,6 @@ class PredictionsApi(Protocol):
     ) -> PredictionLike: ...
 
     def get(self, id: str) -> PredictionLike: ...
-
-
-@dataclass(frozen=True)
-class ReplicateResult:
-    prediction_id: str
-    output_urls: list[str]
-    stored_images: list[StoredImage]
-    logs: str
 
 
 class ReplicatePredictionError(RuntimeError):
@@ -124,12 +116,15 @@ def generate_image_urls(
         prediction_input=prediction_metadata_input,
         author=app_config.author,
     )
-    return ReplicateResult(
+    return GenerationResult(
         prediction_id=prediction.id,
         output_urls=output_urls,
         stored_images=stored_images,
         logs=prediction.logs or "",
     )
+
+
+ReplicateResult = GenerationResult
 
 
 def build_prediction_input(

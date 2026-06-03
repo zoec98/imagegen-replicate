@@ -10,11 +10,32 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Event
 
+from imagegen.generation_provider import ReplicateGenerationProvider
 from imagegen.generation_log import SQLiteGenerationLog
+from imagegen.generation_types import GenerationProviderTimeout, GenerationResult
 from imagegen.image_store import StoredImage
-from imagegen.replicate_client import ReplicatePredictionTimeout, ReplicateResult
+from imagegen.replicate_client import ReplicateResult
 from imagegen.request_store import RequestStore
 from imagegen.worker import ThreadedGenerationWorker, run_generation_request
+
+
+class RecordingProvider:
+    def __init__(self, result, *, on_generate=None):
+        self.result = result
+        self.on_generate = on_generate
+
+    def generate(self, request_record, app_config):
+        if self.on_generate is not None:
+            self.on_generate(request_record, app_config)
+        return self.result
+
+
+class ErrorProvider:
+    def __init__(self, error):
+        self.error = error
+
+    def generate(self, request_record, app_config):
+        raise self.error
 
 
 def test_run_generation_request_succeeded_updates_request(app_config):
@@ -30,20 +51,29 @@ def test_run_generation_request_succeeded_updates_request(app_config):
         edit_mode=True,
     )
 
-    def fake_generate(prompt, config, *, parameters, source_image_paths):
-        assert prompt == "a red house"
-        assert config.output_dir == app_config.output_dir
-        assert config.model_alias == "seedream45"
-        assert parameters == {"size": "2K"}
-        assert source_image_paths == [source_path]
-        return ReplicateResult(
+    def on_generate(request_record, provider_app_config):
+        assert request_record.prompt == "a red house"
+        assert request_record.parameters == {"size": "2K"}
+        assert request_record.source_images == ["source.png"]
+        assert provider_app_config.output_dir == app_config.output_dir
+        assert source_path.exists()
+
+    provider = RecordingProvider(
+        GenerationResult(
             prediction_id="prediction-123",
             output_urls=["https://example.test/image.png"],
             stored_images=[Path("seedream45-prediction-123-01.png")],
             logs="created\nfinished",
-        )
+        ),
+        on_generate=on_generate,
+    )
 
-    run_generation_request(store, record, app_config, fake_generate)
+    run_generation_request(
+        store,
+        record,
+        app_config,
+        {"replicate": provider},
+    )
 
     assert record.status == "succeeded"
     assert record.prediction_id == "prediction-123"
@@ -56,11 +86,9 @@ def test_run_generation_request_succeeded_updates_request(app_config):
 def test_run_generation_request_failed_updates_error(app_config):
     store = RequestStore()
     record = store.create(provider="replicate", prompt="a red house", parameters={})
+    provider = ErrorProvider(RuntimeError("Replicate failed."))
 
-    def fake_generate(prompt, config, *, parameters, source_image_paths):
-        raise RuntimeError("Replicate failed.")
-
-    run_generation_request(store, record, app_config, fake_generate)
+    run_generation_request(store, record, app_config, {"replicate": provider})
 
     assert record.status == "failed"
     assert record.error == "Replicate failed."
@@ -69,11 +97,9 @@ def test_run_generation_request_failed_updates_error(app_config):
 def test_run_generation_request_timeout_updates_timeout(app_config):
     store = RequestStore()
     record = store.create(provider="replicate", prompt="a red house", parameters={})
+    provider = ErrorProvider(GenerationProviderTimeout("Timed out."))
 
-    def fake_generate(prompt, config, *, parameters, source_image_paths):
-        raise ReplicatePredictionTimeout("Timed out.")
-
-    run_generation_request(store, record, app_config, fake_generate)
+    run_generation_request(store, record, app_config, {"replicate": provider})
 
     assert record.status == "timeout"
     assert record.error == "Timed out."
@@ -98,19 +124,20 @@ def test_run_generation_request_logs_lifecycle_and_results(app_config):
         created_at="2026-05-30T12:00:00+00:00",
     )
 
-    def fake_generate(prompt, config, *, parameters, source_image_paths):
-        return ReplicateResult(
+    provider = RecordingProvider(
+        GenerationResult(
             prediction_id="prediction-123",
             output_urls=["https://example.test/image.png"],
             stored_images=[stored_image],
             logs="created\nfinished",
         )
+    )
 
     run_generation_request(
         store,
         record,
         app_config,
-        fake_generate,
+        {"replicate": provider},
         generation_log,
     )
 
@@ -160,8 +187,8 @@ def test_run_generation_request_persists_multiple_assets(app_config):
         ),
     ]
 
-    def fake_generate(prompt, config, *, parameters, source_image_paths):
-        return ReplicateResult(
+    provider = RecordingProvider(
+        GenerationResult(
             prediction_id="prediction-123",
             output_urls=[
                 "https://example.test/image-1.png",
@@ -170,12 +197,13 @@ def test_run_generation_request_persists_multiple_assets(app_config):
             stored_images=stored_images,
             logs="created\nfinished",
         )
+    )
 
     run_generation_request(
         store,
         record,
         app_config,
-        fake_generate,
+        {"replicate": provider},
         generation_log,
     )
 
@@ -202,14 +230,13 @@ def test_run_generation_request_logs_failure(app_config):
         replicate_input={"prompt": "a red house"},
     )
 
-    def fake_generate(prompt, config, *, parameters, source_image_paths):
-        raise RuntimeError("Replicate failed.")
+    provider = ErrorProvider(RuntimeError("Replicate failed."))
 
     run_generation_request(
         store,
         record,
         app_config,
-        fake_generate,
+        {"replicate": provider},
         generation_log,
     )
 
@@ -232,8 +259,11 @@ def test_run_generation_request_uses_request_model(app_config):
     )
 
     def fake_generate(prompt, config, *, parameters, source_image_paths):
+        assert prompt == "a red house"
         assert config.model_alias == "flux-flex"
         assert config.model.replicate_model == "black-forest-labs/flux-2-flex"
+        assert parameters == {"guidance": 5.5}
+        assert source_image_paths == []
         return ReplicateResult(
             prediction_id="prediction-123",
             output_urls=[],
@@ -241,7 +271,9 @@ def test_run_generation_request_uses_request_model(app_config):
             logs="done",
         )
 
-    run_generation_request(store, record, app_config, fake_generate)
+    provider = ReplicateGenerationProvider(generate=fake_generate)
+
+    run_generation_request(store, record, app_config, {"replicate": provider})
 
     assert record.status == "succeeded"
 
@@ -252,22 +284,23 @@ def test_threaded_worker_start_returns_before_generation_completes(app_config):
     started = Event()
     release = Event()
 
-    def fake_generate(prompt, config, *, parameters, source_image_paths):
-        started.set()
-        release.wait(timeout=1.0)
-        return ReplicateResult(
-            prediction_id="prediction-123",
-            output_urls=[],
-            stored_images=[],
-            logs="done",
-        )
+    class BlockingProvider:
+        def generate(self, request_record, app_config):
+            started.set()
+            release.wait(timeout=1.0)
+            return GenerationResult(
+                prediction_id="prediction-123",
+                output_urls=[],
+                stored_images=[],
+                logs="done",
+            )
 
     executor = ThreadPoolExecutor(max_workers=1)
     try:
         worker = ThreadedGenerationWorker(
             store=store,
             app_config=app_config,
-            generate=fake_generate,
+            providers={"replicate": BlockingProvider()},
             executor=executor,
         )
 
@@ -280,3 +313,13 @@ def test_threaded_worker_start_returns_before_generation_completes(app_config):
         executor.shutdown(wait=True)
 
     assert record.status == "succeeded"
+
+
+def test_run_generation_request_reports_unimplemented_provider(app_config):
+    store = RequestStore()
+    record = store.create(provider="falai", prompt="a red house", parameters={})
+
+    run_generation_request(store, record, app_config, {"replicate": RecordingProvider(None)})
+
+    assert record.status == "failed"
+    assert record.error == "Provider `falai` is not implemented yet."

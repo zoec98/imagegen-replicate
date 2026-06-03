@@ -1,32 +1,26 @@
 """Background generation worker orchestration.
 
 This module owns starting generation work outside the HTTP request/response
-cycle and translating Replicate wrapper outcomes into request-store lifecycle
+cycle and translating provider client outcomes into request-store lifecycle
 updates. The default worker uses a small thread pool; tests can inject a fake
 worker through Flask config.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import replace
 from pathlib import Path
 from typing import Protocol
 
 from imagegen.config import AppConfig
-from imagegen.generation_log import GenerationLog
-from imagegen.model_registry import MODEL_REGISTRY
-from imagegen.replicate_client import (
-    ReplicatePredictionTimeout,
-    ReplicateResult,
-    generate_image_urls,
+from imagegen.generation_provider import (
+    GenerationProvider,
+    default_generation_providers,
 )
+from imagegen.generation_log import GenerationLog
+from imagegen.generation_types import GenerationProviderTimeout
 from imagegen.request_store import GenerationRequest, RequestStore
-from imagegen.source_images import source_image_paths
-
-
-GenerateImage = Callable[..., ReplicateResult]
 
 
 class GenerationWorker(Protocol):
@@ -40,13 +34,13 @@ class ThreadedGenerationWorker:
         store: RequestStore,
         app_config: AppConfig,
         generation_log: GenerationLog | None = None,
-        generate: GenerateImage = generate_image_urls,
+        providers: Mapping[str, GenerationProvider] | None = None,
         executor: ThreadPoolExecutor | None = None,
     ) -> None:
         self._store = store
         self._app_config = app_config
         self._generation_log = generation_log
-        self._generate = generate
+        self._providers = dict(providers or default_generation_providers())
         self._executor = executor or ThreadPoolExecutor(
             max_workers=1,
             thread_name_prefix="imagegen-worker",
@@ -58,7 +52,7 @@ class ThreadedGenerationWorker:
             self._store,
             request_record,
             self._app_config,
-            self._generate,
+            self._providers,
             self._generation_log,
         )
 
@@ -67,13 +61,15 @@ def run_generation_request(
     store: RequestStore,
     request_record: GenerationRequest,
     app_config: AppConfig,
-    generate: GenerateImage = generate_image_urls,
+    providers: Mapping[str, GenerationProvider] | None = None,
     generation_log: GenerationLog | None = None,
 ) -> None:
     store.update(request_record.request_id, status="running")
     if generation_log is not None:
         generation_log.mark_started(request_record.request_id)
-    if request_record.provider != "replicate":
+    available_providers = providers or default_generation_providers()
+    provider = available_providers.get(request_record.provider)
+    if provider is None:
         error = f"Provider `{request_record.provider}` is not implemented yet."
         store.update(request_record.request_id, status="failed", error=error)
         if generation_log is not None:
@@ -83,23 +79,9 @@ def run_generation_request(
                 error=error,
             )
         return
-    request_model = MODEL_REGISTRY[request_record.model_alias]
-    request_config = replace(
-        app_config,
-        model_alias=request_model.alias,
-        model=request_model,
-    )
     try:
-        result = generate(
-            request_record.prompt,
-            request_config,
-            parameters=request_record.parameters,
-            source_image_paths=source_image_paths(
-                request_record.source_images,
-                output_dir=Path(app_config.output_dir),
-            ),
-        )
-    except ReplicatePredictionTimeout as error:
+        result = provider.generate(request_record, app_config)
+    except GenerationProviderTimeout as error:
         store.update(request_record.request_id, status="timeout", error=str(error))
         if generation_log is not None:
             generation_log.mark_finished(
