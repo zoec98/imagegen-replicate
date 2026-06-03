@@ -35,7 +35,8 @@ Project scripts live in `scripts/`:
 
 - `scripts/run-dev.sh`: start the Flask development server on `0.0.0.0:5002`.
 - `scripts/run-dev.cmd`: Windows CMD version of the Flask development server launcher.
-- `scripts/get_schema owner/model`: fetch `https://replicate.com/<owner>/<model>/api/schema`.
+- `scripts/get_schema_replicate owner/model`: fetch `https://replicate.com/<owner>/<model>/api/schema`.
+- `scripts/get_schema_falai endpoint-or-url`: fetch fal.ai endpoint docs, schema, pricing, and linked edit endpoint information.
 
 ## Expected Application Shape
 
@@ -110,7 +111,11 @@ Model definitions should be data-driven. Each supported model should declare:
 - Defaults, bounds, choices, array item formats, and display order.
 - Output shape, especially whether outputs are image URLs.
 
-Use `scripts/get_schema owner/model` before adding or updating a model registry entry. The Replicate schema page is HTML, but it embeds a dereferenced OpenAPI schema in JSON script data. Extract useful registry information from `components.schemas.Input` and `components.schemas.Output`:
+Use `scripts/get_schema_replicate owner/model` before adding or updating a Replicate model registry entry. The Replicate schema page is HTML, but it embeds a dereferenced OpenAPI schema in JSON script data. Extract useful registry information from `components.schemas.Input` and `components.schemas.Output`.
+
+Use `scripts/get_schema_falai endpoint-or-url` before adding or updating a fal.ai model registry entry. It accepts endpoint IDs such as `fal-ai/bytedance/seedream/v4.5/text-to-image`, shortened endpoint paths such as `bytedance/seedream/v4.5/text-to-image`, and full fal.ai model documentation URLs. For endpoints ending in `/text-to-image`, it also checks the matching `/edit` endpoint. For other paired endpoint shapes, pass `--linked-edit` explicitly so registry data can preserve fal.ai's separate endpoints while the UI treats them as one user-facing model.
+
+For provider schemas, extract useful registry information from schema input and output components:
 
 - `required`: server-required input names.
 - `properties`: parameter names and metadata.

@@ -1,0 +1,643 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "$#" -lt 1 ]; then
+    printf 'usage: %s [options] endpoint-or-url\n' "$0" >&2
+    printf 'options:\n' >&2
+    printf '  --linked-edit endpoint-or-url   Explicit linked edit endpoint.\n' >&2
+    printf '  --text-signifier value          Text endpoint suffix to replace when deriving a linked edit endpoint.\n' >&2
+    printf '  --edit-signifier value          Edit endpoint suffix to use when deriving a linked edit endpoint.\n' >&2
+    printf '  --no-linked-edit                Do not check a linked edit endpoint.\n' >&2
+    printf 'examples:\n' >&2
+    printf '  %s fal-ai/bytedance/seedream/v4.5/text-to-image\n' "$0" >&2
+    printf '  %s --linked-edit openai/gpt-image-2/edit openai/gpt-image-2\n' "$0" >&2
+    printf '  %s --text-signifier text-to-image --edit-signifier edit bytedance/seedream/v4.5/text-to-image\n' "$0" >&2
+    printf '  %s bytedance/seedream/v4.5/text-to-image\n' "$0" >&2
+    printf '  %s https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image/api\n' "$0" >&2
+    exit 2
+fi
+
+uv run python - "$@" <<'PY'
+from __future__ import annotations
+
+import argparse
+import html
+import json
+import os
+import re
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlparse
+from urllib.request import Request, urlopen
+
+
+@dataclass(frozen=True)
+class FalPage:
+    endpoint: str
+    url: str
+    page: str
+
+
+@dataclass(frozen=True)
+class FalSchema:
+    path: str
+    input_name: str | None
+    input_schema: dict[str, Any] | None
+    output_name: str | None
+    output_schema: dict[str, Any] | None
+
+
+def main() -> int:
+    args = parse_args()
+    primary_endpoint = normalize_endpoint(args.endpoint)
+    endpoints = [primary_endpoint]
+    linked_edit = linked_edit_endpoint(
+        primary_endpoint,
+        explicit=args.linked_edit,
+        text_signifier=args.text_signifier,
+        edit_signifier=args.edit_signifier,
+        enabled=not args.no_linked_edit,
+    )
+    if linked_edit:
+        endpoints.append(linked_edit)
+
+    print("# fal.ai Schema")
+    print()
+    print(f"- Requested endpoint: `{primary_endpoint}`")
+    if len(endpoints) > 1:
+        print(f"- Linked edit endpoint checked: `{endpoints[1]}`")
+    else:
+        print("- Linked edit endpoint checked: none")
+    print()
+
+    for index, endpoint in enumerate(endpoints):
+        if index:
+            print("---")
+            print()
+        try:
+            page = fetch_endpoint_page(endpoint)
+        except SystemExit as error:
+            if endpoint != primary_endpoint:
+                print(f"## Linked Endpoint: `{endpoint}`")
+                print()
+                print(f"- Warning: could not fetch linked endpoint: {error}")
+                print()
+                continue
+            raise
+        print_page_summary(page, paired=index > 0)
+
+    return 0
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="scripts/get_schema_falai",
+        description="Fetch fal.ai endpoint docs, schema, pricing, and linked edit endpoint information.",
+    )
+    parser.add_argument("endpoint", help="fal.ai endpoint id, shortened endpoint path, docs URL, or local HTML file")
+    parser.add_argument("--linked-edit", help="explicit linked edit endpoint id, shortened path, docs URL, or local HTML file")
+    parser.add_argument(
+        "--text-signifier",
+        default=None,
+        help="text endpoint suffix to replace when deriving a linked edit endpoint",
+    )
+    parser.add_argument(
+        "--edit-signifier",
+        default=None,
+        help="edit endpoint suffix to use when deriving a linked edit endpoint",
+    )
+    parser.add_argument(
+        "--no-linked-edit",
+        action="store_true",
+        help="do not check for a linked edit endpoint",
+    )
+    return parser.parse_args(sys.argv[1:])
+
+
+def linked_edit_endpoint(
+    primary_endpoint: str,
+    *,
+    explicit: str | None,
+    text_signifier: str,
+    edit_signifier: str,
+    enabled: bool,
+) -> str | None:
+    if not enabled:
+        return None
+    if explicit:
+        return normalize_endpoint(explicit)
+    if text_signifier is None and edit_signifier is None:
+        if primary_endpoint.endswith("/text-to-image"):
+            return primary_endpoint.removesuffix("/text-to-image") + "/edit"
+        return None
+    if not text_signifier or not edit_signifier:
+        raise SystemExit(
+            "--text-signifier and --edit-signifier must be provided together "
+            "when deriving a linked edit endpoint"
+        )
+
+    text_signifier = text_signifier.strip("/")
+    edit_signifier = edit_signifier.strip("/")
+    if text_signifier and primary_endpoint.endswith(f"/{text_signifier}"):
+        return primary_endpoint.removesuffix(f"/{text_signifier}") + f"/{edit_signifier}"
+    if text_signifier and primary_endpoint.endswith(text_signifier):
+        return primary_endpoint.removesuffix(text_signifier).rstrip("/") + f"/{edit_signifier}"
+    raise SystemExit(
+        f"endpoint `{primary_endpoint}` does not end with text signifier `{text_signifier}`"
+    )
+
+
+def normalize_endpoint(value: str) -> str:
+    value = value.strip()
+    if not value:
+        raise SystemExit("endpoint or URL must not be empty")
+
+    parsed = urlparse(value)
+    if parsed.scheme in {"http", "https"}:
+        match = re.search(r"/models/(.+?)(?:/api)?/?$", parsed.path)
+        if not match:
+            raise SystemExit(f"could not extract fal.ai endpoint from URL: {value}")
+        value = match.group(1)
+    elif Path(value).exists():
+        page = Path(value).read_text(encoding="utf-8", errors="replace")
+        endpoint = jsonld_endpoint(page)
+        if endpoint is None:
+            raise SystemExit(f"could not extract fal.ai endpoint from local file: {value}")
+        return endpoint
+
+    value = value.strip("/")
+    if value.startswith("models/"):
+        value = value.removeprefix("models/").removesuffix("/api").strip("/")
+    if not value.startswith("fal-ai/"):
+        value = f"fal-ai/{value}"
+    if "/" not in value.removeprefix("fal-ai/"):
+        raise SystemExit(f"endpoint must include a fal.ai model path, got: {value}")
+    return value
+
+
+def fetch_endpoint_page(endpoint: str) -> FalPage:
+    url = docs_url(endpoint)
+    try:
+        page = fetch(url)
+    except SystemExit:
+        fallback_url = docs_url(endpoint, api=False)
+        page = fetch(fallback_url)
+        url = fallback_url
+
+    embedded_endpoint = jsonld_endpoint(page)
+    if embedded_endpoint and embedded_endpoint != endpoint:
+        print(
+            f"Warning: page JSON-LD endpoint `{embedded_endpoint}` differs from requested `{endpoint}`.",
+            file=sys.stderr,
+        )
+    return FalPage(endpoint=embedded_endpoint or endpoint, url=url, page=page)
+
+
+def docs_url(endpoint: str, *, api: bool = True) -> str:
+    suffix = "/api" if api else ""
+    return f"https://fal.ai/models/{endpoint}{suffix}"
+
+
+def fetch(url: str) -> str:
+    request = Request(
+        url,
+        headers={
+            "Accept": "text/html,application/json",
+            "User-Agent": "imagegen-schema-fetch/0.1",
+        },
+    )
+    try:
+        with urlopen(request, timeout=30) as response:
+            return response.read().decode("utf-8", errors="replace")
+    except HTTPError as error:
+        raise SystemExit(f"HTTP {error.code} while fetching {url}") from error
+    except URLError as error:
+        raise SystemExit(f"Could not fetch {url}: {error.reason}") from error
+
+
+def print_page_summary(page: FalPage, *, paired: bool) -> None:
+    heading = "## Linked Edit Endpoint" if paired else "## Primary Endpoint"
+    print(f"{heading}: `{page.endpoint}`")
+    print()
+    print(f"- Documentation URL: <{page.url}>")
+    print(f"- Runtime URL: <https://fal.run/{page.endpoint}>")
+
+    metadata = jsonld_metadata(page.page)
+    if metadata.get("name"):
+        print(f"- Display name: {markdown_value(metadata['name'])}")
+    if metadata.get("description"):
+        print(f"- Description: {markdown_value(metadata['description'])}")
+
+    schema = extract_endpoint_schema(page.page, page.endpoint)
+    if schema is None:
+        print("- Warning: no embedded OpenAPI schema found for this endpoint.")
+    else:
+        print(f"- OpenAPI path: `{schema.path}`")
+        if schema.input_name:
+            print(f"- Input schema: `{schema.input_name}`")
+        if schema.output_name:
+            print(f"- Output schema: `{schema.output_name}`")
+    print()
+
+    if schema is not None:
+        print_schema(schema)
+
+    print_pricing(page.endpoint, page.page)
+    print_registry_hints(page.endpoint, schema, paired=paired)
+
+
+def jsonld_metadata(page: str) -> dict[str, Any]:
+    matches = re.findall(r'<meta name="application/ld\+json" content="(.*?)"', page)
+    for match in matches:
+        try:
+            data = json.loads(html.unescape(match))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict) and data.get("@type") == "WebAPI":
+            return data
+    return {}
+
+
+def jsonld_endpoint(page: str) -> str | None:
+    identifier = jsonld_metadata(page).get("identifier")
+    return identifier if isinstance(identifier, str) else None
+
+
+def extract_endpoint_schema(page: str, endpoint: str) -> FalSchema | None:
+    openapi = extract_openapi(page)
+    if openapi is None:
+        return None
+
+    path = endpoint_path(openapi, endpoint)
+    if path is None:
+        return None
+
+    post = openapi.get("paths", {}).get(path, {}).get("post", {})
+    if not isinstance(post, dict):
+        return None
+
+    input_ref = (
+        post.get("requestBody", {})
+        .get("content", {})
+        .get("application/json", {})
+        .get("schema", {})
+        .get("$ref")
+    )
+    output_ref = (
+        post.get("responses", {})
+        .get("200", {})
+        .get("content", {})
+        .get("application/json", {})
+        .get("schema", {})
+        .get("$ref")
+    )
+    schemas = openapi.get("components", {}).get("schemas", {})
+    input_name = ref_name(input_ref) if isinstance(input_ref, str) else None
+    output_name = ref_name(output_ref) if isinstance(output_ref, str) else None
+    input_schema = schemas.get(input_name) if input_name else None
+    output_schema = schemas.get(output_name) if output_name else None
+    return FalSchema(
+        path=path,
+        input_name=input_name,
+        input_schema=input_schema if isinstance(input_schema, dict) else None,
+        output_name=output_name,
+        output_schema=output_schema if isinstance(output_schema, dict) else None,
+    )
+
+
+def extract_openapi(page: str) -> dict[str, Any] | None:
+    for marker in ('\\"openapi\\":{', '"openapi":{'):
+        index = page.find(marker)
+        if index >= 0:
+            start = index + len(marker) - 1
+            decoded = page[start:].encode("utf-8").decode("unicode_escape")
+            return parse_first_json_object(decoded)
+    return None
+
+
+def parse_first_json_object(text: str) -> dict[str, Any] | None:
+    depth = 0
+    in_string = False
+    escaped = False
+    for index, char in enumerate(text):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    value = json.loads(text[: index + 1])
+                except json.JSONDecodeError:
+                    return None
+                return value if isinstance(value, dict) else None
+    return None
+
+
+def endpoint_path(openapi: dict[str, Any], endpoint: str) -> str | None:
+    paths = openapi.get("paths", {})
+    if not isinstance(paths, dict):
+        return None
+    matches = [
+        path
+        for path in paths
+        if isinstance(path, str) and endpoint.endswith(path.strip("/"))
+    ]
+    if not matches:
+        return None
+    return max(matches, key=len)
+
+
+def ref_name(ref: str) -> str:
+    return ref.rsplit("/", 1)[-1]
+
+
+def print_schema(schema: FalSchema) -> None:
+    if schema.input_schema:
+        print("### Input")
+        print()
+        required = schema.input_schema.get("required", [])
+        if required:
+            print("- Required: " + ", ".join(f"`{name}`" for name in required))
+        else:
+            print("- Required: none")
+        print()
+        print("| Order | Name | Type | Default | Choices | Bounds | Description |")
+        print("| ---: | --- | --- | --- | --- | --- | --- |")
+        for order, name, prop in ordered_properties(schema.input_schema):
+            print(parameter_row(order, name, prop, required))
+        print()
+
+    if schema.output_schema:
+        print("### Output")
+        print()
+        required = schema.output_schema.get("required", [])
+        if required:
+            print("- Required: " + ", ".join(f"`{name}`" for name in required))
+        print()
+        print("| Order | Name | Type | Description |")
+        print("| ---: | --- | --- | --- |")
+        for order, name, prop in ordered_properties(schema.output_schema):
+            print(
+                f"| {order} | `{name}` | {schema_type(prop)} | "
+                f"{markdown_value(prop.get('description', ''))} |"
+            )
+        print()
+
+
+def ordered_properties(schema: dict[str, Any]) -> list[tuple[int | str, str, dict[str, Any]]]:
+    order = schema.get("x-fal-order-properties", [])
+    properties = schema.get("properties", {})
+    if not isinstance(order, list):
+        order = []
+    if not isinstance(properties, dict):
+        return []
+    rows: list[tuple[int | str, str, dict[str, Any]]] = []
+    seen: set[str] = set()
+    for index, name in enumerate(order, start=1):
+        if isinstance(name, str) and isinstance(properties.get(name), dict):
+            rows.append((index, name, properties[name]))
+            seen.add(name)
+    for name, prop in sorted(properties.items()):
+        if name not in seen and isinstance(prop, dict):
+            rows.append(("", name, prop))
+    return rows
+
+
+def parameter_row(
+    order: int | str,
+    name: str,
+    prop: dict[str, Any],
+    required: list[str],
+) -> str:
+    label = f"`{name}`"
+    if name in required:
+        label += " *"
+    choices = ", ".join(f"`{choice}`" for choice in enum_choices(prop))
+    return (
+        f"| {order} | {label} | {schema_type(prop)} | "
+        f"{markdown_value(prop.get('default', ''))} | {choices} | "
+        f"{format_bounds(prop)} | {markdown_value(prop.get('description', ''))} |"
+    )
+
+
+def enum_choices(prop: dict[str, Any]) -> list[Any]:
+    if isinstance(prop.get("enum"), list):
+        return prop["enum"]
+    choices: list[Any] = []
+    for nested in prop.get("anyOf", []):
+        if isinstance(nested, dict) and isinstance(nested.get("enum"), list):
+            choices.extend(nested["enum"])
+    return choices
+
+
+def schema_type(prop: dict[str, Any]) -> str:
+    if "$ref" in prop:
+        return f"`{ref_name(str(prop['$ref']))}`"
+    if isinstance(prop.get("anyOf"), list):
+        return " or ".join(
+            schema_type(nested) for nested in prop["anyOf"] if isinstance(nested, dict)
+        )
+    type_name = prop.get("type", "unknown")
+    if type_name == "array" and isinstance(prop.get("items"), dict):
+        return f"array[{schema_type(prop['items'])}]"
+    return f"`{type_name}`"
+
+
+def format_bounds(prop: dict[str, Any]) -> str:
+    minimum = prop.get("minimum")
+    maximum = prop.get("maximum")
+    if minimum is None and maximum is None:
+        return ""
+    if minimum is None:
+        return f"<= `{maximum}`"
+    if maximum is None:
+        return f">= `{minimum}`"
+    return f"`{minimum}`-`{maximum}`"
+
+
+def print_pricing(endpoint: str, page: str) -> None:
+    print("### Pricing")
+    print()
+    pricing = fetch_platform_pricing(endpoint)
+    if pricing is not None:
+        print("- Source: `fal.ai Platform API`")
+        print(f"- Endpoint: `{endpoint}`")
+        print("```json")
+        print(json.dumps(pricing, indent=2, ensure_ascii=False, sort_keys=True))
+        print("```")
+        print()
+        return
+
+    page_billing = endpoint_billing(page, endpoint)
+    if page_billing is not None:
+        print("- Source: `fal.ai page endpointBilling`")
+        print(f"- Billing unit: `{page_billing.get('billing_unit', '')}`")
+        print(f"- Price: `{page_billing.get('price', '')}`")
+        if page_billing.get("provider_type"):
+            print(f"- Provider type: `{page_billing['provider_type']}`")
+        print()
+        return
+
+    print("- Source: `unknown`")
+    print("- Warning: no `FAL_KEY` was available for Platform API pricing, and no page billing was found.")
+    print()
+
+
+def fetch_platform_pricing(endpoint: str) -> dict[str, Any] | None:
+    key = os.getenv("FAL_KEY", "").strip() or dotenv_value("FAL_KEY")
+    if not key:
+        print(
+            "Warning: FAL_KEY is not set; fal.ai Platform API pricing was not fetched.",
+            file=sys.stderr,
+        )
+        return None
+    url = f"https://api.fal.ai/v1/models/pricing?endpoint_id={quote(endpoint, safe='')}"
+    request = Request(
+        url,
+        headers={
+            "Accept": "application/json",
+            "Authorization": f"Key {key}",
+            "User-Agent": "imagegen-schema-fetch/0.1",
+        },
+    )
+    try:
+        with urlopen(request, timeout=30) as response:
+            data = json.loads(response.read().decode("utf-8", errors="replace"))
+    except (HTTPError, URLError, json.JSONDecodeError) as error:
+        print(f"Warning: fal.ai Platform API pricing unavailable: {error}", file=sys.stderr)
+        return None
+    return data if isinstance(data, dict) else {"value": data}
+
+
+def dotenv_value(name: str) -> str:
+    path = Path(".env")
+    if not path.exists():
+        return ""
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        if key.strip() == name:
+            return value.strip().strip('"').strip("'")
+    return ""
+
+
+def endpoint_billing(page: str, endpoint: str) -> dict[str, Any] | None:
+    decoded = page.encode("utf-8").decode("unicode_escape")
+    marker = '"endpointBilling":'
+    index = 0
+    decoder = json.JSONDecoder()
+    while True:
+        index = decoded.find(marker, index)
+        if index < 0:
+            return None
+        start = index + len(marker)
+        try:
+            billing, offset = decoder.raw_decode(decoded[start:])
+        except json.JSONDecodeError:
+            index = start
+            continue
+        if isinstance(billing, dict) and billing.get("endpoint") == endpoint:
+            return billing
+        index = start + offset
+
+
+def print_registry_hints(endpoint: str, schema: FalSchema | None, *, paired: bool) -> None:
+    print("### Registry Hints")
+    print()
+    print(f"- Provider: `falai`")
+    print(f"- Provider endpoint: `{endpoint}`")
+    print(f"- Selector entry: `{'false' if paired else 'true'}`")
+    if paired:
+        print("- Link role: `edit-endpoint`")
+    elif endpoint.endswith("/text-to-image"):
+        print(f"- Suggested alias: `{suggested_alias(endpoint)}`")
+        print("- Suggested linked edit endpoint: use script output header or `--linked-edit`")
+    if schema and schema.input_schema:
+        fixed_inputs = fixed_provider_inputs(schema.input_schema)
+        if fixed_inputs:
+            print(f"- Fixed inputs: `{json.dumps(fixed_inputs, ensure_ascii=False)}`")
+        print()
+        for order, name, prop in ordered_properties(schema.input_schema):
+            if name in fixed_inputs:
+                continue
+            hints = {
+                "name": name,
+                "type": registry_type(name, prop),
+                "required": name in schema.input_schema.get("required", []),
+                "default": prop.get("default", ""),
+                "choices": enum_choices(prop),
+                "minimum": prop.get("minimum"),
+                "maximum": prop.get("maximum"),
+                "order": order,
+            }
+            compact = {
+                key: value
+                for key, value in hints.items()
+                if value not in (None, [], "")
+            }
+            print(f"- `{name}`: `{json.dumps(compact, ensure_ascii=False)}`")
+    print()
+
+
+def fixed_provider_inputs(input_schema: dict[str, Any]) -> dict[str, Any]:
+    properties = input_schema.get("properties", {})
+    if isinstance(properties, dict) and "enable_safety_checker" in properties:
+        return {"enable_safety_checker": False}
+    return {}
+
+
+def suggested_alias(endpoint: str) -> str:
+    match = re.search(r"/seedream/v(\d+)(?:\.(\d+))?/", endpoint)
+    if match:
+        return f"seedream{match.group(1)}{match.group(2) or ''}"
+    return endpoint.rsplit("/", 1)[0].rsplit("/", 1)[-1].replace("-", "_").replace(".", "")
+
+
+def registry_type(name: str, prop: dict[str, Any]) -> str:
+    if name in {"prompt"}:
+        return "textarea"
+    if name.endswith("_url") or name.endswith("_urls"):
+        return "image upload"
+    if enum_choices(prop):
+        return "select"
+    if prop.get("type") in {"boolean", "integer", "number", "string", "array"}:
+        return str(prop["type"])
+    if isinstance(prop.get("anyOf"), list):
+        nested_types = [nested.get("type") for nested in prop["anyOf"] if isinstance(nested, dict)]
+        if "integer" in nested_types:
+            return "seed" if name == "seed" else "integer"
+    return "string"
+
+
+def markdown_value(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    if isinstance(value, bool):
+        return "`true`" if value else "`false`"
+    if isinstance(value, (int, float)):
+        return f"`{value}`"
+    if isinstance(value, (dict, list)):
+        text = json.dumps(value, ensure_ascii=False)
+    else:
+        text = str(value)
+    text = text.replace("`", "\\`").replace("|", "\\|").replace("\n", " ")
+    return f"`{text}`"
+
+
+raise SystemExit(main())
+PY
