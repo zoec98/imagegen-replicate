@@ -99,6 +99,15 @@ select:not(:disabled):hover,
   margin: 0;
 }
 
+.provider-empty {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  color: #9a3412;
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+}
+
 .model-label-row {
   align-items: center;
   display: inline-flex;

@@ -23,11 +23,15 @@ from imagegen.app_version import app_checksum
 from imagegen.gallery import IMAGE_EXTENSIONS, list_gallery_images
 from imagegen.image_export import ImageExportError, clean_image_export
 from imagegen.model_registry import (
-    MODEL_REGISTRY,
     CustomDimensionsControl,
+    GenerationTarget,
     ModelPricing,
     ModelParameter,
+    ProviderInfo,
     ReplicateModel,
+    default_model_for_provider,
+    list_models_for_provider,
+    list_providers,
 )
 from imagegen.palettes import Palette, PaletteFragment, PaletteRepository
 from imagegen.security import ensure_csrf_token
@@ -37,6 +41,17 @@ def register_routes(app: Flask) -> None:
     @app.get("/")
     def index():
         app_config = app.config["IMAGEGEN_APP_CONFIG"]
+        selected_provider = app_config.selected_provider
+        selected_provider_model = (
+            default_model_for_provider(selected_provider)
+            if selected_provider is not None
+            else None
+        )
+        target = (
+            selected_provider_model.text_target
+            if selected_provider_model is not None
+            else None
+        )
         return render_template(
             "index.html",
             images=list_gallery_images(
@@ -49,11 +64,18 @@ def register_routes(app: Flask) -> None:
                 metadata_provider=app.config["IMAGEGEN_METADATA_PROVIDER"],
             ),
             model=app_config.model,
+            selected_provider=selected_provider,
+            selected_provider_model=selected_provider_model,
+            has_generation_provider=app_config.has_generation_provider,
+            providers=[
+                _provider_json(provider)
+                for provider in list_providers()
+                if provider.id in app_config.enabled_providers
+            ],
             model_registry=[
-                _model_json(model)
-                for model in sorted(
-                    MODEL_REGISTRY.values(), key=lambda item: item.alias
-                )
+                _provider_model_json(provider_model)
+                for provider in app_config.enabled_providers
+                for provider_model in list_models_for_provider(provider)
             ],
             palettes=[
                 _palette_json(palette)
@@ -65,11 +87,10 @@ def register_routes(app: Flask) -> None:
             parameters=[
                 parameter
                 for parameter in sorted(
-                    app_config.model.parameters,
+                    target.parameters if target is not None else (),
                     key=lambda item: item.order if item.order is not None else 999,
                 )
-                if parameter.name
-                not in {"prompt", app_config.model.source_image_parameter}
+                if parameter.name not in {"prompt"}
             ],
             prompt="",
             csrf_token=ensure_csrf_token(),
@@ -171,6 +192,55 @@ def _model_json(model: ReplicateModel) -> dict[str, object]:
             if parameter.name not in {"prompt", model.source_image_parameter}
         ],
     }
+
+
+def _provider_json(provider: ProviderInfo) -> dict[str, object]:
+    return {
+        "id": provider.id,
+        "display_name": provider.display_name,
+    }
+
+
+def _provider_model_json(model) -> dict[str, object]:
+    target = model.text_target
+    return {
+        "provider": model.provider,
+        "alias": model.alias,
+        "display_name": model.display_name,
+        "provider_model": target.provider_model,
+        "replicate_model": (
+            target.provider_model if model.provider == "replicate" else None
+        ),
+        "edit_capable": model.edit_capable,
+        "source_image_parameter": (
+            model.edit_target.source_images.provider_field
+            if model.edit_target is not None and model.edit_target.source_images is not None
+            else None
+        ),
+        "source_image_max": (
+            model.edit_target.source_images.max_count
+            if model.edit_target is not None and model.edit_target.source_images is not None
+            else 0
+        ),
+        "custom_dimensions": _custom_dimensions_json(target.custom_dimensions),
+        "pricing": [_pricing_json(pricing) for pricing in target.pricing],
+        "parameters": _target_parameter_json(target),
+    }
+
+
+def _target_parameter_json(target: GenerationTarget) -> list[dict[str, object]]:
+    source_parameter = (
+        target.source_images.provider_field if target.source_images is not None else None
+    )
+    return [
+        _parameter_json(parameter)
+        for parameter in sorted(
+            target.parameters,
+            key=lambda item: item.order if item.order is not None else 999,
+        )
+        if parameter.name not in {"prompt", source_parameter}
+        and parameter.name not in target.fixed_inputs
+    ]
 
 
 def _pricing_json(pricing: ModelPricing) -> dict[str, object]:

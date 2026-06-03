@@ -35,12 +35,20 @@
           <div class="prompt-bar">
             <div class="model-heading">
               <span class="model-label-row">
+                <label class="model-selector-label" for="provider-selector">Provider</label>
                 <label class="model-selector-label" for="model-selector">Model</label>
               </span>
               <div class="model-control-row">
-                <select id="model-selector" name="model">
+                <select id="provider-selector" name="provider" {% if not has_generation_provider %}disabled{% endif %}>
+                  {% for provider in providers %}
+                    <option value="{{ provider.id }}" {% if provider.id == selected_provider %}selected{% endif %}>{{ provider.display_name }}</option>
+                  {% endfor %}
+                </select>
+                <select id="model-selector" name="model" {% if not has_generation_provider %}disabled{% endif %}>
                   {% for registry_model in model_registry %}
-                    <option value="{{ registry_model.alias }}" {% if registry_model.alias == model.alias %}selected{% endif %}>{{ registry_model.display_name }}</option>
+                    {% if registry_model.provider == selected_provider %}
+                      <option value="{{ registry_model.alias }}" {% if selected_provider_model and registry_model.alias == selected_provider_model.alias %}selected{% endif %}>{{ registry_model.display_name }}</option>
+                    {% endif %}
                   {% endfor %}
                 </select>
                 <div class="edit-controls">
@@ -77,9 +85,17 @@
                   {% endfor %}
                 </span>
               </span>
-              <button class="generate-button" type="submit" data-default-label="Generate">Generate</button>
+              <button
+                class="generate-button"
+                type="submit"
+                data-default-label="Generate"
+                {% if not has_generation_provider %}disabled{% endif %}
+              >Generate</button>
             </div>
           </div>
+          {% if not has_generation_provider %}
+            <p class="provider-empty" role="status">No image generation provider is configured. Set REPLICATE_API_TOKEN or FAL_KEY.</p>
+          {% endif %}
           <textarea id="prompt" name="prompt" rows="9">{{ prompt }}</textarea>
           {% if palettes %}
             <div class="palette-controls" aria-label="Prompt palettes">

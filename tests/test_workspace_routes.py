@@ -34,7 +34,11 @@ def test_index_renders_prompt_form(app_factory):
     assert b'data-api-app-version-url="/api/app-version"' in response.data
     assert b'data-poll-seconds="1.0"' in response.data
     assert b'class="messages" aria-live="polite"' in response.data
+    assert b'id="provider-selector"' in response.data
     assert b'id="model-selector"' in response.data
+    assert response.data.index(b'id="provider-selector"') < response.data.index(
+        b'id="model-selector"'
+    )
     assert b'class="edit-toggle"' in response.data
     assert b'class="source-counter" aria-live="polite">0 selected' in response.data
     assert b'class="source-clear"' in response.data
@@ -63,9 +67,16 @@ def test_index_exposes_model_registry_metadata(app_factory):
     response = client.get("/")
     registry = extract_model_registry(response)
 
-    aliases = {model["alias"] for model in registry}
-    assert aliases == set(MODEL_REGISTRY)
-    seedream = next(model for model in registry if model["alias"] == "seedream45")
+    replicate_models = [model for model in registry if model["provider"] == "replicate"]
+    falai_models = [model for model in registry if model["provider"] == "falai"]
+    assert {model["alias"] for model in replicate_models} == set(MODEL_REGISTRY)
+    assert falai_models == []
+    seedream = next(
+        model
+        for model in registry
+        if model["provider"] == "replicate" and model["alias"] == "seedream45"
+    )
+    assert seedream["provider_model"] == "bytedance/seedream-4.5"
     assert seedream["edit_capable"] is True
     assert seedream["source_image_max"] == 14
     assert seedream["pricing"] == [
@@ -78,7 +89,11 @@ def test_index_exposes_model_registry_metadata(app_factory):
             "metric_count": 1,
         }
     ]
-    flux = next(model for model in registry if model["alias"] == "flux-flex")
+    flux = next(
+        model
+        for model in registry
+        if model["provider"] == "replicate" and model["alias"] == "flux-flex"
+    )
     assert flux["display_name"] == "Flux 2 Flex"
     assert flux["edit_capable"] is True
     assert flux["source_image_parameter"] == "input_images"
@@ -117,6 +132,81 @@ def test_index_exposes_model_registry_metadata(app_factory):
     )
     assert seed["semantic_type"] == "seed"
     assert "prompt" not in {parameter["name"] for parameter in flux["parameters"]}
+
+
+def test_index_renders_only_enabled_provider_options(app_config, app_factory):
+    app = app_factory(
+        IMAGEGEN_APP_CONFIG=replace(
+            app_config,
+            replicate_api_token="replicate-token",
+            fal_key="fal-key",
+            enabled_providers=("replicate", "falai"),
+            selected_provider="replicate",
+        )
+    )
+    client = app.test_client()
+
+    response = client.get("/")
+
+    assert b'<option value="replicate" selected>Replicate</option>' in response.data
+    assert b'<option value="falai" >fal.ai</option>' in response.data
+
+
+def test_index_exposes_provider_scoped_models_when_falai_is_enabled(
+    app_config,
+    app_factory,
+):
+    app = app_factory(
+        IMAGEGEN_APP_CONFIG=replace(
+            app_config,
+            replicate_api_token="replicate-token",
+            fal_key="fal-key",
+            enabled_providers=("replicate", "falai"),
+            selected_provider="replicate",
+        )
+    )
+    client = app.test_client()
+
+    response = client.get("/")
+    registry = extract_model_registry(response)
+
+    falai_seedream = next(
+        model
+        for model in registry
+        if model["provider"] == "falai" and model["alias"] == "seedream45"
+    )
+    assert falai_seedream["provider_model"] == (
+        "fal-ai/bytedance/seedream/v4.5/text-to-image"
+    )
+    assert {parameter["name"] for parameter in falai_seedream["parameters"]} >= {
+        "image_size",
+        "num_images",
+    }
+    assert "size" not in {
+        parameter["name"] for parameter in falai_seedream["parameters"]
+    }
+
+
+def test_index_renders_no_provider_state(app_config, app_factory):
+    app = app_factory(
+        IMAGEGEN_APP_CONFIG=replace(
+            app_config,
+            replicate_api_token="",
+            fal_key="",
+            enabled_providers=(),
+            selected_provider=None,
+        )
+    )
+    client = app.test_client()
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b"No image generation provider is configured." in response.data
+    assert b'id="provider-selector" name="provider" disabled' in response.data
+    assert b'id="model-selector" name="model" disabled' in response.data
+    assert b'class="generate-button"' in response.data
+    assert b"disabled\n              >Generate" in response.data
 
 def test_index_exposes_empty_palette_data_when_fragment_root_is_missing(app_factory):
     client = app_factory().test_client()

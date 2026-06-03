@@ -5,6 +5,7 @@
   }
 
   const promptInput = form.querySelector("#prompt");
+  const providerSelector = form.querySelector("#provider-selector");
   const modelSelector = form.querySelector("#model-selector");
   const pricingInfo = form.querySelector(".pricing-info");
   const pricingTooltip = form.querySelector(".pricing-tooltip");
@@ -60,13 +61,45 @@
   let armedDeleteButton = null;
   let editModeEnabled = false;
 
+  function selectedProvider() {
+    return providerSelector?.value || null;
+  }
+
+  function modelsForProvider(provider) {
+    return modelRegistry.filter((model) => model.provider === provider);
+  }
+
   function selectedModel() {
+    const provider = selectedProvider();
     const selectedAlias = modelSelector?.value;
+    const providerModels = modelsForProvider(provider);
     return (
-      modelRegistry.find((model) => model.alias === selectedAlias) ||
-      modelRegistry[0] ||
+      providerModels.find((model) => model.alias === selectedAlias) ||
+      providerModels[0] ||
       null
     );
+  }
+
+  function renderModelOptions(provider) {
+    if (!modelSelector) {
+      return selectedModel();
+    }
+    const providerModels = modelsForProvider(provider);
+    const previous = modelSelector.value;
+    modelSelector.replaceChildren();
+    providerModels.forEach((model) => {
+      const option = document.createElement("option");
+      option.value = model.alias;
+      option.textContent = model.display_name;
+      modelSelector.append(option);
+    });
+    if (providerModels.some((model) => model.alias === previous)) {
+      modelSelector.value = previous;
+    } else if (providerModels[0]) {
+      modelSelector.value = providerModels[0].alias;
+    }
+    modelSelector.disabled = providerModels.length === 0;
+    return selectedModel();
   }
 
   function showMessage(text, category) {
@@ -522,7 +555,8 @@
     if (!generateButton) {
       return;
     }
-    generateButton.disabled = isGenerating || isPageStale;
+    const hasProviderModel = Boolean(selectedModel());
+    generateButton.disabled = isGenerating || isPageStale || !hasProviderModel;
     generateButton.setAttribute("aria-busy", isGenerating ? "true" : "false");
     generateButton.textContent = isGenerating
       ? "Generating"
@@ -591,6 +625,7 @@
 
   function collectGenerationPayload(prompt) {
     const payload = {
+      provider: providerSelector?.value || undefined,
       model: modelSelector?.value || undefined,
       prompt,
       parameters: collectParameters(),
@@ -723,6 +758,15 @@
 
   function modelForMetadata(metadata) {
     if (metadata.model_alias) {
+      if (metadata.provider) {
+        return (
+          modelRegistry.find(
+            (model) =>
+              model.provider === metadata.provider &&
+              model.alias === metadata.model_alias,
+          ) || null
+        );
+      }
       return modelRegistry.find((model) => model.alias === metadata.model_alias) || null;
     }
     if (metadata.model) {
@@ -768,6 +812,10 @@
 
     const nextParameters = parametersForModel(metadata.parameters, model);
     promptInput.value = metadata.prompt;
+    if (providerSelector && model.provider) {
+      providerSelector.value = model.provider;
+      renderModelOptions(model.provider);
+    }
     modelSelector.value = model.alias;
     selectedSourceImages.clear();
     editModeEnabled = false;
@@ -1273,6 +1321,16 @@
   checkAppFreshness().catch((error) => {
     showMessage(error.message || "App version check failed.", "error");
   });
+  providerSelector?.addEventListener("change", () => {
+    const model = renderModelOptions(selectedProvider());
+    selectedSourceImages.clear();
+    editModeEnabled = false;
+    sourceStatus("");
+    renderPricing(model);
+    renderParameters(model);
+    updateSourceSelectionUi();
+    setGenerating(false);
+  });
   modelSelector?.addEventListener("change", () => {
     const model = selectedModel();
     selectedSourceImages.clear();
@@ -1423,6 +1481,7 @@
       renderParameters(selectedModel());
     }
   });
+  renderModelOptions(selectedProvider());
   renderPricing(selectedModel());
   renderParameters(selectedModel());
   populatePaletteEditor();

@@ -8,7 +8,7 @@ Developer and agent contribution guidance lives in [AGENTS.md](AGENTS.md).
 
 - Python 3.14 or newer, matching the project configuration.
 - `uv`.
-- A Replicate account and API token for real generation requests.
+- A Replicate API token or fal.ai API key for real generation requests.
 
 ## Installation
 
@@ -24,10 +24,11 @@ Install the project environment:
 uv sync
 ```
 
-Set your Replicate API token:
+Set at least one provider API key:
 
 ```bash
 export REPLICATE_API_TOKEN="your-token"
+export FAL_KEY="your-key"
 ```
 
 For local development, you can place environment setup in a local `.env` file. Do not commit secrets. See `.env.example` for supported configuration.
