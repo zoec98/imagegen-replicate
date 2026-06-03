@@ -23,9 +23,11 @@ def test_run_generation_request_succeeded_updates_request(app_config):
     source_path.parent.mkdir(parents=True)
     source_path.write_bytes(b"image")
     record = store.create(
+        provider="replicate",
         prompt="a red house",
         parameters={"size": "2K"},
         source_images=["source.png"],
+        edit_mode=True,
     )
 
     def fake_generate(prompt, config, *, parameters, source_image_paths):
@@ -53,7 +55,7 @@ def test_run_generation_request_succeeded_updates_request(app_config):
 
 def test_run_generation_request_failed_updates_error(app_config):
     store = RequestStore()
-    record = store.create(prompt="a red house", parameters={})
+    record = store.create(provider="replicate", prompt="a red house", parameters={})
 
     def fake_generate(prompt, config, *, parameters, source_image_paths):
         raise RuntimeError("Replicate failed.")
@@ -66,7 +68,7 @@ def test_run_generation_request_failed_updates_error(app_config):
 
 def test_run_generation_request_timeout_updates_timeout(app_config):
     store = RequestStore()
-    record = store.create(prompt="a red house", parameters={})
+    record = store.create(provider="replicate", prompt="a red house", parameters={})
 
     def fake_generate(prompt, config, *, parameters, source_image_paths):
         raise ReplicatePredictionTimeout("Timed out.")
@@ -79,7 +81,7 @@ def test_run_generation_request_timeout_updates_timeout(app_config):
 
 def test_run_generation_request_logs_lifecycle_and_results(app_config):
     store = RequestStore()
-    record = store.create(prompt="a red house", parameters={})
+    record = store.create(provider="replicate", prompt="a red house", parameters={})
     generation_log = SQLiteGenerationLog(app_config.generation_log_path)
     generation_log.initialize()
     generation_log.create_request(
@@ -132,7 +134,7 @@ def test_run_generation_request_logs_lifecycle_and_results(app_config):
 
 def test_run_generation_request_persists_multiple_assets(app_config):
     store = RequestStore()
-    record = store.create(prompt="a red house", parameters={})
+    record = store.create(provider="replicate", prompt="a red house", parameters={})
     generation_log = SQLiteGenerationLog(app_config.generation_log_path)
     generation_log.initialize()
     generation_log.create_request(
@@ -190,7 +192,7 @@ def test_run_generation_request_persists_multiple_assets(app_config):
 
 def test_run_generation_request_logs_failure(app_config):
     store = RequestStore()
-    record = store.create(prompt="a red house", parameters={})
+    record = store.create(provider="replicate", prompt="a red house", parameters={})
     generation_log = SQLiteGenerationLog(app_config.generation_log_path)
     generation_log.initialize()
     generation_log.create_request(
@@ -223,6 +225,7 @@ def test_run_generation_request_logs_failure(app_config):
 def test_run_generation_request_uses_request_model(app_config):
     store = RequestStore()
     record = store.create(
+        provider="replicate",
         model_alias="flux-flex",
         prompt="a red house",
         parameters={"guidance": 5.5},
@@ -245,7 +248,7 @@ def test_run_generation_request_uses_request_model(app_config):
 
 def test_threaded_worker_start_returns_before_generation_completes(app_config):
     store = RequestStore()
-    record = store.create(prompt="a red house", parameters={})
+    record = store.create(provider="replicate", prompt="a red house", parameters={})
     started = Event()
     release = Event()
 

@@ -8,6 +8,8 @@ worker without changing browser-facing route names.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from flask import Flask, jsonify, request, url_for
 
 from imagegen.app_version import app_checksum
@@ -18,7 +20,16 @@ from imagegen.gallery import (
 )
 from imagegen.generation_log import GenerationLog
 from imagegen.immich_client import ImmichClient, ImmichUploadError
-from imagegen.model_registry import MODEL_REGISTRY, ReplicateModel
+from imagegen.model_registry import (
+    GenerationTarget,
+    ProviderId,
+    ProviderModel,
+    RegistryLookupError,
+    default_model_for_provider,
+    list_models_for_provider,
+    resolve_generation_target,
+    resolve_model_ref,
+)
 from imagegen.palettes import (
     Palette,
     PaletteConflictError,
@@ -28,7 +39,6 @@ from imagegen.palettes import (
     PaletteRepository,
 )
 from imagegen.prompt_annotations import strip_prompt_annotations
-from imagegen.replicate_client import build_prediction_input
 from imagegen.request_store import GenerationRequest, RequestStore
 from imagegen.security import require_api_csrf
 from imagegen.validation import ValidationError, validate_generation_payload
@@ -47,33 +57,35 @@ def register_api_routes(app: Flask) -> None:
         payload = request.get_json(silent=True) or {}
         app_config = app.config["IMAGEGEN_APP_CONFIG"]
         try:
-            selected_model = _selected_model(
-                payload, default_alias=app_config.model_alias
-            )
+            selection = _selected_generation_model(payload, app_config=app_config)
         except ValidationError as error:
             return jsonify({"error": str(error)}), 400
         try:
             validated = validate_generation_payload(
                 payload,
-                model=selected_model,
+                model=selection.model,
+                target=selection.target,
                 output_dir=app_config.output_dir,
             )
         except ValidationError as error:
             return jsonify({"error": str(error)}), 400
 
         record = _request_store(app).create(
-            model_alias=selected_model.alias,
+            provider=selection.provider,
+            model_alias=selection.model.alias,
             prompt=validated.prompt,
             parameters=validated.parameters,
             source_images=validated.source_images,
+            edit_mode=validated.edit_mode,
         )
         _generation_log(app).create_request(
             record,
-            model_alias=selected_model.alias,
-            model=selected_model.replicate_model,
-            replicate_input=build_prediction_input(
+            model_alias=selection.model.alias,
+            model=selection.target.provider_model,
+            replicate_input=_build_provider_request(
                 strip_prompt_annotations(validated.prompt),
-                selected_model,
+                selection.model,
+                selection.target,
                 parameters=validated.parameters,
                 source_image_inputs=validated.source_images,
             ),
@@ -276,17 +288,137 @@ def _immich_client(app: Flask) -> ImmichClient:
     )
 
 
-def _selected_model(
-    payload: dict[str, object], *, default_alias: str
-) -> ReplicateModel:
-    alias = payload.get("model", default_alias)
-    if not isinstance(alias, str) or not alias.strip():
+@dataclass(frozen=True)
+class SelectedGenerationModel:
+    provider: ProviderId
+    model: ProviderModel
+    target: GenerationTarget
+
+
+def _selected_generation_model(
+    payload: dict[str, object],
+    *,
+    app_config,
+) -> SelectedGenerationModel:
+    provider = _selected_provider(payload, app_config=app_config)
+    edit_mode = _selected_edit_mode(payload)
+    model = _selected_provider_model(payload, provider=provider)
+    try:
+        target = resolve_generation_target(
+            provider,
+            model.alias,
+            edit_mode=edit_mode,
+        )
+    except RegistryLookupError as error:
+        raise ValidationError(str(error)) from error
+    return SelectedGenerationModel(provider=provider, model=model, target=target)
+
+
+def _selected_provider(payload: dict[str, object], *, app_config) -> ProviderId:
+    if not app_config.enabled_providers:
+        raise ValidationError("No image generation provider is configured.")
+    raw_provider = payload.get("provider", app_config.selected_provider)
+    if raw_provider is None:
+        raise ValidationError("No image generation provider is configured.")
+    if not isinstance(raw_provider, str) or not raw_provider.strip():
+        raise ValidationError("provider must be a valid provider id.")
+    provider = raw_provider.strip()
+    if provider not in {"replicate", "falai"}:
+        choices = ", ".join(app_config.enabled_providers)
+        raise ValidationError(
+            f"Unknown provider: {provider}. Expected one of: {choices}."
+        )
+    if provider not in app_config.enabled_providers:
+        raise ValidationError(f"Provider `{provider}` is not enabled.")
+    return provider
+
+
+def _selected_edit_mode(payload: dict[str, object]) -> bool:
+    edit_mode = payload.get("edit_mode", False)
+    if not isinstance(edit_mode, bool):
+        raise ValidationError("edit_mode must be a boolean.")
+    return edit_mode
+
+
+def _selected_provider_model(
+    payload: dict[str, object],
+    *,
+    provider: ProviderId,
+) -> ProviderModel:
+    raw_model = payload.get("model")
+    if raw_model is None:
+        model = default_model_for_provider(provider)
+        if model is None:
+            raise ValidationError(f"Provider `{provider}` has no configured models.")
+        return model
+    if not isinstance(raw_model, str) or not raw_model.strip():
         raise ValidationError("model must be a valid model id.")
-    model = MODEL_REGISTRY.get(alias.strip())
-    if model is None:
-        choices = ", ".join(sorted(MODEL_REGISTRY))
-        raise ValidationError(f"Unknown model: {alias}. Expected one of: {choices}.")
+    model_ref = raw_model.strip()
+    try:
+        model = resolve_model_ref(model_ref, selected_provider=provider)
+    except RegistryLookupError as error:
+        if ":" not in model_ref:
+            choices = ", ".join(
+                provider_model.alias
+                for provider_model in list_models_for_provider(provider)
+            )
+            raise ValidationError(
+                f"Unknown model: {model_ref}. Expected one of: {choices}."
+            ) from error
+        raise ValidationError(str(error)) from error
+    if model.provider != provider:
+        raise ValidationError(
+            f"Model `{model_ref}` does not belong to provider `{provider}`."
+        )
     return model
+
+
+def _build_provider_request(
+    prompt: str,
+    model: ProviderModel,
+    target: GenerationTarget,
+    *,
+    parameters: dict[str, object] | None = None,
+    source_image_inputs: list[object] | None = None,
+) -> dict[str, object]:
+    custom_dimensions = target.custom_dimensions
+    use_custom_dimensions = (
+        custom_dimensions is not None
+        and parameters is not None
+        and parameters.get(custom_dimensions.activation_parameter)
+        == custom_dimensions.activation_value
+    )
+    provider_request: dict[str, object] = {}
+    source_image_parameter = (
+        model.edit_target.source_images.provider_field
+        if model.edit_target is not None and model.edit_target.source_images is not None
+        else None
+    )
+    for parameter in target.parameters:
+        if parameter.name == "prompt":
+            provider_request[parameter.name] = prompt
+        elif parameter.name == source_image_parameter:
+            continue
+        elif (
+            use_custom_dimensions
+            and custom_dimensions is not None
+            and parameter.name == custom_dimensions.scale_parameter
+        ):
+            continue
+        elif parameter.default != "":
+            provider_request[parameter.name] = parameter.default
+    if parameters:
+        provider_request.update(parameters)
+    if use_custom_dimensions and custom_dimensions is not None:
+        provider_request.pop(custom_dimensions.scale_parameter, None)
+    if source_image_inputs and target.source_images is not None:
+        provider_request[target.source_images.provider_field] = (
+            source_image_inputs[0]
+            if target.source_images.max_count == 1
+            else source_image_inputs
+        )
+    provider_request.update(target.fixed_inputs)
+    return provider_request
 
 
 def _request_json(app: Flask, record: GenerationRequest) -> dict[str, object]:

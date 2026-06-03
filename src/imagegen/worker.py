@@ -73,6 +73,16 @@ def run_generation_request(
     store.update(request_record.request_id, status="running")
     if generation_log is not None:
         generation_log.mark_started(request_record.request_id)
+    if request_record.provider != "replicate":
+        error = f"Provider `{request_record.provider}` is not implemented yet."
+        store.update(request_record.request_id, status="failed", error=error)
+        if generation_log is not None:
+            generation_log.mark_finished(
+                request_record.request_id,
+                status="failed",
+                error=error,
+            )
+        return
     request_model = MODEL_REGISTRY[request_record.model_alias]
     request_config = replace(
         app_config,

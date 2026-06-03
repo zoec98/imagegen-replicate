@@ -13,11 +13,13 @@ def test_request_store_creates_and_gets_queued_request():
     store = RequestStore()
 
     record = store.create(
+        provider="replicate",
         prompt="a small red house",
         parameters={"size": "2K"},
     )
 
     assert record.request_id
+    assert record.provider == "replicate"
     assert record.model_alias == "seedream45"
     assert record.status == "queued"
     assert record.prompt == "a small red house"
@@ -40,9 +42,11 @@ def test_request_store_unknown_request_returns_none():
 def test_request_store_status_transition_preserves_submission_data():
     store = RequestStore()
     record = store.create(
+        provider="replicate",
         prompt="prompt",
         parameters={"max_images": 1},
         source_images=["source.png"],
+        edit_mode=True,
     )
 
     updated = store.update(
@@ -57,6 +61,7 @@ def test_request_store_status_transition_preserves_submission_data():
     assert record.prompt == "prompt"
     assert record.parameters == {"max_images": 1}
     assert record.source_images == ["source.png"]
+    assert record.edit_mode is True
     assert record.prediction_id == "prediction-123"
     assert record.logs == ["prediction created"]
     assert record.updated_at >= record.created_at
@@ -64,7 +69,7 @@ def test_request_store_status_transition_preserves_submission_data():
 
 def test_request_store_succeeded_request_tracks_outputs_and_images():
     store = RequestStore()
-    record = store.create(prompt="prompt", parameters={})
+    record = store.create(provider="replicate", prompt="prompt", parameters={})
 
     store.update(
         record.request_id,
@@ -80,7 +85,7 @@ def test_request_store_succeeded_request_tracks_outputs_and_images():
 
 def test_request_store_failed_request_keeps_displayable_error():
     store = RequestStore()
-    record = store.create(prompt="prompt", parameters={})
+    record = store.create(provider="replicate", prompt="prompt", parameters={})
 
     store.update(record.request_id, status="failed", error="Replicate failed.")
 
@@ -90,7 +95,7 @@ def test_request_store_failed_request_keeps_displayable_error():
 
 def test_request_store_timeout_request_keeps_displayable_error():
     store = RequestStore()
-    record = store.create(prompt="prompt", parameters={})
+    record = store.create(provider="replicate", prompt="prompt", parameters={})
 
     store.update(record.request_id, status="timeout", error="Timed out.")
 

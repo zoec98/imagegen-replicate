@@ -13,8 +13,10 @@ from typing import Any
 
 from imagegen.model_registry import (
     CustomDimensionsControl,
+    GenerationTarget,
     ModelParameter,
     ReplicateModel,
+    ProviderModel,
 )
 from imagegen.prompt_annotations import (
     PromptAnnotationError,
@@ -38,7 +40,8 @@ class ValidationError(ValueError):
 def validate_generation_payload(
     payload: dict[str, Any],
     *,
-    model: ReplicateModel,
+    model: ProviderModel | ReplicateModel,
+    target: GenerationTarget | None = None,
     output_dir: Path,
 ) -> ValidatedGenerationRequest:
     prompt = str(payload.get("prompt", "")).strip()
@@ -60,10 +63,15 @@ def validate_generation_payload(
         payload.get("source_images"),
         edit_mode=edit_mode,
         model=model,
+        target=target,
         output_dir=output_dir,
     )
 
-    parameters = validate_model_parameters(raw_parameters, model=model)
+    parameters = validate_model_parameters(
+        raw_parameters,
+        model=model,
+        target=target,
+    )
     return ValidatedGenerationRequest(
         prompt=prompt,
         parameters=parameters,
@@ -82,7 +90,8 @@ def _validate_payload_source_images(
     value: Any,
     *,
     edit_mode: bool,
-    model: ReplicateModel,
+    model: ProviderModel | ReplicateModel,
+    target: GenerationTarget | None,
     output_dir: Path,
 ) -> list[str]:
     if not edit_mode:
@@ -96,11 +105,14 @@ def _validate_payload_source_images(
 
     if not model.edit_capable:
         raise ValidationError("This model does not accept edit requests.")
+    max_count = _source_image_max(model, target)
+    if max_count is None:
+        raise ValidationError("This model does not accept edit requests.")
 
     try:
         source_images = validate_source_images(
             value,
-            model=model,
+            max_count=max_count,
             output_dir=output_dir,
         )
     except SourceImageError as error:
@@ -113,14 +125,16 @@ def _validate_payload_source_images(
 def validate_model_parameters(
     raw_parameters: dict[str, Any],
     *,
-    model: ReplicateModel,
+    model: ProviderModel | ReplicateModel,
+    target: GenerationTarget | None = None,
 ) -> dict[str, object]:
-    registry_parameters = {parameter.name: parameter for parameter in model.parameters}
+    parameters = _model_parameters(model, target)
+    registry_parameters = {parameter.name: parameter for parameter in parameters}
     validated: dict[str, object] = {}
-    source_image_parameter = model.source_image_parameter
+    source_image_parameter = _source_image_parameter(model, target)
 
     for name in raw_parameters:
-        if name in model.fixed_inputs:
+        if name in _fixed_inputs(model, target):
             raise ValidationError(f"{name} is fixed by the server.")
         if name == "prompt":
             raise ValidationError("prompt must be submitted as a top-level field.")
@@ -132,7 +146,7 @@ def validate_model_parameters(
             raise ValidationError(f"Unknown parameter: {name}.")
 
     for parameter in sorted(
-        model.parameters,
+        parameters,
         key=lambda item: item.order if item.order is not None else 999,
     ):
         if parameter.name in {"prompt", source_image_parameter}:
@@ -151,6 +165,7 @@ def validate_model_parameters(
         validated,
         raw_parameters=raw_parameters,
         model=model,
+        target=target,
     )
 
 
@@ -189,9 +204,10 @@ def _normalize_model_parameters(
     validated: dict[str, object],
     *,
     raw_parameters: dict[str, Any],
-    model: ReplicateModel,
+    model: ProviderModel | ReplicateModel,
+    target: GenerationTarget | None,
 ) -> dict[str, object]:
-    control = model.custom_dimensions
+    control = _custom_dimensions(model, target)
     if control is None:
         return validated
 
@@ -275,3 +291,56 @@ def _validate_number(parameter: ModelParameter, value: Any) -> float:
     if parameter.maximum is not None and parsed > parameter.maximum:
         raise ValidationError(f"{parameter.name} must be at most {parameter.maximum}.")
     return parsed
+
+
+def _model_parameters(
+    model: ProviderModel | ReplicateModel,
+    target: GenerationTarget | None,
+) -> tuple[ModelParameter, ...]:
+    if target is not None:
+        return target.parameters
+    return model.parameters
+
+
+def _fixed_inputs(
+    model: ProviderModel | ReplicateModel,
+    target: GenerationTarget | None,
+) -> dict[str, object]:
+    if target is not None:
+        return dict(target.fixed_inputs)
+    return dict(model.fixed_inputs)
+
+
+def _custom_dimensions(
+    model: ProviderModel | ReplicateModel,
+    target: GenerationTarget | None,
+) -> CustomDimensionsControl | None:
+    if target is not None:
+        return target.custom_dimensions
+    return model.custom_dimensions
+
+
+def _source_image_parameter(
+    model: ProviderModel | ReplicateModel,
+    target: GenerationTarget | None,
+) -> str | None:
+    if isinstance(model, ReplicateModel):
+        return model.source_image_parameter
+    if model.edit_target is not None and model.edit_target.source_images is not None:
+        return model.edit_target.source_images.provider_field
+    if target is not None and target.source_images is not None:
+        return target.source_images.provider_field
+    return None
+
+
+def _source_image_max(
+    model: ProviderModel | ReplicateModel,
+    target: GenerationTarget | None,
+) -> int | None:
+    if isinstance(model, ReplicateModel):
+        return model.source_image_max if model.edit_capable else None
+    if model.edit_target is not None and model.edit_target.source_images is not None:
+        return model.edit_target.source_images.max_count
+    if target is not None and target.source_images is not None:
+        return target.source_images.max_count
+    return None

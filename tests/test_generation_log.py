@@ -123,9 +123,11 @@ def test_create_request_persists_recreatable_payload(tmp_path):
     log = SQLiteGenerationLog(tmp_path / "imagegen.sqlite3")
     log.initialize()
     record = RequestStore().create(
+        provider="replicate",
         prompt="edit this",
         parameters={"size": "2K"},
         source_images=["source.png"],
+        edit_mode=True,
     )
     replicate_input = {
         "prompt": "edit this",
@@ -158,7 +160,7 @@ def test_create_request_persists_recreatable_payload(tmp_path):
 def test_lifecycle_updates_status_and_elapsed_time(tmp_path):
     log = SQLiteGenerationLog(tmp_path / "imagegen.sqlite3")
     log.initialize()
-    record = RequestStore().create(prompt="prompt", parameters={})
+    record = RequestStore().create(provider="replicate", prompt="prompt", parameters={})
     log.create_request(
         record,
         model_alias="seedream45",
@@ -190,7 +192,7 @@ def test_lifecycle_updates_status_and_elapsed_time(tmp_path):
 def test_failed_request_persists_error_detail(tmp_path):
     log = SQLiteGenerationLog(tmp_path / "imagegen.sqlite3")
     log.initialize()
-    record = RequestStore().create(prompt="prompt", parameters={})
+    record = RequestStore().create(provider="replicate", prompt="prompt", parameters={})
     log.create_request(
         record,
         model_alias="seedream45",
@@ -211,7 +213,7 @@ def test_failed_request_persists_error_detail(tmp_path):
 def test_add_result_persists_stored_image_metadata(tmp_path):
     log = SQLiteGenerationLog(tmp_path / "imagegen.sqlite3")
     log.initialize()
-    record = RequestStore().create(prompt="prompt", parameters={})
+    record = RequestStore().create(provider="replicate", prompt="prompt", parameters={})
     log.create_request(
         record,
         model_alias="seedream45",
@@ -248,7 +250,7 @@ def test_add_result_persists_stored_image_metadata(tmp_path):
 def test_multiple_assets_share_one_lifecycle_row(tmp_path):
     log = SQLiteGenerationLog(tmp_path / "imagegen.sqlite3")
     log.initialize()
-    record = RequestStore().create(prompt="prompt", parameters={})
+    record = RequestStore().create(provider="replicate", prompt="prompt", parameters={})
     log.create_request(
         record,
         model_alias="seedream45",

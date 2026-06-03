@@ -45,10 +45,16 @@ def extract_palette_data(response):
 
 
 def expected_response_parameters(model, overrides=None):
+    source_image_parameter = getattr(model, "source_image_parameter", None)
+    if source_image_parameter is None:
+        source_images = getattr(model, "source_images", None)
+        source_image_parameter = (
+            source_images.provider_field if source_images is not None else None
+        )
     parameters = {
         parameter.name: parameter.default
         for parameter in model.parameters
-        if parameter.name not in {"prompt", model.source_image_parameter}
+        if parameter.name not in {"prompt", source_image_parameter}
         and parameter.default not in {"", ()}
     }
     parameters.update(overrides or {})

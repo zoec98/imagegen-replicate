@@ -12,9 +12,6 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 
 from imagegen.gallery import IMAGE_EXTENSIONS
-from imagegen.model_registry import ReplicateModel
-
-
 class SourceImageError(ValueError):
     pass
 
@@ -22,7 +19,7 @@ class SourceImageError(ValueError):
 def validate_source_images(
     value: object,
     *,
-    model: ReplicateModel,
+    max_count: int,
     output_dir: Path,
 ) -> list[str]:
     if value is None:
@@ -31,11 +28,9 @@ def validate_source_images(
         raise SourceImageError("source_images must be an array.")
     if not value:
         return []
-    if not model.edit_capable:
-        raise SourceImageError("This model does not accept source images.")
-    if len(value) > model.source_image_max:
+    if len(value) > max_count:
         raise SourceImageError(
-            f"source_images cannot contain more than {model.source_image_max} files."
+            f"source_images cannot contain more than {max_count} files."
         )
 
     return [

@@ -8,8 +8,11 @@ Behaviors protected:
 
 from dataclasses import replace
 
-from imagegen import api_routes
-from imagegen.model_registry import MODEL_REGISTRY
+from imagegen.model_registry import (
+    MODEL_REGISTRY,
+    PROVIDER_REGISTRIES,
+    resolve_model,
+)
 from route_helpers import extract_csrf_token, expected_response_parameters
 
 def test_api_generate_accepts_json_and_returns_request_id(app_factory):
@@ -147,6 +150,144 @@ def test_api_generate_rejects_unknown_model(app_factory):
     choices = ", ".join(sorted(MODEL_REGISTRY))
     assert response.json == {
         "error": f"Unknown model: unknown. Expected one of: {choices}."
+    }
+
+
+def test_api_generate_rejects_unknown_provider(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "provider": "unknown",
+            "model": "seedream45",
+            "prompt": "a small red house",
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {
+        "error": "Unknown provider: unknown. Expected one of: replicate."
+    }
+
+
+def test_api_generate_rejects_disabled_provider(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "provider": "falai",
+            "model": "seedream45",
+            "prompt": "a small red house",
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Provider `falai` is not enabled."}
+
+
+def test_api_generate_rejects_wrong_provider_model_alias(app_config, app_factory):
+    app_config = replace(
+        app_config,
+        fal_key="fal-key",
+        enabled_providers=("replicate", "falai"),
+    )
+    client = app_factory(IMAGEGEN_APP_CONFIG=app_config).test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "provider": "falai",
+            "model": "flux-flex",
+            "prompt": "a small red house",
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {
+        "error": "Unknown model: flux-flex. Expected one of: bria-fibo, ernie-image, ernie-image-turbo, seedream45."
+    }
+
+
+def test_api_generate_logs_falai_edit_requests_to_linked_endpoint(app_config, app_factory):
+    app_config = replace(
+        app_config,
+        fal_key="fal-key",
+        enabled_providers=("replicate", "falai"),
+    )
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "source.png").write_bytes(b"image")
+    client = app_factory(IMAGEGEN_APP_CONFIG=app_config).test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "provider": "falai",
+            "model": "seedream45",
+            "prompt": "edit this",
+            "edit_mode": True,
+            "source_images": ["source.png"],
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 202
+    assert response.json["provider"] == "falai"
+    request_log = client.application.config["IMAGEGEN_GENERATION_LOG"].get_logged_request(
+        response.json["request_id"]
+    )
+    assert request_log is not None
+    assert request_log.model == "fal-ai/bytedance/seedream/v4.5/edit"
+    assert request_log.request_sent["image_urls"] == ["source.png"]
+
+
+def test_api_generate_rejects_falai_edit_mode_without_linked_endpoint(
+    app_config,
+    app_factory,
+):
+    app_config = replace(
+        app_config,
+        fal_key="fal-key",
+        enabled_providers=("replicate", "falai"),
+    )
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "source.png").write_bytes(b"image")
+    client = app_factory(IMAGEGEN_APP_CONFIG=app_config).test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "provider": "falai",
+            "model": "ernie-image",
+            "prompt": "edit this",
+            "edit_mode": True,
+            "source_images": ["source.png"],
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {
+        "error": "Model `falai:ernie-image` does not support image edit mode."
     }
 
 def test_api_generate_rejects_invalid_annotation_before_request_creation(app_factory):
@@ -353,10 +494,11 @@ def test_api_generate_rejects_edit_mode_for_non_edit_model(
 ):
     app_config.output_dir.mkdir(parents=True)
     (app_config.output_dir / "source.png").write_bytes(b"image")
+    text_only = replace(resolve_model("replicate", "seedream45"), alias="text-only", edit_target=None)
     monkeypatch.setitem(
-        api_routes.MODEL_REGISTRY,
+        PROVIDER_REGISTRIES["replicate"],
         "text-only",
-        replace(MODEL_REGISTRY["seedream45"], alias="text-only", edit_capable=False),
+        text_only,
     )
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
@@ -375,7 +517,9 @@ def test_api_generate_rejects_edit_mode_for_non_edit_model(
     )
 
     assert response.status_code == 400
-    assert response.json == {"error": "This model does not accept edit requests."}
+    assert response.json == {
+        "error": "Model `replicate:text-only` does not support image edit mode."
+    }
 
 def test_api_generate_rejects_missing_source_image(app_factory):
     client = app_factory().test_client()

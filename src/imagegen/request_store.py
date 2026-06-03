@@ -13,6 +13,8 @@ from datetime import UTC, datetime
 from threading import Lock
 from typing import Literal
 
+from imagegen.model_registry import ProviderId
+
 
 RequestStatus = Literal["queued", "running", "succeeded", "failed", "timeout"]
 REQUEST_STATUSES: set[str] = {"queued", "running", "succeeded", "failed", "timeout"}
@@ -21,10 +23,12 @@ REQUEST_STATUSES: set[str] = {"queued", "running", "succeeded", "failed", "timeo
 @dataclass
 class GenerationRequest:
     request_id: str
+    provider: ProviderId
     model_alias: str
     prompt: str
     parameters: dict[str, object]
     source_images: list[str]
+    edit_mode: bool
     status: RequestStatus
     created_at: datetime
     updated_at: datetime
@@ -37,11 +41,13 @@ class GenerationRequest:
     def to_json(self) -> dict[str, object]:
         return {
             "request_id": self.request_id,
+            "provider": self.provider,
             "model": self.model_alias,
             "status": self.status,
             "prompt": self.prompt,
             "parameters": self.parameters,
             "source_images": self.source_images,
+            "edit_mode": self.edit_mode,
             "error": self.error,
             "prediction_id": self.prediction_id,
             "output_urls": self.output_urls,
@@ -62,18 +68,22 @@ class RequestStore:
     def create(
         self,
         *,
+        provider: ProviderId,
         prompt: str,
         parameters: dict[str, object],
         source_images: list[str] | None = None,
+        edit_mode: bool = False,
         model_alias: str = "seedream45",
     ) -> GenerationRequest:
         now = datetime.now(UTC)
         request_record = GenerationRequest(
             request_id=uuid.uuid4().hex,
+            provider=provider,
             model_alias=model_alias,
             prompt=prompt,
             parameters=dict(parameters),
             source_images=list(source_images or []),
+            edit_mode=edit_mode,
             status="queued",
             created_at=now,
             updated_at=now,
