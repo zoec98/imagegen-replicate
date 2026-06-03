@@ -12,7 +12,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from imagegen.model_registry import DEFAULT_MODEL_ALIAS, MODEL_REGISTRY, ReplicateModel
+from imagegen.model_registry import (
+    DEFAULT_MODEL_ALIAS,
+    MODEL_REGISTRY,
+    ProviderId,
+    ReplicateModel,
+)
 
 
 @dataclass(frozen=True)
@@ -27,6 +32,11 @@ ENV_SETTINGS: tuple[EnvSetting, ...] = (
         name="REPLICATE_API_TOKEN",
         default="",
         comment="Replicate API token. Leave empty until you are ready to call Replicate.",
+    ),
+    EnvSetting(
+        name="FAL_KEY",
+        default="",
+        comment="fal.ai API key. Leave empty until you are ready to call fal.ai.",
     ),
     EnvSetting(
         name="IMAGEGEN_DATA_DIR",
@@ -88,6 +98,9 @@ DEPRECATED_ENV_SETTING_NAMES = {
 @dataclass(frozen=True)
 class AppConfig:
     replicate_api_token: str
+    fal_key: str
+    enabled_providers: tuple[ProviderId, ...]
+    selected_provider: ProviderId | None
     data_dir: Path
     author: str
     immich_url: str
@@ -98,6 +111,10 @@ class AppConfig:
     flask_secret_key: str
     replicate_poll_seconds: float
     replicate_timeout_seconds: float
+
+    @property
+    def has_generation_provider(self) -> bool:
+        return self.selected_provider is not None
 
     @property
     def output_dir(self) -> Path:
@@ -167,8 +184,18 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
     if not data_dir.is_absolute():
         data_dir = env_file.parent / data_dir
 
+    replicate_api_token = os.getenv("REPLICATE_API_TOKEN", "").strip()
+    fal_key = os.getenv("FAL_KEY", "").strip()
+    enabled_providers = _enabled_providers(
+        replicate_api_token=replicate_api_token,
+        fal_key=fal_key,
+    )
+
     return AppConfig(
-        replicate_api_token=os.getenv("REPLICATE_API_TOKEN", "").strip(),
+        replicate_api_token=replicate_api_token,
+        fal_key=fal_key,
+        enabled_providers=enabled_providers,
+        selected_provider=_selected_provider(enabled_providers),
         data_dir=data_dir,
         author=os.getenv("AUTHOR", "Noname Changeme Nescio").strip(),
         immich_url=os.getenv("IMMICH_URL", "").strip().rstrip("/"),
@@ -265,3 +292,26 @@ def _float_env(name: str, default: float) -> float:
         msg = f"{name} must be greater than zero."
         raise ValueError(msg)
     return parsed
+
+
+def _enabled_providers(
+    *,
+    replicate_api_token: str,
+    fal_key: str,
+) -> tuple[ProviderId, ...]:
+    providers: list[ProviderId] = []
+    if replicate_api_token:
+        providers.append("replicate")
+    if fal_key:
+        providers.append("falai")
+    return tuple(providers)
+
+
+def _selected_provider(
+    enabled_providers: tuple[ProviderId, ...],
+) -> ProviderId | None:
+    if "replicate" in enabled_providers:
+        return "replicate"
+    if enabled_providers:
+        return enabled_providers[0]
+    return None

@@ -21,6 +21,9 @@ class NoopGenerationWorker:
 def app_config(tmp_path):
     return AppConfig(
         replicate_api_token="",
+        fal_key="",
+        enabled_providers=(),
+        selected_provider=None,
         data_dir=tmp_path,
         author="Test Author",
         immich_url="",

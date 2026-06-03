@@ -22,6 +22,7 @@ def test_ensure_env_file_creates_expected_defaults(tmp_path):
 
     content = env_path.read_text(encoding="utf-8")
     assert "REPLICATE_API_TOKEN=" in content
+    assert "FAL_KEY=" in content
     assert "IMAGEGEN_DATA_DIR=data" in content
     assert "AUTHOR=Noname Changeme Nescio" in content
     assert "IMAGEGEN_OUTPUT_DIR" not in content
@@ -40,6 +41,7 @@ def test_ensure_env_file_preserves_existing_values(tmp_path):
     env_path = tmp_path / ".env"
     env_path.write_text(
         "REPLICATE_API_TOKEN=existing-token\n"
+        "FAL_KEY=existing-fal-key\n"
         "IMAGEGEN_DATA_DIR=custom-data\n"
         "AUTHOR=Existing Author\n"
         "IMAGEGEN_OUTPUT_DIR=custom/images\n"
@@ -53,6 +55,7 @@ def test_ensure_env_file_preserves_existing_values(tmp_path):
 
     content = env_path.read_text(encoding="utf-8")
     assert "REPLICATE_API_TOKEN=existing-token" in content
+    assert "FAL_KEY=existing-fal-key" in content
     assert "IMAGEGEN_DATA_DIR=custom-data" in content
     assert "AUTHOR=Existing Author" in content
     assert "IMAGEGEN_OUTPUT_DIR" not in content
@@ -71,6 +74,7 @@ def test_write_env_example_uses_non_secret_defaults(tmp_path):
 
     content = example_path.read_text(encoding="utf-8")
     assert "REPLICATE_API_TOKEN=" in content
+    assert "FAL_KEY=" in content
     assert "IMAGEGEN_DATA_DIR=data" in content
     assert "AUTHOR=Noname Changeme Nescio" in content
     assert "IMAGEGEN_OUTPUT_DIR" not in content
@@ -84,6 +88,7 @@ def test_write_env_example_uses_non_secret_defaults(tmp_path):
 
 def test_load_config_reads_env_file(tmp_path, monkeypatch):
     monkeypatch.delenv("REPLICATE_API_TOKEN", raising=False)
+    monkeypatch.delenv("FAL_KEY", raising=False)
     monkeypatch.delenv("IMAGEGEN_DATA_DIR", raising=False)
     monkeypatch.delenv("AUTHOR", raising=False)
     monkeypatch.delenv("IMAGEGEN_MODEL", raising=False)
@@ -96,6 +101,7 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     env_path = tmp_path / ".env"
     env_path.write_text(
         "REPLICATE_API_TOKEN=test-token\n"
+        "FAL_KEY=fal-test-key\n"
         "IMAGEGEN_DATA_DIR=custom-data\n"
         "AUTHOR=Zoé Cordelier\n"
         "IMMICH_URL=https://immich.example.test/\n"
@@ -111,6 +117,10 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     config = load_config(env_path)
 
     assert config.replicate_api_token == "test-token"
+    assert config.fal_key == "fal-test-key"
+    assert config.enabled_providers == ("replicate", "falai")
+    assert config.selected_provider == "replicate"
+    assert config.has_generation_provider is True
     assert config.data_dir == tmp_path / "custom-data"
     assert config.author == "Zoé Cordelier"
     assert config.output_dir == tmp_path / "custom-data/images"
@@ -172,3 +182,51 @@ def test_load_config_does_not_override_existing_environment(tmp_path, monkeypatc
 
     assert config.replicate_api_token == "from-environment"
     assert os.environ["REPLICATE_API_TOKEN"] == "from-environment"
+
+
+def test_load_config_starts_with_no_generation_provider(tmp_path, monkeypatch):
+    monkeypatch.delenv("REPLICATE_API_TOKEN", raising=False)
+    monkeypatch.delenv("FAL_KEY", raising=False)
+    env_path = tmp_path / ".env"
+    env_path.write_text("", encoding="utf-8")
+
+    config = load_config(env_path)
+
+    assert config.replicate_api_token == ""
+    assert config.fal_key == ""
+    assert config.enabled_providers == ()
+    assert config.selected_provider is None
+    assert config.has_generation_provider is False
+
+
+def test_load_config_reports_replicate_enabled_from_token(tmp_path, monkeypatch):
+    monkeypatch.delenv("FAL_KEY", raising=False)
+    monkeypatch.setenv("REPLICATE_API_TOKEN", "replicate-token")
+    env_path = tmp_path / ".env"
+
+    config = load_config(env_path)
+
+    assert config.enabled_providers == ("replicate",)
+    assert config.selected_provider == "replicate"
+
+
+def test_load_config_reports_falai_enabled_from_key(tmp_path, monkeypatch):
+    monkeypatch.delenv("REPLICATE_API_TOKEN", raising=False)
+    monkeypatch.setenv("FAL_KEY", "fal-key")
+    env_path = tmp_path / ".env"
+
+    config = load_config(env_path)
+
+    assert config.enabled_providers == ("falai",)
+    assert config.selected_provider == "falai"
+
+
+def test_load_config_provider_default_prefers_replicate(tmp_path, monkeypatch):
+    monkeypatch.setenv("REPLICATE_API_TOKEN", "replicate-token")
+    monkeypatch.setenv("FAL_KEY", "fal-key")
+    env_path = tmp_path / ".env"
+
+    config = load_config(env_path)
+
+    assert config.enabled_providers == ("replicate", "falai")
+    assert config.selected_provider == "replicate"

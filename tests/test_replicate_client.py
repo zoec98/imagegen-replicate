@@ -59,6 +59,9 @@ class FailingCreatePredictionsApi:
 def app_config(tmp_path):
     return AppConfig(
         replicate_api_token="test-token",
+        fal_key="",
+        enabled_providers=("replicate",),
+        selected_provider="replicate",
         data_dir=tmp_path,
         author="Test Author",
         immich_url="",
