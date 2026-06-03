@@ -13,8 +13,17 @@ from pathlib import Path
 from typing import Protocol
 
 from imagegen.config import AppConfig
+from imagegen.falai_client import (
+    FalAIRequestTimeout,
+    generate_image_urls as generate_falai_image_urls,
+)
 from imagegen.generation_types import GenerationProviderTimeout, GenerationResult
-from imagegen.model_registry import MODEL_REGISTRY, ProviderId
+from imagegen.model_registry import (
+    MODEL_REGISTRY,
+    ProviderId,
+    resolve_generation_target,
+    resolve_model,
+)
 from imagegen.replicate_client import (
     ReplicatePredictionTimeout,
     generate_image_urls,
@@ -60,5 +69,39 @@ class ReplicateGenerationProvider:
             raise GenerationProviderTimeout(str(error)) from error
 
 
+class FalAIGenerationProvider:
+    def __init__(self, *, generate=generate_falai_image_urls) -> None:
+        self._generate = generate
+
+    def generate(
+        self,
+        request_record: GenerationRequest,
+        app_config: AppConfig,
+    ) -> GenerationResult:
+        request_model = resolve_model("falai", request_record.model_alias)
+        request_target = resolve_generation_target(
+            "falai",
+            request_record.model_alias,
+            edit_mode=request_record.edit_mode,
+        )
+        try:
+            return self._generate(
+                request_record.prompt,
+                app_config,
+                model=request_model,
+                target=request_target,
+                parameters=request_record.parameters,
+                source_image_paths=source_image_paths(
+                    request_record.source_images,
+                    output_dir=Path(app_config.output_dir),
+                ),
+            )
+        except FalAIRequestTimeout as error:
+            raise GenerationProviderTimeout(str(error)) from error
+
+
 def default_generation_providers() -> dict[ProviderId, GenerationProvider]:
-    return {"replicate": ReplicateGenerationProvider()}
+    return {
+        "replicate": ReplicateGenerationProvider(),
+        "falai": FalAIGenerationProvider(),
+    }

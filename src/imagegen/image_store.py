@@ -9,13 +9,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Protocol
 from urllib.parse import urlparse
 
 import httpx
 
 from imagegen.metadata_embed import write_embedded_metadata
 from imagegen.metadata_policy import synthesize_copyright
-from imagegen.model_registry import ProviderId, ReplicateModel
+from imagegen.model_registry import ProviderId
 
 
 SOFTWARE_NAME = "https://github.com/zoec98/imagegen-replicate"
@@ -27,6 +28,11 @@ CONTENT_TYPE_EXTENSIONS = {
     "image/webp": ".webp",
 }
 DOWNLOAD_SIZE_OVERHEAD_BYTES = 1024 * 1024
+DEFAULT_MAX_DOWNLOAD_BYTES = 4096 * 4096 * 3 + DOWNLOAD_SIZE_OVERHEAD_BYTES
+
+
+class StoredImageModel(Protocol):
+    alias: str
 
 
 @dataclass(frozen=True)
@@ -46,7 +52,7 @@ def persist_generated_images(
     urls: list[str],
     *,
     output_dir: Path,
-    model: ReplicateModel,
+    model: StoredImageModel,
     provider: ProviderId = "replicate",
     model_alias: str | None = None,
     provider_model: str | None = None,
@@ -86,7 +92,7 @@ def download_image(
     url: str,
     *,
     output_dir: Path,
-    model: ReplicateModel,
+    model: StoredImageModel,
     provider: ProviderId = "replicate",
     model_alias: str | None = None,
     provider_model: str | None = None,
@@ -123,7 +129,7 @@ def download_image(
         "created_at": created_at,
         "provider": provider,
         "model_alias": model_alias or model.alias,
-        "model": provider_model or model.replicate_model,
+        "model": provider_model or getattr(model, "replicate_model", model.alias),
         "prediction_id": prediction_id,
         "sequence": sequence,
         "prompt": prompt,
@@ -146,8 +152,12 @@ def download_image(
     )
 
 
-def max_download_bytes(model: ReplicateModel) -> int:
-    return model.default_width * model.default_height * 3 + DOWNLOAD_SIZE_OVERHEAD_BYTES
+def max_download_bytes(model: StoredImageModel) -> int:
+    default_width = getattr(model, "default_width", None)
+    default_height = getattr(model, "default_height", None)
+    if isinstance(default_width, int) and isinstance(default_height, int):
+        return default_width * default_height * 3 + DOWNLOAD_SIZE_OVERHEAD_BYTES
+    return DEFAULT_MAX_DOWNLOAD_BYTES
 
 
 def _extension_for(content_type: str, url: str) -> str:
