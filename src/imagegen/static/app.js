@@ -44,6 +44,7 @@
   const maskEditorBrushFalloffValue = maskEditorOverlay?.querySelector(
     ".mask-editor-brush-falloff-value",
   );
+  const maskEditorInvert = maskEditorOverlay?.querySelector(".mask-editor-invert");
   const maskEditorTitle = maskEditorOverlay?.querySelector("#mask-editor-title");
   const maskEditorClose = maskEditorOverlay?.querySelector(".mask-editor-close");
   const csrfToken = document
@@ -686,6 +687,16 @@
         const index = y * maskEditorMask.width + x;
         maskEditorMaskData[index] = Math.max(maskEditorMaskData[index], intensity);
       }
+    }
+    redrawMaskOverlay();
+  }
+
+  function invertMaskEditorData() {
+    if (!maskEditorMaskData) {
+      return;
+    }
+    for (let index = 0; index < maskEditorMaskData.length; index += 1) {
+      maskEditorMaskData[index] = 1 - Math.min(Math.max(maskEditorMaskData[index], 0), 1);
     }
     redrawMaskOverlay();
   }
@@ -1779,6 +1790,7 @@
   maskEditorMask?.addEventListener("pointerleave", stopMaskPainting);
   maskEditorBrushSizeInput?.addEventListener("input", updateMaskBrushControls);
   maskEditorBrushFalloffInput?.addEventListener("input", updateMaskBrushControls);
+  maskEditorInvert?.addEventListener("click", invertMaskEditorData);
   window.addEventListener("resize", () => {
     if (maskEditorOverlay && !maskEditorOverlay.hidden) {
       redrawMaskEditor();

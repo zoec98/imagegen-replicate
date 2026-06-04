@@ -104,6 +104,8 @@ Test focus:
 
 ## Ticket 5: Add Invert Mask
 
+Status: Completed.
+
 Goal: Let users swap masked and unmasked areas before saving.
 
 Scope:
