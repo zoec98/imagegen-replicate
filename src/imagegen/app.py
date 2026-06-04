@@ -31,6 +31,9 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     app.config.update(
         IMAGEGEN_APP_CONFIG=app_config,
         IMAGEGEN_METADATA_PROVIDER=EmbeddedImageMetadataProvider(),
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=False,
     )
     if config:
         app.config.update(config)

@@ -19,6 +19,15 @@ CSRF_TOKEN_BYTES = 32
 CSRF_SESSION_KEY = "csrf_token"
 CSRF_CLIENT_IP_SESSION_KEY = "csrf_client_ip"
 CSRF_HEADER = "X-CSRF-Token"
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self'; "
+    "style-src 'self'; "
+    "img-src 'self' data: blob:; "
+    "object-src 'none'; "
+    "base-uri 'none'; "
+    "frame-ancestors 'none'"
+)
 
 
 def ensure_csrf_token() -> str:
@@ -63,4 +72,7 @@ def require_api_csrf(handler: Callable[..., Any]) -> Callable[..., Any]:
 def no_cors_response(response: Response) -> Response:
     response.headers.pop("Access-Control-Allow-Origin", None)
     response.headers.pop("Access-Control-Allow-Credentials", None)
+    response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
     return response
