@@ -1,5 +1,7 @@
 # imagegen
 
+(Successor to https://github.com/zoec98/imagegen; feature parity or better than the previous version)
+
 `imagegen` is a Flask web application for preparing image generation and image edit requests, sending them to Replicate, and keeping the generated images available in a local gallery.
 
 Developer and agent contribution guidance lives in [AGENTS.md](AGENTS.md).
