@@ -22,6 +22,7 @@ IMAGE_EXTENSIONS = {".jpeg", ".jpg", ".png", ".webp"}
 class GalleryImage:
     filename: str
     url: str
+    mask_url: str
     metadata_url: str | None
     content_type: str | None
     created_at: str | None
@@ -80,12 +81,18 @@ def _gallery_image(
     return GalleryImage(
         filename=path.name,
         url=image_url(path.name),
+        mask_url=image_url(_mask_filename(path.name)),
         metadata_url=metadata_url(path.name)
         if metadata_url and metadata.exists
         else None,
         content_type=metadata.content_type,
         created_at=metadata.created_at,
     )
+
+
+def _mask_filename(filename: str) -> str:
+    path = Path(filename)
+    return f"{path.stem}-mask.png"
 
 
 def _trash_path(filename: str, *, trash_dir: Path) -> Path:

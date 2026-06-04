@@ -6,6 +6,8 @@ Decision captured from the open questions: implement the first mask editor with 
 
 ## Ticket 1: Add Gallery Mask Actions
 
+Status: Completed.
+
 Goal: Let users start mask creation from an eligible gallery image.
 
 Scope:

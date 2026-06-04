@@ -1067,6 +1067,9 @@
     if (image.clean_download_url) {
       figure.dataset.cleanDownloadUrl = image.clean_download_url;
     }
+    if (image.mask_url) {
+      figure.dataset.maskUrl = image.mask_url;
+    }
     if (image.metadata_url) {
       figure.dataset.metadataUrl = image.metadata_url;
     }
@@ -1135,6 +1138,12 @@
       "M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z",
       "Download without metadata",
     );
+    const maskButton = iconButton(
+      "gallery-mask",
+      `Create mask for ${image.filename}`,
+      "M7 20c-1.7 0-3-1.3-3-3 0-1.1.6-2.1 1.5-2.6L15 4.9c.9-.9 2.3-.9 3.2 0l.9.9c.9.9.9 2.3 0 3.2l-9.5 9.5C9.1 19.4 8.1 20 7 20zm1.2-3.1 8.8-8.8-1.1-1.1-8.8 8.8c-.4.4-.4.9 0 1.2.3.3.8.3 1.1-.1z",
+      "Create mask",
+    );
     const loadButton = iconButton(
       "gallery-load",
       `Load metadata from ${image.filename}`,
@@ -1148,7 +1157,7 @@
       "M9 3h6l1 2h4v2H4V5h4zm-3 6h12l-.7 11H6.7z",
       "Delete image",
     );
-    actions.append(infoWrap, loadButton, downloadLink, cleanDownloadLink);
+    actions.append(infoWrap, loadButton, downloadLink, cleanDownloadLink, maskButton);
     if (immichButton) {
       actions.append(immichButton);
     }

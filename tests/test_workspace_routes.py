@@ -351,16 +351,20 @@ def test_index_exposes_gallery_filenames_for_source_selection(app_config, app_fa
     assert response.status_code == 200
     assert b'data-filename="source.png"' in response.data
     assert b'data-delete-url="/api/images/source.png/delete"' in response.data
+    assert b'data-mask-url="/images/source-mask.png"' in response.data
     assert b'href="/images/source.png/download"' in response.data
     assert b'href="/images/source.png/download-clean"' in response.data
     assert b'class="gallery-action gallery-download"' in response.data
     assert b'class="gallery-action gallery-download-clean"' in response.data
+    assert b'class="gallery-action gallery-mask"' in response.data
     assert b'aria-label="Download source.png"' in response.data
     assert b'aria-label="Download clean source.png"' in response.data
+    assert b'aria-label="Create mask for source.png"' in response.data
     assert b'aria-label="Select source.png as source image"' in response.data
     assert b'title="Load metadata"' in response.data
     assert b'title="Download with metadata"' in response.data
     assert b'title="Download without metadata"' in response.data
+    assert b'title="Create mask"' in response.data
     assert b'title="Delete image"' in response.data
     assert b'class="image-type"' not in response.data
     assert b"gallery-immich" not in response.data
