@@ -114,10 +114,16 @@ def test_provider_model_lists_are_scoped_by_provider():
         "flux-2",
         "flux-2-pro",
         "flux-2-realism",
+        "gpt-image-2",
+        "gpt-image15",
+        "grok",
         "hidream-dev",
         "hidream-fast",
         "hidream-full",
+        "nano-banana-2",
+        "seedream",
         "seedream45",
+        "seedream5",
         "zit",
     } <= falai_aliases
     assert {model.provider for model in replicate_models} == {"replicate"}
@@ -192,6 +198,16 @@ def test_falai_plan_ticket_models_use_linked_edit_endpoints():
     expected = {
         "flux-2": ("fal-ai/flux-2/edit", "image_urls", 4),
         "flux-2-pro": ("fal-ai/flux-2-pro/edit", "image_urls", 10),
+        "gpt-image-2": ("openai/gpt-image-2/edit", "image_urls", 10),
+        "gpt-image15": ("fal-ai/gpt-image-1.5/edit", "image_urls", 10),
+        "grok": ("xai/grok-imagine-image/edit", "image_urls", 3),
+        "nano-banana-2": ("fal-ai/nano-banana-2/edit", "image_urls", 10),
+        "seedream": ("fal-ai/bytedance/seedream/v4/edit", "image_urls", 10),
+        "seedream5": (
+            "fal-ai/bytedance/seedream/v5/lite/edit",
+            "image_urls",
+            10,
+        ),
         "zit": ("fal-ai/z-image/turbo/image-to-image", "image_url", 1),
     }
     for alias, (provider_model, source_field, max_count) in expected.items():
@@ -211,6 +227,8 @@ def test_falai_models_keep_safety_checker_fixed_when_supported():
         "hidream-dev",
         "hidream-fast",
         "hidream-full",
+        "seedream",
+        "seedream5",
         "zit",
     ):
         target = resolve_generation_target("falai", alias, edit_mode=False)

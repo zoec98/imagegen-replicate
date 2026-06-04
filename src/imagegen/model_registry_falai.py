@@ -344,7 +344,12 @@ def _seedream_parameters(
 
 def _nano_banana_2_parameters() -> tuple[ModelParameter, ...]:
     return (
-        _param("prompt", "The text prompt to generate or edit the image.", "string", order=1),
+        _param(
+            "prompt",
+            "The text prompt to generate or edit the image.",
+            "string",
+            order=1,
+        ),
         _param(
             "num_images",
             "The number of images to generate.",
@@ -412,9 +417,7 @@ def _nano_banana_2_parameters() -> tuple[ModelParameter, ...]:
         _param(
             "thinking_level",
             "Optional model thinking level.",
-            "select",
-            "",
-            choices=("minimal", "high"),
+            "string",
             order=12,
         ),
     )
@@ -845,7 +848,9 @@ def _z_image_parameters(
 
 def _gpt_image15_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
     parameters = [
-        _param("prompt", "The prompt for image generation or editing.", "string", order=1),
+        _param(
+            "prompt", "The prompt for image generation or editing.", "string", order=1
+        ),
         _param(
             "image_size",
             "Aspect ratio for the generated image.",
@@ -917,7 +922,9 @@ def _gpt_image15_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
 
 def _gpt_image2_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
     parameters = [
-        _param("prompt", "The prompt for image generation or editing.", "string", order=1),
+        _param(
+            "prompt", "The prompt for image generation or editing.", "string", order=1
+        ),
         _param(
             "image_size",
             "The size of the generated image.",
@@ -953,7 +960,9 @@ def _gpt_image2_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
         ),
     ]
     if edit:
-        parameters.append(_param("mask_url", "Mask image URL for edits.", "string", order=8))
+        parameters.append(
+            _param("mask_url", "Mask image URL for edits.", "string", order=8)
+        )
     return tuple(parameters)
 
 
@@ -974,7 +983,9 @@ def _grok_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
             "Aspect ratio of the generated or edited image.",
             "select",
             "auto" if edit else "1:1",
-            choices=GROK_EDIT_ASPECT_RATIO_CHOICES if edit else GROK_ASPECT_RATIO_CHOICES,
+            choices=GROK_EDIT_ASPECT_RATIO_CHOICES
+            if edit
+            else GROK_ASPECT_RATIO_CHOICES,
             order=3,
         ),
         _param(
@@ -1286,7 +1297,7 @@ FLUX_2 = ProviderModel(
         documentation_url="https://fal.ai/models/fal-ai/flux-2/edit/api",
         runtime_url="https://fal.run/fal-ai/flux-2/edit",
         mode="image-edit",
-        parameters=_flux2_parameters(image_size_default=""),
+        parameters=_flux2_parameters(),
         fixed_inputs=FALAI_FIXED_SAFE_IMAGE_INPUTS,
         source_images=SourceImageBinding(provider_field="image_urls", max_count=4),
         pricing=(
@@ -1544,9 +1555,7 @@ GPT_IMAGE15 = ProviderModel(
         mode="text-to-image",
         parameters=_gpt_image15_parameters(edit=False),
         fixed_inputs=FALAI_FIXED_IMAGE_OUTPUT_INPUTS,
-        pricing=(
-            _falai_price("$1", "per billing unit", metric="billing_unit_count"),
-        ),
+        pricing=(_falai_price("$1", "per billing unit", metric="billing_unit_count"),),
     ),
     edit_target=GenerationTarget(
         provider="falai",
@@ -1559,9 +1568,7 @@ GPT_IMAGE15 = ProviderModel(
         parameters=_gpt_image15_parameters(edit=True),
         fixed_inputs=FALAI_FIXED_IMAGE_OUTPUT_INPUTS,
         source_images=SourceImageBinding(provider_field="image_urls", max_count=10),
-        pricing=(
-            _falai_price("$1", "per billing unit", metric="billing_unit_count"),
-        ),
+        pricing=(_falai_price("$1", "per billing unit", metric="billing_unit_count"),),
     ),
 )
 
@@ -1579,9 +1586,7 @@ GPT_IMAGE2 = ProviderModel(
         mode="text-to-image",
         parameters=_gpt_image2_parameters(edit=False),
         fixed_inputs=FALAI_FIXED_IMAGE_OUTPUT_INPUTS,
-        pricing=(
-            _falai_price("$1", "per billing unit", metric="billing_unit_count"),
-        ),
+        pricing=(_falai_price("$1", "per billing unit", metric="billing_unit_count"),),
     ),
     edit_target=GenerationTarget(
         provider="falai",
@@ -1594,9 +1599,7 @@ GPT_IMAGE2 = ProviderModel(
         parameters=_gpt_image2_parameters(edit=True),
         fixed_inputs=FALAI_FIXED_IMAGE_OUTPUT_INPUTS,
         source_images=SourceImageBinding(provider_field="image_urls", max_count=10),
-        pricing=(
-            _falai_price("$1", "per billing unit", metric="billing_unit_count"),
-        ),
+        pricing=(_falai_price("$1", "per billing unit", metric="billing_unit_count"),),
     ),
 )
 
