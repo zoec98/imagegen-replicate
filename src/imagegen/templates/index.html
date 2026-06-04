@@ -290,6 +290,18 @@
             </svg>
           </button>
         </div>
+        <div class="mask-editor-tools" aria-label="Mask brush controls">
+          <label class="mask-editor-tool">
+            <span>Brush size</span>
+            <input class="mask-editor-brush-size" type="range" min="8" max="160" step="1" value="48">
+            <output class="mask-editor-brush-size-value">48 px</output>
+          </label>
+          <label class="mask-editor-tool">
+            <span>Falloff</span>
+            <input class="mask-editor-brush-falloff" type="range" min="0" max="100" step="1" value="65">
+            <output class="mask-editor-brush-falloff-value">65%</output>
+          </label>
+        </div>
         <div class="mask-editor-stage">
           <div class="mask-editor-canvas-wrap">
             <canvas class="mask-editor-source" aria-hidden="true"></canvas>

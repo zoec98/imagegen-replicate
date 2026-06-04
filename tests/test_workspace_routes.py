@@ -68,6 +68,8 @@ def test_index_renders_prompt_form(app_factory):
     assert b'class="mask-editor-canvas-wrap"' in response.data
     assert b'class="mask-editor-source"' in response.data
     assert b'class="mask-editor-mask"' in response.data
+    assert b'class="mask-editor-brush-size"' in response.data
+    assert b'class="mask-editor-brush-falloff"' in response.data
     assert b'class="mask-editor-close"' in response.data
 
 

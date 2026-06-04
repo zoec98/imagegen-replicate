@@ -80,6 +80,8 @@ Test focus:
 
 ## Ticket 4: Add Brush Controls
 
+Status: Completed.
+
 Goal: Give users control over mask stroke size and edge falloff.
 
 Scope:

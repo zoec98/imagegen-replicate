@@ -32,6 +32,18 @@
   const maskEditorWrap = maskEditorOverlay?.querySelector(".mask-editor-canvas-wrap");
   const maskEditorSource = maskEditorOverlay?.querySelector(".mask-editor-source");
   const maskEditorMask = maskEditorOverlay?.querySelector(".mask-editor-mask");
+  const maskEditorBrushSizeInput = maskEditorOverlay?.querySelector(
+    ".mask-editor-brush-size",
+  );
+  const maskEditorBrushFalloffInput = maskEditorOverlay?.querySelector(
+    ".mask-editor-brush-falloff",
+  );
+  const maskEditorBrushSizeValue = maskEditorOverlay?.querySelector(
+    ".mask-editor-brush-size-value",
+  );
+  const maskEditorBrushFalloffValue = maskEditorOverlay?.querySelector(
+    ".mask-editor-brush-falloff-value",
+  );
   const maskEditorTitle = maskEditorOverlay?.querySelector("#mask-editor-title");
   const maskEditorClose = maskEditorOverlay?.querySelector(".mask-editor-close");
   const csrfToken = document
@@ -70,8 +82,8 @@
   let maskEditorSourceImage = null;
   let maskEditorMaskData = null;
   let maskEditorPainting = false;
-  const maskEditorBrushSize = 48;
-  const maskEditorBrushFalloff = 0.65;
+  let maskEditorBrushSize = 48;
+  let maskEditorBrushFalloff = 0.65;
 
   function selectedProvider() {
     return providerSelector?.value || null;
@@ -458,6 +470,30 @@
     updateSourceSelectionUi();
   }
 
+  function numberFromInput(input, fallback) {
+    const value = Number.parseFloat(input?.value || "");
+    return Number.isFinite(value) ? value : fallback;
+  }
+
+  function updateMaskBrushControls() {
+    maskEditorBrushSize = Math.max(
+      numberFromInput(maskEditorBrushSizeInput, maskEditorBrushSize),
+      1,
+    );
+    maskEditorBrushFalloff = Math.min(
+      Math.max(numberFromInput(maskEditorBrushFalloffInput, maskEditorBrushFalloff * 100), 0),
+      100,
+    ) / 100;
+    if (maskEditorBrushSizeValue) {
+      maskEditorBrushSizeValue.textContent = `${Math.round(maskEditorBrushSize)} px`;
+    }
+    if (maskEditorBrushFalloffValue) {
+      maskEditorBrushFalloffValue.textContent = `${Math.round(
+        maskEditorBrushFalloff * 100,
+      )}%`;
+    }
+  }
+
   function openMaskEditor(figure) {
     const filename = figure?.dataset.filename;
     const imageUrl = figure?.querySelector("img")?.src;
@@ -478,6 +514,7 @@
     if (maskEditorTitle) {
       maskEditorTitle.textContent = filename;
     }
+    updateMaskBrushControls();
     maskEditorOverlay.hidden = false;
     loadMaskEditorImage(imageUrl);
     maskEditorClose?.focus();
@@ -549,7 +586,7 @@
       return;
     }
     const maxWidth = Math.max(maskEditorStage.clientWidth, 1);
-    const maxHeight = Math.max(window.innerHeight - 128, 192);
+    const maxHeight = Math.max(window.innerHeight - 176, 192);
     const scale = Math.min(
       maxWidth / maskEditorSourceImage.naturalWidth,
       maxHeight / maskEditorSourceImage.naturalHeight,
@@ -1740,6 +1777,8 @@
   maskEditorMask?.addEventListener("pointerup", stopMaskPainting);
   maskEditorMask?.addEventListener("pointercancel", stopMaskPainting);
   maskEditorMask?.addEventListener("pointerleave", stopMaskPainting);
+  maskEditorBrushSizeInput?.addEventListener("input", updateMaskBrushControls);
+  maskEditorBrushFalloffInput?.addEventListener("input", updateMaskBrushControls);
   window.addEventListener("resize", () => {
     if (maskEditorOverlay && !maskEditorOverlay.hidden) {
       redrawMaskEditor();
@@ -1786,6 +1825,7 @@
   renderParameters(selectedModel());
   populatePaletteEditor();
   setPaletteEditorOpen(!paletteEditor?.hidden);
+  updateMaskBrushControls();
   updateSourceSelectionUi();
   form.addEventListener("submit", submitGeneration);
 })();
