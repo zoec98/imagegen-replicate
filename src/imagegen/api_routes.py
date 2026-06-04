@@ -52,6 +52,13 @@ from imagegen.worker import GenerationWorker
 from imagegen.routes import safe_image_filename
 
 
+MASK_PNG_BYTES_PER_PIXEL_LIMIT = 4
+MASK_PNG_FIXED_OVERHEAD_BYTES = 1024 * 1024
+MASK_PNG_ABSOLUTE_DECODED_LIMIT_BYTES = 256 * 1024 * 1024
+MASK_JSON_FIXED_OVERHEAD_BYTES = 4096
+MASK_DATA_URL_PREFIX = "data:image/png;base64,"
+
+
 def register_api_routes(app: Flask) -> None:
     @app.get("/api/app-version")
     def api_app_version():
@@ -234,10 +241,12 @@ def register_api_routes(app: Flask) -> None:
         if not source_path.is_file():
             return jsonify({"error": "Image not found."}), 404
 
-        payload = request.get_json(silent=True) or {}
         try:
-            mask_image = _decode_mask_png(_mask_png_payload(payload))
             source_size = _image_size(source_path)
+            limits = mask_payload_limits(source_size)
+            _validate_mask_request_size(request.content_length, limits)
+            payload = request.get_json(silent=True) or {}
+            mask_image = _decode_mask_png(_mask_png_payload(payload, limits))
         except MaskPayloadError as error:
             return jsonify({"error": str(error)}), 400
         except OSError:
@@ -334,21 +343,58 @@ class MaskPayloadError(ValueError):
     pass
 
 
-def _mask_png_payload(payload: object) -> bytes:
+@dataclass(frozen=True)
+class MaskPayloadLimits:
+    max_decoded_bytes: int
+    max_base64_chars: int
+    max_request_bytes: int
+
+
+def mask_payload_limits(source_size: tuple[int, int]) -> MaskPayloadLimits:
+    width, height = source_size
+    pixel_count = width * height
+    max_decoded_bytes = (
+        pixel_count * MASK_PNG_BYTES_PER_PIXEL_LIMIT + MASK_PNG_FIXED_OVERHEAD_BYTES
+    )
+    max_decoded_bytes = min(
+        max_decoded_bytes,
+        MASK_PNG_ABSOLUTE_DECODED_LIMIT_BYTES,
+    )
+    max_base64_chars = ((max_decoded_bytes + 2) // 3) * 4 + len(MASK_DATA_URL_PREFIX)
+    return MaskPayloadLimits(
+        max_decoded_bytes=max_decoded_bytes,
+        max_base64_chars=max_base64_chars,
+        max_request_bytes=max_base64_chars + MASK_JSON_FIXED_OVERHEAD_BYTES,
+    )
+
+
+def _validate_mask_request_size(
+    content_length: int | None,
+    limits: MaskPayloadLimits,
+) -> None:
+    if content_length is not None and content_length > limits.max_request_bytes:
+        raise MaskPayloadError("Mask PNG is too large.")
+
+
+def _mask_png_payload(payload: object, limits: MaskPayloadLimits) -> bytes:
     if not isinstance(payload, dict):
         raise MaskPayloadError("Mask PNG is required.")
     value = payload.get("mask_png")
     if not isinstance(value, str) or not value:
         raise MaskPayloadError("Mask PNG is required.")
+    if len(value) > limits.max_base64_chars:
+        raise MaskPayloadError("Mask PNG is too large.")
     if value.startswith("data:"):
-        prefix = "data:image/png;base64,"
-        if not value.startswith(prefix):
+        if not value.startswith(MASK_DATA_URL_PREFIX):
             raise MaskPayloadError("Mask PNG is invalid.")
-        value = value[len(prefix) :]
+        value = value[len(MASK_DATA_URL_PREFIX) :]
     try:
-        return b64decode(value, validate=True)
+        decoded = b64decode(value, validate=True)
     except (Base64Error, ValueError) as error:
         raise MaskPayloadError("Mask PNG is invalid.") from error
+    if len(decoded) > limits.max_decoded_bytes:
+        raise MaskPayloadError("Mask PNG is too large.")
+    return decoded
 
 
 def _decode_mask_png(mask_bytes: bytes) -> Image.Image:

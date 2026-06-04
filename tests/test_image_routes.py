@@ -4,6 +4,8 @@ Behaviors protected:
 - Stored images can be viewed, downloaded normally, downloaded cleanly, and read for metadata.
 - Gallery JSON lists safe local images and embedded metadata newest first.
 - Image deletion moves files to trash safely and rejects missing, unsafe, or unsupported names.
+- Mask saving rejects unsafe names, invalid payloads, dimension mismatches, missing CSRF,
+  and oversized payloads before storing a provider-ready mask.
 """
 
 import os
@@ -13,6 +15,14 @@ from io import BytesIO
 from PIL import Image
 
 from imagegen.app import create_app
+from imagegen.api_routes import (
+    MASK_PNG_ABSOLUTE_DECODED_LIMIT_BYTES,
+    MASK_DATA_URL_PREFIX,
+    MASK_JSON_FIXED_OVERHEAD_BYTES,
+    MASK_PNG_BYTES_PER_PIXEL_LIMIT,
+    MASK_PNG_FIXED_OVERHEAD_BYTES,
+    mask_payload_limits,
+)
 from imagegen.metadata_embed import read_embedded_metadata, write_embedded_metadata
 from route_helpers import extract_csrf_token
 
@@ -495,6 +505,19 @@ def grayscale_png_payload(pixels, size):
     return f"data:image/png;base64,{encoded}"
 
 
+def mask_limit_values(size):
+    width, height = size
+    decoded = (
+        width * height * MASK_PNG_BYTES_PER_PIXEL_LIMIT + MASK_PNG_FIXED_OVERHEAD_BYTES
+    )
+    base64_chars = ((decoded + 2) // 3) * 4 + len(MASK_DATA_URL_PREFIX)
+    return {
+        "decoded": decoded,
+        "base64": base64_chars,
+        "request": base64_chars + MASK_JSON_FIXED_OVERHEAD_BYTES,
+    }
+
+
 def test_api_save_mask_writes_mask_png_next_to_source(app_config, app_factory):
     source_path = app_config.output_dir / "sample.jpg"
     write_sample_png(source_path)
@@ -599,6 +622,82 @@ def test_api_save_mask_rejects_invalid_payload(app_config, app_factory):
 
     assert response.status_code == 400
     assert response.json == {"error": "Mask PNG is invalid."}
+    assert not (app_config.output_dir / "sample-mask.png").exists()
+
+
+def test_mask_payload_limit_scales_with_source_dimensions():
+    limits = mask_payload_limits((8, 8))
+
+    assert limits.max_decoded_bytes == mask_limit_values((8, 8))["decoded"]
+
+
+def test_mask_payload_limit_is_capped_at_256_mib():
+    limits = mask_payload_limits((100_000, 100_000))
+
+    assert limits.max_decoded_bytes == MASK_PNG_ABSOLUTE_DECODED_LIMIT_BYTES
+
+
+def test_api_save_mask_rejects_oversized_request_body(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.png"
+    write_sample_png(source_path)
+    limits = mask_limit_values((8, 8))
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/mask",
+        data='{"mask_png":"' + ("A" * limits["request"]) + '"}',
+        content_type="application/json",
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Mask PNG is too large."}
+    assert not (app_config.output_dir / "sample-mask.png").exists()
+
+
+def test_api_save_mask_rejects_oversized_mask_string(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.png"
+    write_sample_png(source_path)
+    limits = mask_limit_values((8, 8))
+    oversized_payload = "A" * (limits["base64"] + 1)
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/mask",
+        json={"mask_png": oversized_payload},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Mask PNG is too large."}
+    assert not (app_config.output_dir / "sample-mask.png").exists()
+
+
+def test_api_save_mask_rejects_oversized_decoded_mask(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (1, 1), (255, 0, 0)).save(source_path, "PNG")
+    limits = mask_limit_values((1, 1))
+    oversized_decoded = b"\0" * (limits["decoded"] + 1)
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/mask",
+        json={"mask_png": b64encode(oversized_decoded).decode("ascii")},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Mask PNG is too large."}
     assert not (app_config.output_dir / "sample-mask.png").exists()
 
 
