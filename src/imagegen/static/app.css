@@ -434,6 +434,85 @@ select {
   color: #1d4ed8;
 }
 
+.mask-editor-overlay {
+  align-items: center;
+  background: rgb(15 23 42 / 72%);
+  box-sizing: border-box;
+  display: grid;
+  inset: 0;
+  padding: 1rem;
+  position: fixed;
+  z-index: 20;
+}
+
+.mask-editor-overlay[hidden] {
+  display: none;
+}
+
+.mask-editor {
+  background: #ffffff;
+  border: 1px solid #dfe3e8;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgb(15 23 42 / 28%);
+  box-sizing: border-box;
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 auto;
+  max-height: calc(100vh - 2rem);
+  max-width: min(72rem, calc(100vw - 2rem));
+  padding: 0.75rem;
+  width: 100%;
+}
+
+.mask-editor-bar {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.mask-editor-bar h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.mask-editor-close {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #c9d1da;
+  border-radius: 6px;
+  color: #334155;
+  display: inline-flex;
+  height: 2rem;
+  justify-content: center;
+  padding: 0;
+  width: 2rem;
+}
+
+.mask-editor-close svg {
+  fill: currentColor;
+  height: 1rem;
+  width: 1rem;
+}
+
+.mask-editor-stage {
+  align-items: center;
+  background: #0f172a;
+  border-radius: 6px;
+  display: grid;
+  justify-items: center;
+  max-height: calc(100vh - 8rem);
+  min-height: 12rem;
+  overflow: auto;
+}
+
+.mask-editor-image {
+  display: block;
+  max-height: calc(100vh - 8rem);
+  max-width: 100%;
+  object-fit: contain;
+}
+
 .gallery-section {
   display: grid;
   gap: 0.75rem;

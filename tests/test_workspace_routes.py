@@ -62,6 +62,11 @@ def test_index_renders_prompt_form(app_factory):
     assert b'name="image_input"' not in response.data
     assert b"disable_safety_checker" not in response.data
     assert b"Generate" in response.data
+    assert b'class="mask-editor-overlay"' in response.data
+    assert b'role="dialog"' in response.data
+    assert b'aria-modal="true"' in response.data
+    assert b'class="mask-editor-image"' in response.data
+    assert b'class="mask-editor-close"' in response.data
 
 
 def test_index_exposes_model_registry_metadata(app_factory):

@@ -27,6 +27,10 @@
   const sourceSelectionStatus = form.querySelector(".source-selection-status");
   const messages = form.querySelector(".messages");
   const gallery = document.querySelector(".gallery");
+  const maskEditorOverlay = document.querySelector(".mask-editor-overlay");
+  const maskEditorImage = maskEditorOverlay?.querySelector(".mask-editor-image");
+  const maskEditorTitle = maskEditorOverlay?.querySelector("#mask-editor-title");
+  const maskEditorClose = maskEditorOverlay?.querySelector(".mask-editor-close");
   const csrfToken = document
     .querySelector('meta[name="csrf-token"]')
     ?.getAttribute("content");
@@ -444,6 +448,40 @@
   function clearSelectedSources() {
     selectedSourceImages.clear();
     updateSourceSelectionUi();
+  }
+
+  function openMaskEditor(figure) {
+    const filename = figure?.dataset.filename;
+    const imageUrl = figure?.querySelector("img")?.src;
+    const maskUrl = figure?.dataset.maskUrl;
+    if (!maskEditorOverlay || !maskEditorImage || !filename || !imageUrl || !maskUrl) {
+      return;
+    }
+    maskEditorOverlay.dataset.filename = filename;
+    maskEditorOverlay.dataset.imageUrl = imageUrl;
+    maskEditorOverlay.dataset.maskUrl = maskUrl;
+    if (maskEditorTitle) {
+      maskEditorTitle.textContent = filename;
+    }
+    maskEditorImage.src = imageUrl;
+    maskEditorImage.alt = filename;
+    maskEditorOverlay.hidden = false;
+    maskEditorClose?.focus();
+  }
+
+  function closeMaskEditor() {
+    if (!maskEditorOverlay || !maskEditorImage) {
+      return;
+    }
+    maskEditorOverlay.hidden = true;
+    delete maskEditorOverlay.dataset.filename;
+    delete maskEditorOverlay.dataset.imageUrl;
+    delete maskEditorOverlay.dataset.maskUrl;
+    maskEditorImage.removeAttribute("src");
+    maskEditorImage.alt = "";
+    if (maskEditorTitle) {
+      maskEditorTitle.textContent = "Mask";
+    }
   }
 
   function setEditMode(enabled) {
@@ -1458,6 +1496,12 @@
       disarmGalleryDelete();
       return;
     }
+    const maskButton = event.target.closest(".gallery-mask");
+    if (maskButton) {
+      disarmGalleryDelete();
+      openMaskEditor(maskButton.closest(".gallery-item"));
+      return;
+    }
     const deleteButton = event.target.closest(".gallery-delete");
     if (deleteButton) {
       const figure = deleteButton.closest(".gallery-item");
@@ -1487,6 +1531,19 @@
     disarmGalleryDelete();
     const figure = button.closest(".gallery-item");
     toggleSourceImage(figure?.dataset.filename || "");
+  });
+  maskEditorClose?.addEventListener("click", () => {
+    closeMaskEditor();
+  });
+  maskEditorOverlay?.addEventListener("click", (event) => {
+    if (event.target === maskEditorOverlay) {
+      closeMaskEditor();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && maskEditorOverlay && !maskEditorOverlay.hidden) {
+      closeMaskEditor();
+    }
   });
   gallery?.addEventListener("mouseover", (event) => {
     const infoButton = event.target.closest(".gallery-info");

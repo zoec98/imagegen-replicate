@@ -30,6 +30,8 @@ Test focus:
 
 ## Ticket 2: Build the Mask Editor Overlay Shell
 
+Status: Completed.
+
 Goal: Provide the modal-style editing surface above the current workspace.
 
 Scope:
