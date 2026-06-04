@@ -159,6 +159,8 @@ Test focus:
 
 ## Ticket 7: Export 8-Bit Black-and-White PNG Masks
 
+Status: Completed.
+
 Goal: Convert the painted mask data into a provider-ready PNG.
 
 Scope:

@@ -248,7 +248,7 @@ def register_api_routes(app: Flask) -> None:
             ), 400
 
         saved_name = mask_filename(safe_name)
-        mask_image.save(app_config.output_dir / saved_name, "PNG")
+        mask_image.convert("L").save(app_config.output_dir / saved_name, "PNG")
         return (
             jsonify(
                 {

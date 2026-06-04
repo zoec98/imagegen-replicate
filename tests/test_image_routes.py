@@ -483,6 +483,15 @@ def png_payload(size=(8, 8), color=(255, 255, 255)):
     return f"data:image/png;base64,{encoded}"
 
 
+def grayscale_png_payload(pixels, size):
+    buffer = BytesIO()
+    image = Image.new("L", size)
+    image.putdata(pixels)
+    image.save(buffer, "PNG")
+    encoded = b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
 def test_api_save_mask_writes_mask_png_next_to_source(app_config, app_factory):
     source_path = app_config.output_dir / "sample.jpg"
     write_sample_png(source_path)
@@ -508,6 +517,32 @@ def test_api_save_mask_writes_mask_png_next_to_source(app_config, app_factory):
     with Image.open(mask_path) as image:
         assert image.format == "PNG"
         assert image.size == (8, 8)
+        assert image.mode == "L"
+
+
+def test_api_save_mask_preserves_black_white_and_gray_pixels(
+    app_config,
+    app_factory,
+):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (3, 1), (255, 0, 0)).save(source_path, "PNG")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/mask",
+        json={"mask_png": grayscale_png_payload([0, 128, 255], (3, 1))},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 201
+    with Image.open(app_config.output_dir / "sample-mask.png") as image:
+        assert image.mode == "L"
+        assert image.size == (3, 1)
+        assert image.tobytes() == bytes([0, 128, 255])
 
 
 def test_api_save_mask_rejects_unsafe_source_filename(app_config, app_factory):
