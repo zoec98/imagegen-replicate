@@ -43,7 +43,7 @@ uv sync --managed-python
 ```
 
 
-On MacOS and Linux, start `scripts/run-dev-sh` and stop it again.
+On MacOS and Linux, start `scripts/run-dev.sh` and stop it again.
 On Windows, start `scripts\run-dev.cmd` and stop it again.
 
 This will create a .env file in the project directory. It will look like the `env.example` file we provide.
@@ -85,6 +85,26 @@ After making these changes you can start the server again, and connect to 127.0.
 
 ```bash
 scripts/run-dev.sh  # or scripts\run-dev.cmd on Windows
+```
+
+Debug mode is off by default. For local development with the Flask debugger and
+reloader, pass `--dev`:
+
+```bash
+scripts/run-dev.sh --dev  # or scripts\run-dev.cmd --dev on Windows
+```
+
+To use the app from another trusted device on a secure household LAN, bind to all
+network interfaces explicitly:
+
+```bash
+scripts/run-dev.sh --secure-network  # or scripts\run-dev.cmd --secure-network on Windows
+```
+
+The flags can be combined when you explicitly want both behaviors:
+
+```bash
+scripts/run-dev.sh --secure-network --dev
 ```
 
 Then open:

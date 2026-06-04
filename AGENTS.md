@@ -33,7 +33,9 @@ When adding runtime dependencies, use `uv add <package>`. When adding test or to
 
 Project scripts live in `scripts/`:
 
-- `scripts/run-dev.sh`: start the Flask development server on `0.0.0.0:5002`.
+- `scripts/run-dev.sh`: start the Flask development server on `127.0.0.1:5002`
+  by default, or `0.0.0.0:5002` with `--secure-network`. Debug mode is enabled
+  only with `--dev`.
 - `scripts/run-dev.cmd`: Windows CMD version of the Flask development server launcher.
 - `scripts/get_schema_replicate owner/model`: fetch `https://replicate.com/<owner>/<model>/api/schema`.
 - `scripts/get_schema_falai text-api-url [edit-api-url]`: fetch fal.ai endpoint docs, schema, pricing, and optional linked edit endpoint information.
