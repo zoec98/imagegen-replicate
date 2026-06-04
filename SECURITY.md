@@ -207,6 +207,8 @@ must not be listed as gallery images.
 - When using `0.0.0.0:5002`, use it only on a trusted household LAN and stop the
   app when finished.
 - Use a strong `IMAGEGEN_FLASK_SECRET_KEY` for any shared LAN or proxied setup.
+  The setup flow generates this automatically, and the start scripts warn on
+  `--secure-network` when an older `.env` still contains the legacy default.
 - Keep `.env`, `IMAGEGEN_DATA_DIR`, generated images, uploaded source images,
   and SQLite data out of source control.
 - Put a TLS reverse proxy in front when accessing the app over Wi-Fi or through

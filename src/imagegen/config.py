@@ -7,6 +7,7 @@ variables into the typed AppConfig used by the Flask app and service wrappers.
 from __future__ import annotations
 
 import os
+import secrets
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,6 +19,11 @@ from imagegen.model_registry import (
     ProviderId,
     ReplicateModel,
 )
+
+
+FLASK_SECRET_SETTING = "IMAGEGEN_FLASK_SECRET_KEY"
+INSECURE_FLASK_SECRET_KEY = "dev-secret-change-me"
+FLASK_SECRET_BYTES = 32
 
 
 @dataclass(frozen=True)
@@ -72,9 +78,9 @@ ENV_SETTINGS: tuple[EnvSetting, ...] = (
         comment=f"Default model alias. Options: {', '.join(sorted(MODEL_REGISTRY))}.",
     ),
     EnvSetting(
-        name="IMAGEGEN_FLASK_SECRET_KEY",
-        default="dev-secret-change-me",
-        comment="Flask secret key for local development. Replace for shared deployments.",
+        name=FLASK_SECRET_SETTING,
+        default="",
+        comment="Flask secret key for browser sessions. Generated automatically by setup.",
     ),
     EnvSetting(
         name="IMAGEGEN_REPLICATE_POLL_SECONDS",
@@ -162,7 +168,8 @@ def write_env_example(path: str | Path = ".env.example") -> Path:
 
     example_path = Path(path)
     example_path.write_text(
-        "\n".join(_setting_lines(ENV_SETTINGS)) + "\n", encoding="utf-8"
+        "\n".join(_setting_lines(ENV_SETTINGS, generate_secrets=False)) + "\n",
+        encoding="utf-8",
     )
     return example_path
 
@@ -204,8 +211,8 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
         model_alias=model_alias,
         model=model,
         flask_secret_key=os.getenv(
-            "IMAGEGEN_FLASK_SECRET_KEY",
-            "dev-secret-change-me",
+            FLASK_SECRET_SETTING,
+            "",
         ),
         replicate_poll_seconds=_float_env("IMAGEGEN_REPLICATE_POLL_SECONDS", 1.0),
         replicate_timeout_seconds=_float_env(
@@ -227,10 +234,10 @@ def _with_required_settings(existing_lines: list[str]) -> list[str]:
             continue
 
         current_value = lines[index].split("=", 1)[1].strip()
-        if current_value:
+        if current_value and not _is_insecure_flask_secret(setting, current_value):
             continue
 
-        lines[index] = f"{setting.name}={setting.default}"
+        lines[index] = f"{setting.name}={_setting_value(setting)}"
         comment = f"# {setting.comment}"
         previous_line = lines[index - 1] if index > 0 else ""
         if previous_line != comment:
@@ -257,11 +264,30 @@ def _without_deprecated_settings(existing_lines: list[str]) -> list[str]:
     return lines
 
 
-def _setting_lines(settings: tuple[EnvSetting, ...]) -> list[str]:
+def _setting_lines(
+    settings: tuple[EnvSetting, ...],
+    *,
+    generate_secrets: bool = True,
+) -> list[str]:
     lines: list[str] = []
     for setting in settings:
-        lines.extend((f"# {setting.comment}", f"{setting.name}={setting.default}"))
+        lines.extend(
+            (
+                f"# {setting.comment}",
+                f"{setting.name}={_setting_value(setting, generate=generate_secrets)}",
+            )
+        )
     return lines
+
+
+def _setting_value(setting: EnvSetting, *, generate: bool = True) -> str:
+    if generate and setting.name == FLASK_SECRET_SETTING:
+        return secrets.token_urlsafe(FLASK_SECRET_BYTES)
+    return setting.default
+
+
+def _is_insecure_flask_secret(setting: EnvSetting, value: str) -> bool:
+    return setting.name == FLASK_SECRET_SETTING and value == INSECURE_FLASK_SECRET_KEY
 
 
 def _line_key(line: str) -> str | None:

@@ -32,7 +32,9 @@ def test_ensure_env_file_creates_expected_defaults(tmp_path):
     assert "IMMICH_GALLERY_ID=" in content
     assert "IMMICH_API_KEY=" in content
     assert "IMAGEGEN_MODEL=seedream45" in content
-    assert "IMAGEGEN_FLASK_SECRET_KEY=dev-secret-change-me" in content
+    secret = setting_value(content, "IMAGEGEN_FLASK_SECRET_KEY")
+    assert secret
+    assert secret != "dev-secret-change-me"
     assert "IMAGEGEN_REPLICATE_POLL_SECONDS=1.0" in content
     assert "IMAGEGEN_REPLICATE_TIMEOUT_SECONDS=60.0" in content
 
@@ -62,9 +64,37 @@ def test_ensure_env_file_preserves_existing_values(tmp_path):
     assert "IMAGEGEN_FRAGMENT_ROOT" not in content
     assert "IMAGEGEN_DB_PATH" not in content
     assert "IMAGEGEN_MODEL=seedream45" in content
-    assert "IMAGEGEN_FLASK_SECRET_KEY=dev-secret-change-me" in content
+    secret = setting_value(content, "IMAGEGEN_FLASK_SECRET_KEY")
+    assert secret
+    assert secret != "dev-secret-change-me"
     assert "IMAGEGEN_REPLICATE_POLL_SECONDS=1.0" in content
     assert "IMAGEGEN_REPLICATE_TIMEOUT_SECONDS=60.0" in content
+
+
+def test_ensure_env_file_preserves_existing_flask_secret(tmp_path):
+    env_path = tmp_path / ".env"
+    env_path.write_text("IMAGEGEN_FLASK_SECRET_KEY=existing-secret\n", encoding="utf-8")
+
+    ensure_env_file(env_path)
+
+    content = env_path.read_text(encoding="utf-8")
+    assert "IMAGEGEN_FLASK_SECRET_KEY=existing-secret" in content
+
+
+def test_ensure_env_file_replaces_insecure_flask_secret(tmp_path):
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "IMAGEGEN_FLASK_SECRET_KEY=dev-secret-change-me\n",
+        encoding="utf-8",
+    )
+
+    ensure_env_file(env_path)
+
+    secret = setting_value(
+        env_path.read_text(encoding="utf-8"), "IMAGEGEN_FLASK_SECRET_KEY"
+    )
+    assert secret
+    assert secret != "dev-secret-change-me"
 
 
 def test_write_env_example_uses_non_secret_defaults(tmp_path):
@@ -84,6 +114,8 @@ def test_write_env_example_uses_non_secret_defaults(tmp_path):
     assert "IMMICH_GALLERY_ID=" in content
     assert "IMMICH_API_KEY=" in content
     assert "IMAGEGEN_MODEL=seedream45" in content
+    assert "IMAGEGEN_FLASK_SECRET_KEY=" in content
+    assert "IMAGEGEN_FLASK_SECRET_KEY=dev-secret-change-me" not in content
 
 
 def test_load_config_reads_env_file(tmp_path, monkeypatch):
@@ -230,3 +262,11 @@ def test_load_config_provider_default_prefers_replicate(tmp_path, monkeypatch):
 
     assert config.enabled_providers == ("replicate", "falai")
     assert config.selected_provider == "replicate"
+
+
+def setting_value(content: str, name: str) -> str:
+    prefix = f"{name}="
+    for line in content.splitlines():
+        if line.startswith(prefix):
+            return line.removeprefix(prefix)
+    return ""

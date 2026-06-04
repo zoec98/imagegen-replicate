@@ -46,7 +46,7 @@ uv sync --managed-python
 On MacOS and Linux, start `scripts/run-dev.sh` and stop it again.
 On Windows, start `scripts\run-dev.cmd` and stop it again.
 
-This will create a .env file in the project directory. It will look like the `env.example` file we provide.
+This will create a .env file in the project directory. It will look like the `env.example` file we provide, except that `IMAGEGEN_FLASK_SECRET_KEY` is filled with a generated random session secret.
 
 Edit this file, and set at least one provider API key:
 
@@ -100,6 +100,10 @@ network interfaces explicitly:
 ```bash
 scripts/run-dev.sh --secure-network  # or scripts\run-dev.cmd --secure-network on Windows
 ```
+
+If an older `.env` still contains `IMAGEGEN_FLASK_SECRET_KEY=dev-secret-change-me`,
+the start script warns before `--secure-network` startup. The app setup replaces
+that value with a random secret before startup.
 
 The flags can be combined when you explicitly want both behaviors:
 
