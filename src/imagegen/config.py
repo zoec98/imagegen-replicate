@@ -89,7 +89,7 @@ ENV_SETTINGS: tuple[EnvSetting, ...] = (
     ),
     EnvSetting(
         name="IMAGEGEN_REPLICATE_TIMEOUT_SECONDS",
-        default="60.0",
+        default="180.0",
         comment="Maximum seconds to wait for a Replicate prediction before timing out.",
     ),
 )

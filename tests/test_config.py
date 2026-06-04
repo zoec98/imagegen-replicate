@@ -36,7 +36,7 @@ def test_ensure_env_file_creates_expected_defaults(tmp_path):
     assert secret
     assert secret != "dev-secret-change-me"
     assert "IMAGEGEN_REPLICATE_POLL_SECONDS=1.0" in content
-    assert "IMAGEGEN_REPLICATE_TIMEOUT_SECONDS=60.0" in content
+    assert "IMAGEGEN_REPLICATE_TIMEOUT_SECONDS=180.0" in content
 
 
 def test_ensure_env_file_preserves_existing_values(tmp_path):
@@ -68,7 +68,7 @@ def test_ensure_env_file_preserves_existing_values(tmp_path):
     assert secret
     assert secret != "dev-secret-change-me"
     assert "IMAGEGEN_REPLICATE_POLL_SECONDS=1.0" in content
-    assert "IMAGEGEN_REPLICATE_TIMEOUT_SECONDS=60.0" in content
+    assert "IMAGEGEN_REPLICATE_TIMEOUT_SECONDS=180.0" in content
 
 
 def test_ensure_env_file_preserves_existing_flask_secret(tmp_path):
