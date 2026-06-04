@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 FRAGMENT_EXTENSION = ".txt"
-MAX_FRAGMENT_BYTES = 256
+MAX_FRAGMENT_BYTES = 1024
 NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 DISALLOWED_CONTENT = {"(", ")", ":"}
 
