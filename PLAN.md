@@ -209,6 +209,8 @@ Test focus:
 
 ## Ticket 9: Document Mask Workflow
 
+Status: Completed.
+
 Goal: Explain the new mask creation workflow to users.
 
 Scope:

@@ -131,15 +131,10 @@ It will notice if the application has updated and will ask you to reload if it i
 5. For image edits, enable `Edit`, select one or more existing gallery images as sources, then submit the request.
 6. Press `Generate`.
 7. Watch request status in the message area.
-8. Use the gallery to open generated images, download metadata-rich or clean copies, inspect metadata, load metadata back into the workspace, or delete local images.
+8. Use the gallery to open generated images, download metadata-rich or clean copies, inspect metadata, load metadata back into the workspace, create edit masks, or delete local images.
 
 Image edit sources are selected from local gallery images.
-
-Images are stored in the configured 
-```text
-
-
-```
+Generated images are stored under `IMAGEGEN_DATA_DIR/images`, `data/images` by default.
 
 ## Prompt Palettes
 
@@ -197,6 +192,7 @@ Generated images appear in the local gallery. Each gallery card provides:
 - A load button that reads embedded metadata and replaces the current prompt, model, and supported settings.
 - A normal download button that downloads the stored metadata-rich image.
 - A clean download button that downloads a temporary copy with embedded metadata stripped.
+- A mask button that opens a simple mask editor for the image.
 - If configured, an upload button that sends the image to your configured immich server.
 - A delete button that moves the local image to trash.
 
@@ -207,6 +203,26 @@ it does not rewrite the stored gallery image.
 Loading metadata requires metadata embedded by this app.
 If metadata is missing or references an unsupported model/settings shape,
 the UI shows an error and preserves the current workspace.
+
+### Edit masks
+
+Some image edit models accept a layer mask that limits where the edit is applied.
+Use the mask button on a gallery image to open the mask editor.
+
+In the editor:
+
+1. Paint over the image; the painted area is shown as a red overlay.
+2. Adjust brush size to change the stroke diameter.
+3. Adjust falloff to change how quickly the brush fades from the center to the edge.
+4. Use `Invert mask` when the unpainted area should become the selected area.
+5. Use `Save mask` to write the mask and return to the gallery.
+
+Saved masks appear in the gallery without a page reload.
+The mask file is saved next to the source image with the same stem plus `-mask.png`;
+for example, `portrait.png` saves as `portrait-mask.png`.
+
+Mask files are 8-bit black-and-white PNGs with the same pixel dimensions as the source image.
+Unpainted pixels are black, fully painted pixels are white, and soft brush falloff is stored as grayscale values between black and white.
 
 ## Storage
 
