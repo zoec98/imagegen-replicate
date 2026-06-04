@@ -128,6 +128,8 @@ Test focus:
 
 ## Ticket 6: Add Server-Side Mask Save Route
 
+Status: Completed.
+
 Goal: Persist provider-ready mask PNG files safely under the gallery image directory.
 
 Scope:

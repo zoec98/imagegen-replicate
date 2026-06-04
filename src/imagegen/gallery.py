@@ -81,7 +81,7 @@ def _gallery_image(
     return GalleryImage(
         filename=path.name,
         url=image_url(path.name),
-        mask_url=image_url(_mask_filename(path.name)),
+        mask_url=image_url(mask_filename(path.name)),
         metadata_url=metadata_url(path.name)
         if metadata_url and metadata.exists
         else None,
@@ -90,7 +90,7 @@ def _gallery_image(
     )
 
 
-def _mask_filename(filename: str) -> str:
+def mask_filename(filename: str) -> str:
     path = Path(filename)
     return f"{path.stem}-mask.png"
 

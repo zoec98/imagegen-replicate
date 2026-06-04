@@ -7,6 +7,8 @@ Behaviors protected:
 """
 
 import os
+from base64 import b64encode
+from io import BytesIO
 
 from PIL import Image
 
@@ -472,3 +474,127 @@ def test_api_delete_image_requires_csrf(app_config, app_factory):
     assert response.status_code == 403
     assert response.json == {"error": "Invalid CSRF token."}
     assert image_path.exists()
+
+
+def png_payload(size=(8, 8), color=(255, 255, 255)):
+    buffer = BytesIO()
+    Image.new("RGB", size, color).save(buffer, "PNG")
+    encoded = b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
+def test_api_save_mask_writes_mask_png_next_to_source(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.jpg"
+    write_sample_png(source_path)
+    original_bytes = source_path.read_bytes()
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.jpg/mask",
+        json={"mask_png": png_payload()},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    mask_path = app_config.output_dir / "sample-mask.png"
+    assert response.status_code == 201
+    assert response.json == {
+        "filename": "sample-mask.png",
+        "url": "/images/sample-mask.png",
+    }
+    assert source_path.read_bytes() == original_bytes
+    with Image.open(mask_path) as image:
+        assert image.format == "PNG"
+        assert image.size == (8, 8)
+
+
+def test_api_save_mask_rejects_unsafe_source_filename(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.png"
+    write_sample_png(source_path)
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/../sample.png/mask",
+        json={"mask_png": png_payload()},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 404
+    assert response.json == {"error": "Image not found."}
+    assert not (app_config.output_dir / "sample-mask.png").exists()
+
+
+def test_api_save_mask_rejects_missing_source_image(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/missing.png/mask",
+        json={"mask_png": png_payload()},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 404
+    assert response.json == {"error": "Image not found."}
+
+
+def test_api_save_mask_rejects_invalid_payload(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.png"
+    write_sample_png(source_path)
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/mask",
+        json={"mask_png": "not a png"},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Mask PNG is invalid."}
+    assert not (app_config.output_dir / "sample-mask.png").exists()
+
+
+def test_api_save_mask_rejects_mismatched_dimensions(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.png"
+    write_sample_png(source_path)
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/mask",
+        json={"mask_png": png_payload(size=(4, 4))},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Mask dimensions must match the source image."}
+    assert not (app_config.output_dir / "sample-mask.png").exists()
+
+
+def test_api_save_mask_requires_csrf(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.png"
+    write_sample_png(source_path)
+    client = app_factory().test_client()
+    client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+
+    response = client.post(
+        "/api/images/sample.png/mask",
+        json={"mask_png": png_payload()},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 403
+    assert response.json == {"error": "Invalid CSRF token."}
+    assert not (app_config.output_dir / "sample-mask.png").exists()

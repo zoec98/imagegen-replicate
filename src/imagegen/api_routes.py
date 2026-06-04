@@ -8,14 +8,19 @@ worker without changing browser-facing route names.
 
 from __future__ import annotations
 
+from base64 import b64decode
+from binascii import Error as Base64Error
 from dataclasses import dataclass
+from io import BytesIO
 
 from flask import Flask, jsonify, request, url_for
+from PIL import Image, UnidentifiedImageError
 
 from imagegen.app_version import app_checksum
 from imagegen.gallery import (
     GalleryImage,
     list_gallery_images,
+    mask_filename,
     move_gallery_image_to_trash,
 )
 from imagegen.generation_log import GenerationLog
@@ -218,6 +223,42 @@ def register_api_routes(app: Flask) -> None:
             return jsonify({"error": "Image not found."}), 404
         return jsonify({"deleted": safe_name})
 
+    @app.post("/api/images/<path:filename>/mask")
+    @require_api_csrf
+    def api_save_mask(filename: str):
+        safe_name = safe_image_filename(filename)
+        if safe_name is None:
+            return jsonify({"error": "Image not found."}), 404
+        app_config = app.config["IMAGEGEN_APP_CONFIG"]
+        source_path = app_config.output_dir / safe_name
+        if not source_path.is_file():
+            return jsonify({"error": "Image not found."}), 404
+
+        payload = request.get_json(silent=True) or {}
+        try:
+            mask_image = _decode_mask_png(_mask_png_payload(payload))
+            source_size = _image_size(source_path)
+        except MaskPayloadError as error:
+            return jsonify({"error": str(error)}), 400
+        except OSError:
+            return jsonify({"error": "Source image is invalid."}), 400
+        if mask_image.size != source_size:
+            return jsonify(
+                {"error": "Mask dimensions must match the source image."}
+            ), 400
+
+        saved_name = mask_filename(safe_name)
+        mask_image.save(app_config.output_dir / saved_name, "PNG")
+        return (
+            jsonify(
+                {
+                    "filename": saved_name,
+                    "url": url_for("image_file", filename=saved_name),
+                }
+            ),
+            201,
+        )
+
     if app.config.get("IMAGEGEN_ENABLE_TEST_API"):
 
         @app.post("/api/_test")
@@ -287,6 +328,43 @@ def _immich_client(app: Flask) -> ImmichClient:
         api_key=app_config.immich_api_key,
         album_id=app_config.immich_gallery_id,
     )
+
+
+class MaskPayloadError(ValueError):
+    pass
+
+
+def _mask_png_payload(payload: object) -> bytes:
+    if not isinstance(payload, dict):
+        raise MaskPayloadError("Mask PNG is required.")
+    value = payload.get("mask_png")
+    if not isinstance(value, str) or not value:
+        raise MaskPayloadError("Mask PNG is required.")
+    if value.startswith("data:"):
+        prefix = "data:image/png;base64,"
+        if not value.startswith(prefix):
+            raise MaskPayloadError("Mask PNG is invalid.")
+        value = value[len(prefix) :]
+    try:
+        return b64decode(value, validate=True)
+    except (Base64Error, ValueError) as error:
+        raise MaskPayloadError("Mask PNG is invalid.") from error
+
+
+def _decode_mask_png(mask_bytes: bytes) -> Image.Image:
+    try:
+        with Image.open(BytesIO(mask_bytes)) as image:
+            image.load()
+            if image.format != "PNG":
+                raise MaskPayloadError("Mask PNG is invalid.")
+            return image.copy()
+    except (OSError, UnidentifiedImageError) as error:
+        raise MaskPayloadError("Mask PNG is invalid.") from error
+
+
+def _image_size(path) -> tuple[int, int]:
+    with Image.open(path) as image:
+        return image.size
 
 
 @dataclass(frozen=True)
