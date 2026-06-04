@@ -55,6 +55,8 @@ Test focus:
 
 ## Ticket 3: Implement Native Canvas Mask Painting
 
+Status: Completed.
+
 Goal: Let users paint a visible mask over the selected image.
 
 Scope:

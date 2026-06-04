@@ -506,11 +506,26 @@ select {
   overflow: auto;
 }
 
-.mask-editor-image {
-  display: block;
+.mask-editor-canvas-wrap {
+  display: grid;
+  line-height: 0;
   max-height: calc(100vh - 8rem);
   max-width: 100%;
-  object-fit: contain;
+  position: relative;
+  touch-action: none;
+}
+
+.mask-editor-source,
+.mask-editor-mask {
+  display: block;
+  grid-area: 1 / 1;
+  max-height: calc(100vh - 8rem);
+  max-width: 100%;
+}
+
+.mask-editor-mask {
+  cursor: crosshair;
+  z-index: 1;
 }
 
 .gallery-section {

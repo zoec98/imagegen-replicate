@@ -65,7 +65,9 @@ def test_index_renders_prompt_form(app_factory):
     assert b'class="mask-editor-overlay"' in response.data
     assert b'role="dialog"' in response.data
     assert b'aria-modal="true"' in response.data
-    assert b'class="mask-editor-image"' in response.data
+    assert b'class="mask-editor-canvas-wrap"' in response.data
+    assert b'class="mask-editor-source"' in response.data
+    assert b'class="mask-editor-mask"' in response.data
     assert b'class="mask-editor-close"' in response.data
 
 
