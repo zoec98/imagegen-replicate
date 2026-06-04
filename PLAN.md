@@ -185,6 +185,8 @@ Test focus:
 
 ## Ticket 8: Refresh Gallery After Mask Save
 
+Status: Completed.
+
 Goal: Make the saved mask immediately available in the gallery.
 
 Scope:

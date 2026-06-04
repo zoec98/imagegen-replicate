@@ -177,6 +177,7 @@
             data-filename="{{ image.filename }}"
             data-delete-url="{{ url_for('api_delete_image', filename=image.filename) }}"
             data-mask-url="{{ image.mask_url }}"
+            data-mask-save-url="{{ url_for('api_save_mask', filename=image.filename) }}"
             {% if immich_enabled %}data-immich-upload-url="{{ url_for('api_immich_upload', filename=image.filename) }}"{% endif %}
             {% if image.metadata_url %}data-metadata-url="{{ image.metadata_url }}"{% endif %}
             {% if image.content_type %}data-content-type="{{ image.content_type }}"{% endif %}
@@ -302,6 +303,7 @@
             <output class="mask-editor-brush-falloff-value">65%</output>
           </label>
           <button class="mask-editor-invert" type="button">Invert mask</button>
+          <button class="mask-editor-save" type="button">Save mask</button>
         </div>
         <div class="mask-editor-stage">
           <div class="mask-editor-canvas-wrap">

@@ -506,7 +506,8 @@ select {
   width: 100%;
 }
 
-.mask-editor-invert {
+.mask-editor-invert,
+.mask-editor-save {
   background: #ffffff;
   border: 1px solid #8b98a8;
   border-radius: 6px;
@@ -521,6 +522,24 @@ select {
   background: #eff6ff;
   border-color: #1d4ed8;
   color: #1d4ed8;
+}
+
+.mask-editor-save {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #ffffff;
+  font-weight: 650;
+}
+
+.mask-editor-save:hover,
+.mask-editor-save:focus-visible {
+  background: #1e40af;
+  border-color: #1e40af;
+}
+
+.mask-editor-save:disabled {
+  cursor: default;
+  opacity: 0.65;
 }
 
 .mask-editor-close {

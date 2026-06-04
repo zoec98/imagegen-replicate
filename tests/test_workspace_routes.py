@@ -71,6 +71,7 @@ def test_index_renders_prompt_form(app_factory):
     assert b'class="mask-editor-brush-size"' in response.data
     assert b'class="mask-editor-brush-falloff"' in response.data
     assert b'class="mask-editor-invert"' in response.data
+    assert b'class="mask-editor-save"' in response.data
     assert b'class="mask-editor-close"' in response.data
 
 
@@ -362,6 +363,7 @@ def test_index_exposes_gallery_filenames_for_source_selection(app_config, app_fa
     assert b'data-filename="source.png"' in response.data
     assert b'data-delete-url="/api/images/source.png/delete"' in response.data
     assert b'data-mask-url="/images/source-mask.png"' in response.data
+    assert b'data-mask-save-url="/api/images/source.png/mask"' in response.data
     assert b'href="/images/source.png/download"' in response.data
     assert b'href="/images/source.png/download-clean"' in response.data
     assert b'class="gallery-action gallery-download"' in response.data

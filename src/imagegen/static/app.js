@@ -45,6 +45,7 @@
     ".mask-editor-brush-falloff-value",
   );
   const maskEditorInvert = maskEditorOverlay?.querySelector(".mask-editor-invert");
+  const maskEditorSave = maskEditorOverlay?.querySelector(".mask-editor-save");
   const maskEditorTitle = maskEditorOverlay?.querySelector("#mask-editor-title");
   const maskEditorClose = maskEditorOverlay?.querySelector(".mask-editor-close");
   const csrfToken = document
@@ -499,19 +500,22 @@
     const filename = figure?.dataset.filename;
     const imageUrl = figure?.querySelector("img")?.src;
     const maskUrl = figure?.dataset.maskUrl;
+    const maskSaveUrl = figure?.dataset.maskSaveUrl;
     if (
       !maskEditorOverlay ||
       !maskEditorSource ||
       !maskEditorMask ||
       !filename ||
       !imageUrl ||
-      !maskUrl
+      !maskUrl ||
+      !maskSaveUrl
     ) {
       return;
     }
     maskEditorOverlay.dataset.filename = filename;
     maskEditorOverlay.dataset.imageUrl = imageUrl;
     maskEditorOverlay.dataset.maskUrl = maskUrl;
+    maskEditorOverlay.dataset.maskSaveUrl = maskSaveUrl;
     if (maskEditorTitle) {
       maskEditorTitle.textContent = filename;
     }
@@ -529,6 +533,7 @@
     delete maskEditorOverlay.dataset.filename;
     delete maskEditorOverlay.dataset.imageUrl;
     delete maskEditorOverlay.dataset.maskUrl;
+    delete maskEditorOverlay.dataset.maskSaveUrl;
     maskEditorSourceImage = null;
     maskEditorMaskData = null;
     maskEditorPainting = false;
@@ -699,6 +704,71 @@
       maskEditorMaskData[index] = 1 - Math.min(Math.max(maskEditorMaskData[index], 0), 1);
     }
     redrawMaskOverlay();
+  }
+
+  function maskEditorPngDataUrl() {
+    if (!maskEditorMask || !maskEditorMaskData) {
+      throw new Error("Mask data is unavailable.");
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = maskEditorMask.width;
+    canvas.height = maskEditorMask.height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Mask export is unavailable.");
+    }
+    const imageData = context.createImageData(canvas.width, canvas.height);
+    for (let index = 0; index < maskEditorMaskData.length; index += 1) {
+      const value = Math.round(
+        Math.min(Math.max(maskEditorMaskData[index], 0), 1) * 255,
+      );
+      const offset = index * 4;
+      imageData.data[offset] = value;
+      imageData.data[offset + 1] = value;
+      imageData.data[offset + 2] = value;
+      imageData.data[offset + 3] = 255;
+    }
+    context.putImageData(imageData, 0, 0);
+    return canvas.toDataURL("image/png");
+  }
+
+  async function saveMaskEditorData() {
+    if (!maskEditorOverlay?.dataset.maskSaveUrl) {
+      showMessage("Mask save URL is unavailable.", "error");
+      return;
+    }
+    if (!csrfToken) {
+      showMessage("Missing CSRF token.", "error");
+      return;
+    }
+    if (maskEditorSave) {
+      maskEditorSave.disabled = true;
+    }
+    showMessage("Saving mask.", "info");
+    try {
+      const response = await fetch(maskEditorOverlay.dataset.maskSaveUrl, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken,
+        },
+        body: JSON.stringify({ mask_png: maskEditorPngDataUrl() }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Mask could not be saved.");
+      }
+      closeMaskEditor();
+      await refreshGallery();
+      showMessage(`${data.filename || "Mask"} saved.`, "success");
+    } catch (error) {
+      showMessage(error.message || "Mask could not be saved.", "error");
+    } finally {
+      if (maskEditorSave) {
+        maskEditorSave.disabled = false;
+      }
+    }
   }
 
   function startMaskPainting(event) {
@@ -1351,6 +1421,9 @@
     if (image.mask_url) {
       figure.dataset.maskUrl = image.mask_url;
     }
+    if (image.mask_save_url) {
+      figure.dataset.maskSaveUrl = image.mask_save_url;
+    }
     if (image.metadata_url) {
       figure.dataset.metadataUrl = image.metadata_url;
     }
@@ -1791,6 +1864,11 @@
   maskEditorBrushSizeInput?.addEventListener("input", updateMaskBrushControls);
   maskEditorBrushFalloffInput?.addEventListener("input", updateMaskBrushControls);
   maskEditorInvert?.addEventListener("click", invertMaskEditorData);
+  maskEditorSave?.addEventListener("click", () => {
+    saveMaskEditorData().catch((error) => {
+      showMessage(error.message || "Mask could not be saved.", "error");
+    });
+  });
   window.addEventListener("resize", () => {
     if (maskEditorOverlay && !maskEditorOverlay.hidden) {
       redrawMaskEditor();
