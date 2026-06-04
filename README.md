@@ -144,7 +144,7 @@ This creates `character` fragments named `aoife` and `zoe`, plus `style` fragmen
 
 Fragment names and palette names must start with a letter and may contain only letters, numbers, underscores,
 and hyphens.
-Fragment content is limited to 256 bytes and may not contain `(`, `)`, or `:`.
+Fragment content is limited to 1024 bytes and may not contain `(`, `)`, or `:`.
 
 Selecting a palette entry inserts editable annotation text into the prompt:
 

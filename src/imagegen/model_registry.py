@@ -49,6 +49,7 @@ PROVIDERS: tuple[ProviderInfo, ...] = (
     ProviderInfo(id="falai", display_name="fal.ai"),
 )
 
+
 class RegistryLookupError(ValueError):
     """Raised when a provider/model registry reference cannot be resolved."""
 
@@ -86,9 +87,7 @@ def resolve_model_ref(
         provider, alias = model_ref.split(":", 1)
         return resolve_model(_provider_id(provider), alias)
     if selected_provider is None:
-        raise RegistryLookupError(
-            "Bare model aliases require a selected provider."
-        )
+        raise RegistryLookupError("Bare model aliases require a selected provider.")
     return resolve_model(selected_provider, model_ref)
 
 
@@ -133,9 +132,7 @@ def _provider_id(value: str) -> ProviderId:
 def _provider_model_from_replicate(model: ReplicateModel) -> ProviderModel:
     text_target = _target_from_replicate(model, mode="text-to-image")
     edit_target = (
-        _target_from_replicate(model, mode="image-edit")
-        if model.edit_capable
-        else None
+        _target_from_replicate(model, mode="image-edit") if model.edit_capable else None
     )
     return ProviderModel(
         provider="replicate",

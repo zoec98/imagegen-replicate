@@ -14,6 +14,7 @@ from imagegen.app import create_app
 from imagegen.metadata_embed import read_embedded_metadata, write_embedded_metadata
 from route_helpers import extract_csrf_token
 
+
 def test_image_route_serves_stored_file(app_config, app_factory):
     app_config.output_dir.mkdir(parents=True)
     (app_config.output_dir / "sample.png").write_bytes(b"image-bytes")
@@ -23,6 +24,7 @@ def test_image_route_serves_stored_file(app_config, app_factory):
 
     assert response.status_code == 200
     assert response.data == b"image-bytes"
+
 
 def test_image_route_uses_env_relative_data_dir(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
@@ -45,12 +47,14 @@ def test_image_route_uses_env_relative_data_dir(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.data == b"image-bytes"
 
+
 def test_image_route_blocks_unsafe_paths(app_factory):
     client = app_factory().test_client()
 
     response = client.get("/images/../pyproject.toml")
 
     assert response.status_code == 404
+
 
 def test_image_route_blocks_gif_files(app_config, app_factory):
     app_config.output_dir.mkdir(parents=True)
@@ -61,6 +65,7 @@ def test_image_route_blocks_gif_files(app_config, app_factory):
 
     assert response.status_code == 404
 
+
 def test_image_view_renders_full_image_page(app_config, app_factory):
     app_config.output_dir.mkdir(parents=True)
     (app_config.output_dir / "sample.png").write_bytes(b"image-bytes")
@@ -70,6 +75,7 @@ def test_image_view_renders_full_image_page(app_config, app_factory):
 
     assert response.status_code == 302
     assert response.headers["Location"] == "/images/sample.png"
+
 
 def test_image_download_forces_stored_file_attachment(app_config, app_factory):
     app_config.output_dir.mkdir(parents=True)
@@ -84,12 +90,14 @@ def test_image_download_forces_stored_file_attachment(app_config, app_factory):
         "attachment; filename=sample.png"
     )
 
+
 def test_image_download_rejects_unsafe_paths(app_factory):
     client = app_factory().test_client()
 
     response = client.get("/images/../sample.png/download")
 
     assert response.status_code == 404
+
 
 def test_image_download_clean_returns_stripped_attachment(app_config, app_factory):
     image_path = app_config.output_dir / "sample.png"
@@ -119,6 +127,7 @@ def test_image_download_clean_returns_stripped_attachment(app_config, app_factor
     clean_path.write_bytes(response.data)
     assert read_embedded_metadata(clean_path) is None
 
+
 def test_image_download_clean_rejects_missing_file(app_factory):
     client = app_factory().test_client()
 
@@ -130,6 +139,7 @@ def test_image_download_clean_rejects_missing_file(app_factory):
 def write_sample_png(path):
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (8, 8), (255, 0, 0)).save(path, "PNG")
+
 
 def test_image_metadata_route_serves_embedded_metadata(app_config, app_factory):
     image_path = app_config.output_dir / "sample.png"
@@ -148,7 +158,73 @@ def test_image_metadata_route_serves_embedded_metadata(app_config, app_factory):
     response = client.get("/images/sample.png/metadata")
 
     assert response.status_code == 200
-    assert response.json == metadata
+    assert response.json == {**metadata, "provider": "replicate", "edit_mode": False}
+
+
+def test_image_metadata_route_exposes_edit_source_images(app_config, app_factory):
+    image_path = app_config.output_dir / "sample.png"
+    source_a = app_config.output_dir / "source-a.jpg"
+    source_b = app_config.output_dir / "source-b.jpg"
+    write_sample_png(image_path)
+    write_sample_png(source_a)
+    write_sample_png(source_b)
+    write_embedded_metadata(
+        image_path,
+        {
+            "content_type": "image/png",
+            "provider": "replicate",
+            "model_alias": "seedream45",
+            "model": "bytedance/seedream-4.5",
+            "prompt": "edit this",
+            "parameters": {
+                "prompt": "edit this",
+                "image_input": ["source-a.jpg", "source-b.jpg"],
+                "size": "4K",
+            },
+        },
+    )
+    client = app_factory().test_client()
+
+    response = client.get("/images/sample.png/metadata")
+
+    assert response.status_code == 200
+    assert response.json["edit_mode"] is True
+    assert response.json["source_images"] == ["source-a.jpg", "source-b.jpg"]
+
+
+def test_image_metadata_route_warns_for_unavailable_edit_source_images(
+    app_config,
+    app_factory,
+):
+    image_path = app_config.output_dir / "sample.png"
+    write_sample_png(image_path)
+    write_embedded_metadata(
+        image_path,
+        {
+            "content_type": "image/png",
+            "provider": "replicate",
+            "model_alias": "seedream45",
+            "model": "bytedance/seedream-4.5",
+            "prompt": "edit this",
+            "parameters": {
+                "prompt": "edit this",
+                "image_input": ["../secret.jpg", ".hidden.jpg", "missing.jpg"],
+                "size": "4K",
+            },
+        },
+    )
+    client = app_factory().test_client()
+
+    response = client.get("/images/sample.png/metadata")
+
+    assert response.status_code == 200
+    assert response.json["edit_mode"] is True
+    assert response.json["source_images"] == []
+    assert response.json["warnings"] == [
+        "Some saved source image references were ignored because they are unsafe.",
+        "Some saved source images are no longer available.",
+    ]
+
 
 def test_image_metadata_route_404s_for_missing_embedded_metadata(
     app_config,
@@ -160,6 +236,7 @@ def test_image_metadata_route_404s_for_missing_embedded_metadata(
     response = client.get("/images/sample.png/metadata")
 
     assert response.status_code == 404
+
 
 def test_api_images_returns_gallery_json_newest_first(app_config, app_factory):
     output_dir = app_config.output_dir
@@ -205,6 +282,7 @@ def test_api_images_returns_gallery_json_newest_first(app_config, app_factory):
         ]
     }
 
+
 def test_api_images_returns_empty_gallery(app_factory):
     client = app_factory().test_client()
 
@@ -212,6 +290,7 @@ def test_api_images_returns_empty_gallery(app_factory):
 
     assert response.status_code == 200
     assert response.json == {"images": []}
+
 
 def test_api_images_includes_embedded_metadata(app_config, app_factory):
     image_path = app_config.output_dir / "sample.png"
@@ -247,6 +326,7 @@ def test_api_images_includes_embedded_metadata(app_config, app_factory):
         ]
     }
 
+
 def test_api_delete_image_moves_valid_image_to_trash(app_config, app_factory):
     image_path = app_config.output_dir / "sample.png"
     image_path.parent.mkdir(parents=True)
@@ -267,6 +347,7 @@ def test_api_delete_image_moves_valid_image_to_trash(app_config, app_factory):
     assert not image_path.exists()
     assert (app_config.trash_dir / "sample.png").read_bytes() == b"image"
 
+
 def test_api_delete_image_creates_missing_trash_dir(app_config, app_factory):
     app = app_factory()
     app_config.trash_dir.rmdir()
@@ -286,6 +367,7 @@ def test_api_delete_image_creates_missing_trash_dir(app_config, app_factory):
     assert response.status_code == 200
     assert not image_path.exists()
     assert (app_config.trash_dir / "sample.png").read_bytes() == b"image"
+
 
 def test_api_delete_image_does_not_overwrite_trash_collision(
     app_config,
@@ -314,6 +396,7 @@ def test_api_delete_image_does_not_overwrite_trash_collision(
     assert len(collision_files) == 1
     assert collision_files[0].read_bytes() == b"new image"
 
+
 def test_api_delete_image_rejects_path_traversal(app_config, app_factory):
     image_path = app_config.output_dir / "sample.png"
     image_path.parent.mkdir(parents=True)
@@ -333,6 +416,7 @@ def test_api_delete_image_rejects_path_traversal(app_config, app_factory):
     assert response.json == {"error": "Image not found."}
     assert image_path.exists()
 
+
 def test_api_delete_image_rejects_missing_image(app_factory):
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
@@ -347,6 +431,7 @@ def test_api_delete_image_rejects_missing_image(app_factory):
 
     assert response.status_code == 404
     assert response.json == {"error": "Image not found."}
+
 
 def test_api_delete_image_rejects_gif(app_config, app_factory):
     image_path = app_config.output_dir / "sample.gif"
@@ -366,6 +451,7 @@ def test_api_delete_image_rejects_gif(app_config, app_factory):
     assert response.status_code == 404
     assert response.json == {"error": "Image not found."}
     assert image_path.exists()
+
 
 def test_api_delete_image_requires_csrf(app_config, app_factory):
     image_path = app_config.output_dir / "sample.png"

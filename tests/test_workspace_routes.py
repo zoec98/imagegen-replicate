@@ -17,6 +17,7 @@ from route_helpers import (
     extract_palette_data,
 )
 
+
 def test_index_renders_prompt_form(app_factory):
     client = app_factory().test_client()
 
@@ -61,6 +62,7 @@ def test_index_renders_prompt_form(app_factory):
     assert b'name="image_input"' not in response.data
     assert b"disable_safety_checker" not in response.data
     assert b"Generate" in response.data
+
 
 def test_index_exposes_model_registry_metadata(app_factory):
     client = app_factory().test_client()
@@ -212,6 +214,7 @@ def test_index_renders_no_provider_state(app_config, app_factory):
     assert b'class="generate-button"' in response.data
     assert b"disabled\n              >Generate" in response.data
 
+
 def test_index_exposes_empty_palette_data_when_fragment_root_is_missing(app_factory):
     client = app_factory().test_client()
 
@@ -220,6 +223,7 @@ def test_index_exposes_empty_palette_data_when_fragment_root_is_missing(app_fact
     assert response.status_code == 200
     assert extract_palette_data(response) == []
     assert b'class="palette-controls"' not in response.data
+
 
 def test_index_exposes_palette_data(app_config, app_factory):
     character = app_config.fragment_root / "character"
@@ -273,6 +277,7 @@ def test_index_exposes_palette_data(app_config, app_factory):
         },
     ]
 
+
 def test_index_excludes_invalid_palette_fragments(app_config, app_factory):
     style = app_config.fragment_root / "style"
     style.mkdir(parents=True)
@@ -293,6 +298,7 @@ def test_index_excludes_invalid_palette_fragments(app_config, app_factory):
         },
     ]
 
+
 def test_index_static_asset_urls_are_cache_busted(app_factory):
     client = app_factory().test_client()
 
@@ -306,6 +312,7 @@ def test_index_static_asset_urls_are_cache_busted(app_factory):
     assert parse_qs(urlparse(css_url).query) == {"v": [checksum]}
     assert parse_qs(urlparse(js_url).query) == {"v": [checksum]}
 
+
 def test_api_app_version_matches_rendered_checksum(app_factory):
     client = app_factory().test_client()
     index = client.get("/")
@@ -315,6 +322,7 @@ def test_api_app_version_matches_rendered_checksum(app_factory):
 
     assert response.status_code == 200
     assert response.json == {"app_checksum": checksum}
+
 
 def test_index_lists_existing_images(app_config, app_factory):
     output_dir = app_config.output_dir
@@ -331,6 +339,7 @@ def test_index_lists_existing_images(app_config, app_factory):
     assert b'href="/images/first.png"' in response.data
     assert b"animated.gif" not in response.data
     assert b"ignore.txt" not in response.data
+
 
 def test_index_exposes_gallery_filenames_for_source_selection(app_config, app_factory):
     app_config.output_dir.mkdir(parents=True)
@@ -355,6 +364,7 @@ def test_index_exposes_gallery_filenames_for_source_selection(app_config, app_fa
     assert b'title="Delete image"' in response.data
     assert b'class="image-type"' not in response.data
     assert b"gallery-immich" not in response.data
+
 
 def test_index_renders_immich_upload_action_when_configured(
     app_config,

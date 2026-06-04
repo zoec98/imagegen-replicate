@@ -8,6 +8,7 @@ Behaviors protected:
 
 from imagegen.app_version import app_checksum
 
+
 def test_app_checksum_changes_when_asset_content_changes(tmp_path):
     template = tmp_path / "index.html"
     script = tmp_path / "app.js"
@@ -22,10 +23,12 @@ def test_app_checksum_changes_when_asset_content_changes(tmp_path):
 
     assert app_checksum((template, script, style)) != first
 
+
 def test_create_app_returns_flask_app(app_factory):
     app = app_factory()
 
     assert app.name == "imagegen.app"
+
 
 def test_create_app_creates_derived_data_directories(app_config, app_factory):
     app_factory()
@@ -36,6 +39,7 @@ def test_create_app_creates_derived_data_directories(app_config, app_factory):
     assert app_config.trash_dir.is_dir()
     assert app_config.tmp_dir.is_dir()
 
+
 def test_create_app_cleans_temporary_exports(app_config, app_factory):
     app_config.tmp_dir.mkdir(parents=True)
     stale_export = app_config.tmp_dir / "sample-clean-old.png"
@@ -44,4 +48,3 @@ def test_create_app_cleans_temporary_exports(app_config, app_factory):
     app_factory()
 
     assert not stale_export.exists()
-

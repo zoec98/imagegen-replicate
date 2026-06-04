@@ -795,6 +795,29 @@
     return supported;
   }
 
+  function sourceImagesFromMetadata(metadata, model) {
+    if (!model?.edit_capable) {
+      return [];
+    }
+    if (Array.isArray(metadata.source_images)) {
+      return metadata.source_images.filter(
+        (filename) => typeof filename === "string" && filename.trim(),
+      );
+    }
+    const sourceParameter = model.source_image_parameter;
+    if (!sourceParameter || !metadata.parameters) {
+      return [];
+    }
+    const value = metadata.parameters[sourceParameter];
+    if (typeof value === "string" && value.trim()) {
+      return [value];
+    }
+    if (Array.isArray(value)) {
+      return value.filter((filename) => typeof filename === "string" && filename.trim());
+    }
+    return [];
+  }
+
   function applyImageMetadata(metadata) {
     if (!metadata || typeof metadata !== "object") {
       throw new Error("Image metadata is missing.");
@@ -811,6 +834,7 @@
     }
 
     const nextParameters = parametersForModel(metadata.parameters, model);
+    const sourceImages = sourceImagesFromMetadata(metadata, model);
     promptInput.value = metadata.prompt;
     if (providerSelector && model.provider) {
       providerSelector.value = model.provider;
@@ -818,7 +842,8 @@
     }
     modelSelector.value = model.alias;
     selectedSourceImages.clear();
-    editModeEnabled = false;
+    sourceImages.forEach((filename) => selectedSourceImages.add(filename));
+    editModeEnabled = Boolean(metadata.edit_mode || sourceImages.length > 0);
     Object.keys(parameterState).forEach((name) => {
       delete parameterState[name];
     });
@@ -842,7 +867,11 @@
       throw new Error(data.error || "Image metadata could not be loaded.");
     }
     applyImageMetadata(data);
-    showMessage("Image metadata loaded.", "success");
+    const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+    showMessage(
+      warnings.length ? `Image metadata loaded. ${warnings.join(" ")}` : "Image metadata loaded.",
+      warnings.length ? "warning" : "success",
+    );
   }
 
   async function deleteGalleryImage(figure) {

@@ -155,7 +155,7 @@ def register_routes(app: Flask) -> None:
         metadata = app.config["IMAGEGEN_METADATA_PROVIDER"].get(image_path)
         if not metadata.exists:
             abort(404)
-        return metadata.to_json()
+        return _metadata_json(metadata.to_json(), image_path.parent)
 
 
 def safe_image_filename(filename: str) -> str | None:
@@ -163,6 +163,43 @@ def safe_image_filename(filename: str) -> str | None:
     if safe_name != filename or Path(filename).suffix.lower() not in IMAGE_EXTENSIONS:
         return None
     return safe_name
+
+
+def _metadata_json(
+    payload: dict[str, object],
+    image_dir: Path,
+) -> dict[str, object]:
+    source_images = payload.get("source_images")
+    if not isinstance(source_images, list):
+        return payload
+
+    available: list[str] = []
+    invalid_count = 0
+    missing_count = 0
+    for filename in source_images:
+        if not isinstance(filename, str):
+            invalid_count += 1
+            continue
+        safe_name = safe_image_filename(filename)
+        if safe_name is None:
+            invalid_count += 1
+            continue
+        if not (image_dir / safe_name).is_file():
+            missing_count += 1
+            continue
+        available.append(safe_name)
+
+    payload["source_images"] = available
+    warnings: list[str] = []
+    if invalid_count:
+        warnings.append(
+            "Some saved source image references were ignored because they are unsafe."
+        )
+    if missing_count:
+        warnings.append("Some saved source images are no longer available.")
+    if warnings:
+        payload["warnings"] = warnings
+    return payload
 
 
 def clean_download_name(filename: str) -> str:
@@ -211,12 +248,14 @@ def _provider_model_json(model) -> dict[str, object]:
         "edit_capable": model.edit_capable,
         "source_image_parameter": (
             model.edit_target.source_images.provider_field
-            if model.edit_target is not None and model.edit_target.source_images is not None
+            if model.edit_target is not None
+            and model.edit_target.source_images is not None
             else None
         ),
         "source_image_max": (
             model.edit_target.source_images.max_count
-            if model.edit_target is not None and model.edit_target.source_images is not None
+            if model.edit_target is not None
+            and model.edit_target.source_images is not None
             else 0
         ),
         "custom_dimensions": _custom_dimensions_json(target.custom_dimensions),
@@ -229,7 +268,9 @@ def _target_parameter_json(
     model: ProviderModel,
     target: GenerationTarget,
 ) -> list[dict[str, object]]:
-    return [_parameter_json(parameter) for parameter in _target_parameters(model, target)]
+    return [
+        _parameter_json(parameter) for parameter in _target_parameters(model, target)
+    ]
 
 
 def _target_parameters(

@@ -226,7 +226,12 @@ def _seedream45_parameters() -> tuple[ModelParameter, ...]:
 def _bria_text_parameters() -> tuple[ModelParameter, ...]:
     return (
         _param("prompt", "Prompt for image generation.", "string", order=1),
-        _param("structured_prompt", "Structured prompt for image generation.", "string", order=2),
+        _param(
+            "structured_prompt",
+            "Structured prompt for image generation.",
+            "string",
+            order=2,
+        ),
         _param("image_url", "Reference image URL.", "string", order=3),
         _param("seed", "Random seed for reproducibility.", "integer", 5555, order=4),
         _param(
@@ -246,7 +251,12 @@ def _bria_text_parameters() -> tuple[ModelParameter, ...]:
             choices=BRIA_ASPECT_RATIO_CHOICES,
             order=6,
         ),
-        _param("negative_prompt", "Negative prompt for image generation.", "string", order=7),
+        _param(
+            "negative_prompt",
+            "Negative prompt for image generation.",
+            "string",
+            order=7,
+        ),
         _param(
             "resolution",
             "Output image resolution.",
@@ -262,9 +272,21 @@ def _bria_edit_parameters() -> tuple[ModelParameter, ...]:
     return (
         _param("mask_url", "Mask image URL.", "string", order=2),
         _param("instruction", "Instruction for image editing.", "string", order=3),
-        _param("structured_instruction", "Structured instruction for image editing.", "string", order=4),
-        _param("original_vgl", "Original VGL used to generate the image.", "string", order=5),
-        _param("new_vgl", "New VGL describing the image after edit.", "string", order=6),
+        _param(
+            "structured_instruction",
+            "Structured instruction for image editing.",
+            "string",
+            order=4,
+        ),
+        _param(
+            "original_vgl",
+            "Original VGL used to generate the image.",
+            "string",
+            order=5,
+        ),
+        _param(
+            "new_vgl", "New VGL describing the image after edit.", "string", order=6
+        ),
         _param("seed", "Random seed for reproducibility.", "integer", 5555, order=7),
         _param(
             "steps_num",
@@ -275,7 +297,12 @@ def _bria_edit_parameters() -> tuple[ModelParameter, ...]:
             maximum=50,
             order=8,
         ),
-        _param("negative_prompt", "Negative prompt for image generation.", "string", order=9),
+        _param(
+            "negative_prompt",
+            "Negative prompt for image generation.",
+            "string",
+            order=9,
+        ),
         _param("guidance_scale", "Guidance scale for text.", "number", 5, order=10),
     )
 
@@ -295,7 +322,9 @@ ERNIE_IMAGE = ProviderModel(
         parameters=_ernie_parameters(turbo=False),
         fixed_inputs=FALAI_FIXED_SAFE_IMAGE_INPUTS,
         pricing=(
-            _falai_price("$0.03", "per output megapixel", metric="image_output_megapixel_count"),
+            _falai_price(
+                "$0.03", "per output megapixel", metric="image_output_megapixel_count"
+            ),
         ),
     ),
 )
@@ -315,7 +344,9 @@ ERNIE_IMAGE_TURBO = ProviderModel(
         parameters=_ernie_parameters(turbo=True),
         fixed_inputs=FALAI_FIXED_SAFE_IMAGE_INPUTS,
         pricing=(
-            _falai_price("$0.01", "per output megapixel", metric="image_output_megapixel_count"),
+            _falai_price(
+                "$0.01", "per output megapixel", metric="image_output_megapixel_count"
+            ),
         ),
     ),
 )
@@ -334,7 +365,9 @@ SEEDREAM45 = ProviderModel(
         mode="text-to-image",
         parameters=_seedream45_parameters(),
         fixed_inputs=FALAI_FIXED_SAFE_IMAGE_INPUTS,
-        pricing=(_falai_price("$0.04", "per output image", metric="image_output_count"),),
+        pricing=(
+            _falai_price("$0.04", "per output image", metric="image_output_count"),
+        ),
     ),
     edit_target=GenerationTarget(
         provider="falai",
@@ -347,7 +380,9 @@ SEEDREAM45 = ProviderModel(
         parameters=_seedream45_parameters(),
         fixed_inputs=FALAI_FIXED_SAFE_IMAGE_INPUTS,
         source_images=SourceImageBinding(provider_field="image_urls", max_count=10),
-        pricing=(_falai_price("$0.04", "per output image", metric="image_output_count"),),
+        pricing=(
+            _falai_price("$0.04", "per output image", metric="image_output_count"),
+        ),
     ),
 )
 
@@ -365,7 +400,9 @@ BRIA_FIBO = ProviderModel(
         mode="text-to-image",
         parameters=_bria_text_parameters(),
         fixed_inputs=FALAI_FIXED_IMAGE_OUTPUT_INPUTS,
-        pricing=(_falai_price("$0.04", "per output image", metric="image_output_count"),),
+        pricing=(
+            _falai_price("$0.04", "per output image", metric="image_output_count"),
+        ),
     ),
     edit_target=GenerationTarget(
         provider="falai",
@@ -378,7 +415,9 @@ BRIA_FIBO = ProviderModel(
         parameters=_bria_edit_parameters(),
         fixed_inputs=FALAI_FIXED_IMAGE_OUTPUT_INPUTS,
         source_images=SourceImageBinding(provider_field="image_url", max_count=1),
-        pricing=(_falai_price("$0.04", "per output image", metric="image_output_count"),),
+        pricing=(
+            _falai_price("$0.04", "per output image", metric="image_output_count"),
+        ),
     ),
 )
 

@@ -319,7 +319,9 @@ def test_run_generation_request_reports_unimplemented_provider(app_config):
     store = RequestStore()
     record = store.create(provider="falai", prompt="a red house", parameters={})
 
-    run_generation_request(store, record, app_config, {"replicate": RecordingProvider(None)})
+    run_generation_request(
+        store, record, app_config, {"replicate": RecordingProvider(None)}
+    )
 
     assert record.status == "failed"
     assert record.error == "Provider `falai` is not implemented yet."

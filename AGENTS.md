@@ -173,7 +173,7 @@ Palette and fragment names:
 Fragment content:
 
 - Must be UTF-8 text.
-- Must be at most 256 bytes.
+- Must be at most 1024 bytes.
 - May not contain `(`, `)`, or `:`.
 - Must be validated before exposure to the browser or writes from the UI.
 

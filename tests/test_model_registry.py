@@ -130,7 +130,9 @@ def test_fully_qualified_and_bare_model_refs_resolve_by_provider():
     assert resolve_model_ref("replicate:seedream45").provider == "replicate"
     assert resolve_model_ref("falai:seedream45").provider == "falai"
     assert (
-        resolve_model_ref("seedream45", selected_provider="falai").text_target.provider_model
+        resolve_model_ref(
+            "seedream45", selected_provider="falai"
+        ).text_target.provider_model
         == "fal-ai/bytedance/seedream/v4.5/text-to-image"
     )
 

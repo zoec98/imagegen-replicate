@@ -181,7 +181,9 @@ def test_falai_edit_submission_uploads_source_images_and_keeps_local_names_in_me
     )
 
     assert client.upload_calls == [source_path]
-    assert client.submit_calls[0]["application"] == "fal-ai/bytedance/seedream/v4.5/edit"
+    assert (
+        client.submit_calls[0]["application"] == "fal-ai/bytedance/seedream/v4.5/edit"
+    )
     assert client.submit_calls[0]["arguments"]["image_urls"] == [
         "https://uploads.test/source.png"
     ]

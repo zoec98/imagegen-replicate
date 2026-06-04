@@ -8,6 +8,7 @@ Behaviors protected:
 
 from route_helpers import extract_csrf_token
 
+
 def test_api_palettes_lists_palette_data(app_config, app_factory):
     style = app_config.fragment_root / "style"
     style.mkdir(parents=True)
@@ -33,6 +34,7 @@ def test_api_palettes_lists_palette_data(app_config, app_factory):
         ]
     }
 
+
 def test_api_palette_fragment_reads_without_csrf(app_config, app_factory):
     style = app_config.fragment_root / "style"
     style.mkdir(parents=True)
@@ -50,6 +52,7 @@ def test_api_palette_fragment_reads_without_csrf(app_config, app_factory):
         }
     }
 
+
 def test_api_palette_fragment_rejects_invalid_read_name(app_factory):
     client = app_factory().test_client()
 
@@ -57,6 +60,7 @@ def test_api_palette_fragment_rejects_invalid_read_name(app_factory):
 
     assert response.status_code == 400
     assert "Invalid palette name" in response.json["error"]
+
 
 def test_api_palette_fragment_crud(app_config, app_factory):
     style = app_config.fragment_root / "style"
@@ -94,6 +98,7 @@ def test_api_palette_fragment_crud(app_config, app_factory):
     assert delete.json == {"deleted": "comic_lawrence"}
     assert not (style / "comic_lawrence.txt").exists()
 
+
 def test_api_create_palette_fragment_requires_csrf(app_config, app_factory):
     (app_config.fragment_root / "style").mkdir(parents=True)
     client = app_factory().test_client()
@@ -104,6 +109,7 @@ def test_api_create_palette_fragment_requires_csrf(app_config, app_factory):
     )
 
     assert response.status_code == 403
+
 
 def test_api_create_palette_fragment_rejects_missing_palette(app_factory):
     client = app_factory().test_client()
@@ -119,6 +125,7 @@ def test_api_create_palette_fragment_rejects_missing_palette(app_factory):
 
     assert response.status_code == 404
     assert response.json == {"error": "Palette not found: style."}
+
 
 def test_api_create_palette_fragment_rejects_conflict(app_config, app_factory):
     style = app_config.fragment_root / "style"
@@ -137,6 +144,7 @@ def test_api_create_palette_fragment_rejects_conflict(app_config, app_factory):
 
     assert response.status_code == 409
     assert "already exists" in response.json["error"]
+
 
 def test_api_update_palette_fragment_rejects_invalid_content(
     app_config,
@@ -158,4 +166,3 @@ def test_api_update_palette_fragment_rejects_invalid_content(
 
     assert response.status_code == 400
     assert "may not contain" in response.json["error"]
-

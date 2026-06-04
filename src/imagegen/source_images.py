@@ -12,6 +12,8 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 
 from imagegen.gallery import IMAGE_EXTENSIONS
+
+
 class SourceImageError(ValueError):
     pass
 

@@ -3,6 +3,7 @@
 Behaviors protected:
 - Metadata objects report existence only when generated-image fields are present.
 - The metadata provider reads embedded metadata and ignores JSON sidecars.
+- Edit-generated image metadata exposes local source image filenames for reload.
 """
 
 from PIL import Image
@@ -20,6 +21,8 @@ def test_image_metadata_exists_when_known_fields_are_present():
     assert ImageMetadata(model="bytedance/seedream-4.5").exists is True
     assert ImageMetadata(prompt="a red house").exists is True
     assert ImageMetadata(parameters={"size": "2K"}).exists is True
+    assert ImageMetadata(edit_mode=True).exists is True
+    assert ImageMetadata(source_images=["source.png"]).exists is True
 
 
 def test_embedded_metadata_provider_reads_embedded_metadata(tmp_path):
@@ -57,7 +60,33 @@ def test_embedded_metadata_provider_reads_embedded_metadata(tmp_path):
         "model": "fal-ai/bytedance/seedream/v4.5/edit",
         "prompt": "a red house",
         "parameters": {"size": "2K"},
+        "edit_mode": False,
     }
+
+
+def test_embedded_metadata_provider_derives_edit_source_images(tmp_path):
+    image_path = tmp_path / "sample.png"
+    Image.new("RGB", (8, 8), (255, 0, 0)).save(image_path, "PNG")
+    write_embedded_metadata(
+        image_path,
+        {
+            "content_type": "image/png",
+            "model_alias": "seedream45",
+            "model": "bytedance/seedream-4.5",
+            "prompt": "edit this",
+            "parameters": {
+                "prompt": "edit this",
+                "image_input": ["source-a.jpg", "source-b.jpg"],
+                "size": "4K",
+            },
+        },
+    )
+
+    metadata = EmbeddedImageMetadataProvider().get(image_path)
+
+    assert metadata.edit_mode is True
+    assert metadata.source_images == ["source-a.jpg", "source-b.jpg"]
+    assert metadata.to_json()["source_images"] == ["source-a.jpg", "source-b.jpg"]
 
 
 def test_embedded_metadata_provider_ignores_json_sidecar_metadata(tmp_path):

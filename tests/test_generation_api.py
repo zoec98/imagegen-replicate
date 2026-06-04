@@ -15,6 +15,7 @@ from imagegen.model_registry import (
 )
 from route_helpers import extract_csrf_token, expected_response_parameters
 
+
 def test_api_generate_accepts_json_and_returns_request_id(app_factory):
     model = MODEL_REGISTRY["seedream45"]
     client = app_factory().test_client()
@@ -48,6 +49,7 @@ def test_api_generate_accepts_json_and_returns_request_id(app_factory):
     )
     assert response.json["images"] == []
 
+
 def test_api_generate_accepts_flux_flex_model_payload(app_factory):
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
@@ -76,6 +78,7 @@ def test_api_generate_accepts_flux_flex_model_payload(app_factory):
         "output_format": "png",
         "output_quality": 80,
     }
+
 
 def test_api_generate_accepts_flux_flex_custom_dimensions_and_blank_seed(app_factory):
     client = app_factory().test_client()
@@ -112,6 +115,7 @@ def test_api_generate_accepts_flux_flex_custom_dimensions_and_blank_seed(app_fac
         "output_quality": 80,
     }
 
+
 def test_api_generate_rejects_flux_flex_dimensions_without_custom_aspect_ratio(
     app_factory,
 ):
@@ -134,6 +138,7 @@ def test_api_generate_rejects_flux_flex_dimensions_without_custom_aspect_ratio(
     assert response.json == {
         "error": "width and height are only allowed when aspect_ratio is custom."
     }
+
 
 def test_api_generate_rejects_unknown_model(app_factory):
     client = app_factory().test_client()
@@ -223,7 +228,9 @@ def test_api_generate_rejects_wrong_provider_model_alias(app_config, app_factory
     }
 
 
-def test_api_generate_logs_falai_edit_requests_to_linked_endpoint(app_config, app_factory):
+def test_api_generate_logs_falai_edit_requests_to_linked_endpoint(
+    app_config, app_factory
+):
     app_config = replace(
         app_config,
         fal_key="fal-key",
@@ -250,9 +257,9 @@ def test_api_generate_logs_falai_edit_requests_to_linked_endpoint(app_config, ap
 
     assert response.status_code == 202
     assert response.json["provider"] == "falai"
-    request_log = client.application.config["IMAGEGEN_GENERATION_LOG"].get_logged_request(
-        response.json["request_id"]
-    )
+    request_log = client.application.config[
+        "IMAGEGEN_GENERATION_LOG"
+    ].get_logged_request(response.json["request_id"])
     assert request_log is not None
     assert request_log.model == "fal-ai/bytedance/seedream/v4.5/edit"
     assert request_log.request_sent["image_urls"] == ["source.png"]
@@ -291,6 +298,7 @@ def test_api_generate_rejects_falai_edit_mode_without_linked_endpoint(
         "error": "Model `falai:ernie-image` does not support image edit mode."
     }
 
+
 def test_api_generate_rejects_invalid_annotation_before_request_creation(app_factory):
     class RecordingWorker:
         def __init__(self):
@@ -315,6 +323,7 @@ def test_api_generate_rejects_invalid_annotation_before_request_creation(app_fac
     assert response.status_code == 400
     assert response.json == {"error": "Prompt annotation is missing a closing ')'."}
     assert worker.started == []
+
 
 def test_api_generate_logs_recreatable_request_payload(app_factory):
     app = app_factory()
@@ -352,6 +361,7 @@ def test_api_generate_logs_recreatable_request_payload(app_factory):
         "prompt": "a small red house",
     }
 
+
 def test_api_generate_logs_annotated_prompt_and_stripped_provider_payload(app_factory):
     app = app_factory()
     client = app.test_client()
@@ -374,6 +384,7 @@ def test_api_generate_logs_annotated_prompt_and_stripped_provider_payload(app_fa
     assert request_log is not None
     assert request_log.prompt == prompt
     assert request_log.request_sent["prompt"] == "portrait of blue hair"
+
 
 def test_api_generate_starts_configured_worker(app_factory):
     class RecordingWorker:
@@ -400,6 +411,7 @@ def test_api_generate_starts_configured_worker(app_factory):
         response.json["request_id"]
     ]
 
+
 def test_api_generate_accepts_existing_source_images(app_config, app_factory):
     app_config.output_dir.mkdir(parents=True)
     (app_config.output_dir / "source.png").write_bytes(b"image")
@@ -420,12 +432,13 @@ def test_api_generate_accepts_existing_source_images(app_config, app_factory):
 
     assert response.status_code == 202
     assert response.json["source_images"] == ["source.png"]
-    request_log = client.application.config["IMAGEGEN_GENERATION_LOG"].get_logged_request(
-        response.json["request_id"]
-    )
+    request_log = client.application.config[
+        "IMAGEGEN_GENERATION_LOG"
+    ].get_logged_request(response.json["request_id"])
     assert request_log is not None
     assert request_log.source_images == ["source.png"]
     assert request_log.request_sent["image_input"] == ["source.png"]
+
 
 def test_api_generate_rejects_invalid_edit_mode(app_factory):
     client = app_factory().test_client()
@@ -445,6 +458,7 @@ def test_api_generate_rejects_invalid_edit_mode(app_factory):
     assert response.status_code == 400
     assert response.json == {"error": "edit_mode must be a boolean."}
 
+
 def test_api_generate_rejects_edit_mode_without_source_images(app_factory):
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
@@ -462,6 +476,7 @@ def test_api_generate_rejects_edit_mode_without_source_images(app_factory):
 
     assert response.status_code == 400
     assert response.json == {"error": "edit_mode requires at least one source image."}
+
 
 def test_api_generate_rejects_source_images_outside_edit_mode(
     app_config,
@@ -488,6 +503,7 @@ def test_api_generate_rejects_source_images_outside_edit_mode(
         "error": "source_images can only be submitted in edit mode."
     }
 
+
 def test_api_generate_rejects_edit_mode_for_non_edit_model(
     app_config,
     app_factory,
@@ -495,7 +511,9 @@ def test_api_generate_rejects_edit_mode_for_non_edit_model(
 ):
     app_config.output_dir.mkdir(parents=True)
     (app_config.output_dir / "source.png").write_bytes(b"image")
-    text_only = replace(resolve_model("replicate", "seedream45"), alias="text-only", edit_target=None)
+    text_only = replace(
+        resolve_model("replicate", "seedream45"), alias="text-only", edit_target=None
+    )
     monkeypatch.setitem(
         PROVIDER_REGISTRIES["replicate"],
         "text-only",
@@ -522,6 +540,7 @@ def test_api_generate_rejects_edit_mode_for_non_edit_model(
         "error": "Model `replicate:text-only` does not support image edit mode."
     }
 
+
 def test_api_generate_rejects_missing_source_image(app_factory):
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
@@ -540,6 +559,7 @@ def test_api_generate_rejects_missing_source_image(app_factory):
 
     assert response.status_code == 400
     assert response.json == {"error": "Source image not found: missing.png."}
+
 
 def test_api_generate_rejects_gif_source_image(app_config, app_factory):
     app_config.output_dir.mkdir(parents=True)
@@ -562,6 +582,7 @@ def test_api_generate_rejects_gif_source_image(app_config, app_factory):
     assert response.status_code == 400
     assert response.json == {"error": "Invalid source image filename: source.gif."}
 
+
 def test_api_generate_rejects_blank_prompt(app_factory):
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
@@ -577,6 +598,7 @@ def test_api_generate_rejects_blank_prompt(app_factory):
     assert response.status_code == 400
     assert response.json == {"error": "Prompt is required."}
 
+
 def test_api_generate_rejects_non_object_parameters(app_factory):
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
@@ -591,6 +613,7 @@ def test_api_generate_rejects_non_object_parameters(app_factory):
 
     assert response.status_code == 400
     assert response.json == {"error": "parameters must be an object."}
+
 
 def test_api_generate_rejects_invalid_select_choice(app_factory):
     client = app_factory().test_client()
@@ -610,6 +633,7 @@ def test_api_generate_rejects_invalid_select_choice(app_factory):
     assert response.status_code == 400
     assert response.json == {"error": "size must be one of: 2K, 4K."}
 
+
 def test_api_generate_rejects_out_of_range_integer(app_factory):
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
@@ -628,6 +652,7 @@ def test_api_generate_rejects_out_of_range_integer(app_factory):
     assert response.status_code == 400
     assert response.json == {"error": "max_images must be at most 15."}
 
+
 def test_api_generate_rejects_disable_safety_checker_override(app_factory):
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
@@ -645,6 +670,7 @@ def test_api_generate_rejects_disable_safety_checker_override(app_factory):
 
     assert response.status_code == 400
     assert response.json == {"error": "disable_safety_checker is fixed by the server."}
+
 
 def test_api_generation_returns_known_request_status(app_factory):
     client = app_factory().test_client()
@@ -675,6 +701,7 @@ def test_api_generation_returns_known_request_status(app_factory):
     assert response.json["logs"] == []
     assert response.json["created_at"]
     assert response.json["updated_at"]
+
 
 def test_api_generation_unknown_request_id_returns_json_404(app_factory):
     client = app_factory().test_client()

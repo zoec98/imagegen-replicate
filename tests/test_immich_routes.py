@@ -11,6 +11,7 @@ from dataclasses import replace
 from imagegen.immich_client import ImmichUploadError, ImmichUploadResult
 from route_helpers import extract_csrf_token
 
+
 def test_api_images_exposes_immich_upload_url_only_when_configured(
     app_config,
     app_factory,
@@ -35,6 +36,7 @@ def test_api_images_exposes_immich_upload_url_only_when_configured(
         "/api/images/sample.png/immich-upload"
     )
 
+
 def test_api_immich_upload_requires_configuration(app_config, app_factory):
     app_config.output_dir.mkdir(parents=True)
     (app_config.output_dir / "sample.png").write_bytes(b"image")
@@ -52,6 +54,7 @@ def test_api_immich_upload_requires_configuration(app_config, app_factory):
     assert response.status_code == 404
     assert response.json == {"error": "Immich upload is not configured."}
 
+
 def test_api_immich_upload_requires_csrf(app_config, app_factory):
     app_config.output_dir.mkdir(parents=True)
     (app_config.output_dir / "sample.png").write_bytes(b"image")
@@ -66,6 +69,7 @@ def test_api_immich_upload_requires_csrf(app_config, app_factory):
     response = client.post("/api/images/sample.png/immich-upload", json={})
 
     assert response.status_code == 403
+
 
 def test_api_immich_upload_rejects_missing_or_unsafe_filename(
     app_config,
@@ -98,6 +102,7 @@ def test_api_immich_upload_rejects_missing_or_unsafe_filename(
     assert missing.json == {"error": "Image not found."}
     assert unsafe.status_code == 404
     assert unsafe.json == {"error": "Image not found."}
+
 
 def test_api_immich_upload_calls_configured_backend_client(
     app_config,
@@ -138,6 +143,7 @@ def test_api_immich_upload_calls_configured_backend_client(
     assert response.json == {"filename": "sample.png", "status": "uploaded"}
     assert immich_client.paths == [app_config.output_dir / "sample.png"]
 
+
 def test_api_immich_upload_treats_already_present_as_success(
     app_config,
     app_factory,
@@ -170,6 +176,7 @@ def test_api_immich_upload_treats_already_present_as_success(
 
     assert response.status_code == 200
     assert response.json == {"filename": "sample.png", "status": "already_present"}
+
 
 def test_api_immich_upload_returns_sanitized_error(
     app_config,

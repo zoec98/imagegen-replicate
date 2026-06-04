@@ -424,6 +424,11 @@ select {
   color: #0a6b2b;
 }
 
+.message-warning {
+  background: #fff7dc;
+  color: #684900;
+}
+
 .message-info {
   background: #eff6ff;
   color: #1d4ed8;
