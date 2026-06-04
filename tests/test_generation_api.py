@@ -224,7 +224,7 @@ def test_api_generate_rejects_wrong_provider_model_alias(app_config, app_factory
 
     assert response.status_code == 400
     assert response.json == {
-        "error": "Unknown model: flux-flex. Expected one of: bria-fibo, ernie-image, ernie-image-turbo, seedream45."
+        "error": "Unknown model: flux-flex. Expected one of: bria-fibo, ernie-image, ernie-image-turbo, flux-2, flux-2-pro, flux-2-realism, hidream-dev, hidream-fast, hidream-full, seedream45, zit."
     }
 
 

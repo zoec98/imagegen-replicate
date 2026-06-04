@@ -105,10 +105,21 @@ def test_provider_registry_lists_supported_providers():
 def test_provider_model_lists_are_scoped_by_provider():
     replicate_models = list_models_for_provider("replicate")
     falai_models = list_models_for_provider("falai")
+    falai_aliases = {model.alias for model in falai_models}
 
     assert {model.alias for model in replicate_models} == set(MODEL_REGISTRY)
     assert "seedream45" in {model.alias for model in replicate_models}
-    assert "seedream45" in {model.alias for model in falai_models}
+    assert {
+        "bria-fibo",
+        "flux-2",
+        "flux-2-pro",
+        "flux-2-realism",
+        "hidream-dev",
+        "hidream-fast",
+        "hidream-full",
+        "seedream45",
+        "zit",
+    } <= falai_aliases
     assert {model.provider for model in replicate_models} == {"replicate"}
     assert {model.provider for model in falai_models} == {"falai"}
 
@@ -172,6 +183,38 @@ def test_falai_edit_target_uses_linked_endpoint_not_selector_duplicate():
     assert edit_target.source_images is not None
     assert edit_target.source_images.provider_field == "image_urls"
     assert edit_target.source_images.max_count == 10
+
+
+def test_falai_plan_ticket_models_use_linked_edit_endpoints():
+    models = list_models_for_provider("falai")
+    selectable_endpoint_ids = {model.text_target.provider_model for model in models}
+
+    expected = {
+        "flux-2": ("fal-ai/flux-2/edit", "image_urls", 4),
+        "flux-2-pro": ("fal-ai/flux-2-pro/edit", "image_urls", 10),
+        "zit": ("fal-ai/z-image/turbo/image-to-image", "image_url", 1),
+    }
+    for alias, (provider_model, source_field, max_count) in expected.items():
+        target = resolve_generation_target("falai", alias, edit_mode=True)
+        assert provider_model not in selectable_endpoint_ids
+        assert target.provider_model == provider_model
+        assert target.source_images is not None
+        assert target.source_images.provider_field == source_field
+        assert target.source_images.max_count == max_count
+
+
+def test_falai_models_keep_safety_checker_fixed_when_supported():
+    for alias in (
+        "flux-2",
+        "flux-2-pro",
+        "flux-2-realism",
+        "hidream-dev",
+        "hidream-fast",
+        "hidream-full",
+        "zit",
+    ):
+        target = resolve_generation_target("falai", alias, edit_mode=False)
+        assert target.fixed_inputs["enable_safety_checker"] is False
 
 
 def test_falai_text_mode_resolves_selectable_endpoint():
