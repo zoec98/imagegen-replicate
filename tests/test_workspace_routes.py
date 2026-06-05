@@ -289,6 +289,39 @@ def test_index_exposes_palette_data(app_config, app_factory):
     ]
 
 
+def test_index_renders_trashcan_button_and_overlay_shell(app_config, app_factory):
+    style = app_config.fragment_root / "style"
+    style.mkdir(parents=True)
+    (style / "photo.txt").write_text("photo", encoding="utf-8")
+    app_config.trash_dir.mkdir(parents=True)
+    (app_config.trash_dir / "deleted.png").write_bytes(b"image")
+    (app_config.trash_dir / "ignored.txt").write_text("ignored", encoding="utf-8")
+    client = app_factory().test_client()
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b'class="trashcan-toggle"' in response.data
+    assert b'data-api-trash-url="/api/trash"' in response.data
+    assert b'data-api-empty-trash-url="/api/trash/empty"' in response.data
+    assert b'<span class="trashcan-count" aria-live="polite">1</span>' in (
+        response.data
+    )
+    assert response.data.index(b'class="palette-editor-toggle"') < (
+        response.data.index(b'class="trashcan-toggle"')
+    )
+    assert response.data.index(b'class="trashcan-toggle"') < (
+        response.data.index(b'class="pricing-info"')
+    )
+    assert b'class="trash-overlay"' in response.data
+    assert b'aria-labelledby="trash-title" hidden' in response.data
+    assert b'id="trash-title">Trash' in response.data
+    assert b'class="trash-empty" type="button">Empty trash' in response.data
+    assert b'class="trash-empty-state" hidden>Trash is empty.' in response.data
+    assert b'class="trash-gallery" aria-label="Trash images"' in response.data
+    assert b'class="trash-close"' in response.data
+
+
 def test_index_excludes_invalid_palette_fragments(app_config, app_factory):
     style = app_config.fragment_root / "style"
     style.mkdir(parents=True)

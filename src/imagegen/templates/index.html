@@ -71,6 +71,19 @@
                 type="button"
                 {% if not palettes %}hidden{% endif %}
               >Palettes</button>
+              <button
+                class="trashcan-toggle"
+                type="button"
+                data-api-trash-url="{{ url_for('api_trash') }}"
+                data-api-empty-trash-url="{{ url_for('api_empty_trash') }}"
+                aria-haspopup="dialog"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M9 3h6l1 2h4v2H4V5h4zm-3 6h12l-.7 11H6.7z"/>
+                </svg>
+                <span>Trash</span>
+                <span class="trashcan-count" aria-live="polite">{{ trash_count }}</span>
+              </button>
               <span class="pricing-popover">
                 <button
                   class="pricing-info"
@@ -311,6 +324,23 @@
             <canvas class="mask-editor-mask" aria-label="Mask painting canvas"></canvas>
           </div>
         </div>
+      </div>
+    </div>
+    <div class="trash-overlay" role="dialog" aria-modal="true" aria-labelledby="trash-title" hidden>
+      <div class="trash-pane">
+        <div class="trash-bar">
+          <h2 id="trash-title">Trash</h2>
+          <button class="trash-close" type="button" aria-label="Close trash" title="Close">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4z"/>
+            </svg>
+          </button>
+        </div>
+        <div class="trash-actions">
+          <button class="trash-empty" type="button">Empty trash</button>
+        </div>
+        <p class="trash-empty-state" hidden>Trash is empty.</p>
+        <div class="trash-gallery" aria-label="Trash images"></div>
       </div>
     </div>
   </body>

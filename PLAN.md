@@ -108,6 +108,8 @@ Test focus:
 
 ## Ticket 5: Render Trashcan Button and Overlay Shell
 
+Status: Completed.
+
 Goal: Add the visible trashcan entry point and modal-style trash overlay.
 
 Scope:

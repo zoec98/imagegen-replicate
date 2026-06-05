@@ -20,7 +20,7 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 from imagegen.app_version import app_checksum
-from imagegen.gallery import IMAGE_EXTENSIONS, list_gallery_images
+from imagegen.gallery import IMAGE_EXTENSIONS, count_trash_images, list_gallery_images
 from imagegen.image_export import ImageExportError, clean_image_export
 from imagegen.model_registry import (
     CustomDimensionsControl,
@@ -93,6 +93,7 @@ def register_routes(app: Flask) -> None:
             csrf_token=ensure_csrf_token(),
             app_checksum=app_checksum(),
             immich_enabled=app_config.immich_enabled,
+            trash_count=count_trash_images(app_config.trash_dir),
         )
 
     @app.get("/images/<path:filename>")
