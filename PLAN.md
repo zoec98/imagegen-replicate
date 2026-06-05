@@ -57,6 +57,8 @@ Test focus:
 
 ## Ticket 3: Purge Old Trash on Gallery Refresh
 
+Status: Completed.
+
 Goal: Automatically delete old trash files whenever the main gallery refreshes.
 
 Scope:

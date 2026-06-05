@@ -11,6 +11,7 @@ from __future__ import annotations
 from base64 import b64decode
 from binascii import Error as Base64Error
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 from flask import Flask, jsonify, request, url_for
@@ -19,9 +20,11 @@ from PIL import Image, UnidentifiedImageError
 from imagegen.app_version import app_checksum
 from imagegen.gallery import (
     GalleryImage,
+    count_trash_images,
     list_gallery_images,
     mask_filename,
     move_gallery_image_to_trash,
+    purge_old_trash,
 )
 from imagegen.generation_log import GenerationLog
 from imagegen.immich_client import ImmichClient, ImmichUploadError
@@ -115,8 +118,10 @@ def register_api_routes(app: Flask) -> None:
 
     @app.get("/api/images")
     def api_images():
+        app_config = app.config["IMAGEGEN_APP_CONFIG"]
+        trash_count = _refresh_trash_count(app)
         images = list_gallery_images(
-            app.config["IMAGEGEN_APP_CONFIG"].output_dir,
+            app_config.output_dir,
             image_url=lambda filename: url_for("image_file", filename=filename),
             metadata_url=lambda filename: url_for(
                 "image_metadata",
@@ -125,7 +130,10 @@ def register_api_routes(app: Flask) -> None:
             metadata_provider=app.config["IMAGEGEN_METADATA_PROVIDER"],
         )
         return jsonify(
-            {"images": [_gallery_image_json(app, image) for image in images]}
+            {
+                "images": [_gallery_image_json(app, image) for image in images],
+                "trash_count": trash_count,
+            }
         )
 
     @app.get("/api/palettes")
@@ -322,6 +330,15 @@ def _fragment_payload(
 
 def _immich_enabled(app: Flask) -> bool:
     return bool(app.config["IMAGEGEN_APP_CONFIG"].immich_enabled)
+
+
+def _refresh_trash_count(app: Flask) -> int:
+    app_config = app.config["IMAGEGEN_APP_CONFIG"]
+    retention_days = app_config.trashcan_hold_limit_days
+    if retention_days is not None:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+        purge_old_trash(app_config.trash_dir, cutoff=cutoff)
+    return count_trash_images(app_config.trash_dir)
 
 
 def _immich_client(app: Flask) -> ImmichClient:

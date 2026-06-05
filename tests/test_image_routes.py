@@ -10,6 +10,7 @@ Behaviors protected:
 
 import os
 from base64 import b64encode
+from dataclasses import replace
 from io import BytesIO
 
 from PIL import Image
@@ -295,7 +296,8 @@ def test_api_images_returns_gallery_json_newest_first(app_config, app_factory):
                 "content_type": None,
                 "created_at": None,
             },
-        ]
+        ],
+        "trash_count": 0,
     }
 
 
@@ -305,7 +307,52 @@ def test_api_images_returns_empty_gallery(app_factory):
     response = client.get("/api/images")
 
     assert response.status_code == 200
-    assert response.json == {"images": []}
+    assert response.json == {"images": [], "trash_count": 0}
+
+
+def test_api_images_purges_old_trash_and_returns_updated_count(
+    app_config,
+    app_factory,
+):
+    app_config.output_dir.mkdir(parents=True)
+    app_config.trash_dir.mkdir(parents=True)
+    active_image = app_config.output_dir / "active.png"
+    old_trash = app_config.trash_dir / "old.png"
+    fresh_trash = app_config.trash_dir / "fresh.png"
+    active_image.write_bytes(b"active")
+    old_trash.write_bytes(b"old")
+    fresh_trash.write_bytes(b"fresh")
+    old_timestamp = 100
+    fresh_timestamp = 2_000_000_000
+    os.utime(old_trash, (old_timestamp, old_timestamp))
+    os.utime(fresh_trash, (fresh_timestamp, fresh_timestamp))
+    client = app_factory().test_client()
+
+    response = client.get("/api/images")
+
+    assert response.status_code == 200
+    assert response.json["trash_count"] == 1
+    assert not old_trash.exists()
+    assert fresh_trash.is_file()
+    assert active_image.is_file()
+
+
+def test_api_images_skips_trash_purge_when_retention_disabled(
+    app_config,
+    app_factory,
+):
+    app_config.trash_dir.mkdir(parents=True)
+    old_trash = app_config.trash_dir / "old.png"
+    old_trash.write_bytes(b"old")
+    os.utime(old_trash, (100, 100))
+    disabled_config = replace(app_config, trashcan_hold_limit_days=None)
+    client = app_factory(IMAGEGEN_APP_CONFIG=disabled_config).test_client()
+
+    response = client.get("/api/images")
+
+    assert response.status_code == 200
+    assert response.json == {"images": [], "trash_count": 1}
+    assert old_trash.is_file()
 
 
 def test_api_images_includes_embedded_metadata(app_config, app_factory):
@@ -341,7 +388,8 @@ def test_api_images_includes_embedded_metadata(app_config, app_factory):
                 "content_type": "image/png",
                 "created_at": "2026-05-29T12:00:00+00:00",
             }
-        ]
+        ],
+        "trash_count": 0,
     }
 
 
