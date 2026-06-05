@@ -81,6 +81,8 @@ Test focus:
 
 ## Ticket 4: Add Trash API Routes
 
+Status: Completed.
+
 Goal: Provide JSON endpoints for trash browsing, restore, and empty operations.
 
 Scope:

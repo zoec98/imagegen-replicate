@@ -262,8 +262,8 @@ def test_api_images_returns_gallery_json_newest_first(app_config, app_factory):
     newer.write_bytes(b"newer")
     gif.write_bytes(b"gif")
     ignored.write_text("ignored", encoding="utf-8")
-    os.utime(older, (100, 100))
-    os.utime(newer, (200, 200))
+    os.utime(older, (2_000_000_000, 2_000_000_000))
+    os.utime(newer, (2_000_000_100, 2_000_000_100))
     os.utime(gif, (300, 300))
     client = app_factory().test_client()
 
@@ -391,6 +391,198 @@ def test_api_images_includes_embedded_metadata(app_config, app_factory):
         ],
         "trash_count": 0,
     }
+
+
+def test_trash_route_serves_trashed_file(app_config, app_factory):
+    app_config.trash_dir.mkdir(parents=True)
+    (app_config.trash_dir / "sample.png").write_bytes(b"trash-image")
+    client = app_factory().test_client()
+
+    response = client.get("/trash/sample.png")
+
+    assert response.status_code == 200
+    assert response.data == b"trash-image"
+
+
+def test_trash_route_blocks_unsafe_paths(app_factory):
+    client = app_factory().test_client()
+
+    response = client.get("/trash/../sample.png")
+
+    assert response.status_code == 404
+
+
+def test_api_trash_lists_eligible_images_newest_first(app_config, app_factory):
+    app_config.trash_dir.mkdir(parents=True)
+    older = app_config.trash_dir / "older.png"
+    newer = app_config.trash_dir / "newer.webp"
+    ignored = app_config.trash_dir / "ignored.txt"
+    older.write_bytes(b"older")
+    newer.write_bytes(b"newer")
+    ignored.write_text("ignored", encoding="utf-8")
+    os.utime(older, (2_000_000_000, 2_000_000_000))
+    os.utime(newer, (2_000_000_100, 2_000_000_100))
+    client = app_factory().test_client()
+
+    response = client.get("/api/trash")
+
+    assert response.status_code == 200
+    assert response.json == {
+        "images": [
+            {
+                "filename": "newer.webp",
+                "restore_url": "/api/trash/newer.webp/restore",
+                "url": "/trash/newer.webp",
+            },
+            {
+                "filename": "older.png",
+                "restore_url": "/api/trash/older.png/restore",
+                "url": "/trash/older.png",
+            },
+        ],
+        "trash_count": 2,
+    }
+
+
+def test_api_restore_trash_image_moves_file_back_to_gallery(
+    app_config,
+    app_factory,
+):
+    app_config.trash_dir.mkdir(parents=True)
+    trash_path = app_config.trash_dir / "sample.png"
+    trash_path.write_bytes(b"image")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/trash/sample.png/restore",
+        json={},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 200
+    assert response.json == {
+        "filename": "sample.png",
+        "image_count": 1,
+        "trash_count": 0,
+    }
+    assert not trash_path.exists()
+    assert (app_config.output_dir / "sample.png").read_bytes() == b"image"
+
+
+def test_api_restore_trash_image_uses_collision_safe_gallery_name(
+    app_config,
+    app_factory,
+):
+    app_config.output_dir.mkdir(parents=True)
+    app_config.trash_dir.mkdir(parents=True)
+    (app_config.output_dir / "sample.png").write_bytes(b"active")
+    (app_config.trash_dir / "sample.png").write_bytes(b"trashed")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/trash/sample.png/restore",
+        json={},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 200
+    restored_name = response.json["filename"]
+    assert restored_name.startswith("sample-")
+    assert restored_name.endswith(".png")
+    assert response.json["image_count"] == 2
+    assert response.json["trash_count"] == 0
+    assert (app_config.output_dir / "sample.png").read_bytes() == b"active"
+    assert (app_config.output_dir / restored_name).read_bytes() == b"trashed"
+
+
+def test_api_restore_trash_image_rejects_unsafe_or_missing_name(
+    app_config,
+    app_factory,
+):
+    app_config.trash_dir.mkdir(parents=True)
+    (app_config.trash_dir / "sample.png").write_bytes(b"image")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    unsafe_response = client.post(
+        "/api/trash/../sample.png/restore",
+        json={},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+    missing_response = client.post(
+        "/api/trash/missing.png/restore",
+        json={},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert unsafe_response.status_code == 404
+    assert unsafe_response.json == {"error": "Trash image not found."}
+    assert missing_response.status_code == 404
+    assert missing_response.json == {"error": "Trash image not found."}
+    assert (app_config.trash_dir / "sample.png").is_file()
+
+
+def test_api_restore_trash_image_requires_csrf(app_config, app_factory):
+    app_config.trash_dir.mkdir(parents=True)
+    (app_config.trash_dir / "sample.png").write_bytes(b"image")
+    client = app_factory().test_client()
+
+    response = client.post("/api/trash/sample.png/restore", json={})
+
+    assert response.status_code == 403
+    assert response.json == {"error": "Invalid CSRF token."}
+    assert (app_config.trash_dir / "sample.png").is_file()
+
+
+def test_api_empty_trash_deletes_only_eligible_trash_images(
+    app_config,
+    app_factory,
+):
+    app_config.output_dir.mkdir(parents=True)
+    app_config.trash_dir.mkdir(parents=True)
+    (app_config.output_dir / "active.png").write_bytes(b"active")
+    (app_config.trash_dir / "one.png").write_bytes(b"one")
+    (app_config.trash_dir / "two.jpg").write_bytes(b"two")
+    ignored = app_config.trash_dir / "ignored.txt"
+    ignored.write_text("ignored", encoding="utf-8")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/trash/empty",
+        json={},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 200
+    assert sorted(response.json["deleted"]) == ["one.png", "two.jpg"]
+    assert response.json["image_count"] == 1
+    assert response.json["trash_count"] == 0
+    assert (app_config.output_dir / "active.png").is_file()
+    assert ignored.is_file()
+
+
+def test_api_empty_trash_requires_csrf(app_config, app_factory):
+    app_config.trash_dir.mkdir(parents=True)
+    (app_config.trash_dir / "sample.png").write_bytes(b"image")
+    client = app_factory().test_client()
+
+    response = client.post("/api/trash/empty", json={})
+
+    assert response.status_code == 403
+    assert response.json == {"error": "Invalid CSRF token."}
+    assert (app_config.trash_dir / "sample.png").is_file()
 
 
 def test_api_delete_image_moves_valid_image_to_trash(app_config, app_factory):

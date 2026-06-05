@@ -89,6 +89,18 @@ def count_trash_images(trash_dir: Path) -> int:
     return len(list_trash_images(trash_dir))
 
 
+def count_gallery_images(output_dir: Path) -> int:
+    if not output_dir.exists():
+        return 0
+    return len(
+        [
+            path
+            for path in output_dir.iterdir()
+            if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+        ]
+    )
+
+
 def restore_trash_image(filename: str, *, trash_dir: Path, output_dir: Path) -> Path:
     safe_name = safe_image_filename(filename)
     if safe_name is None:

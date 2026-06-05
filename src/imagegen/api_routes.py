@@ -20,11 +20,15 @@ from PIL import Image, UnidentifiedImageError
 from imagegen.app_version import app_checksum
 from imagegen.gallery import (
     GalleryImage,
+    count_gallery_images,
     count_trash_images,
+    empty_trash,
     list_gallery_images,
+    list_trash_images,
     mask_filename,
     move_gallery_image_to_trash,
     purge_old_trash,
+    restore_trash_image,
 )
 from imagegen.generation_log import GenerationLog
 from imagegen.immich_client import ImmichClient, ImmichUploadError
@@ -133,6 +137,51 @@ def register_api_routes(app: Flask) -> None:
             {
                 "images": [_gallery_image_json(app, image) for image in images],
                 "trash_count": trash_count,
+            }
+        )
+
+    @app.get("/api/trash")
+    def api_trash():
+        app_config = app.config["IMAGEGEN_APP_CONFIG"]
+        _refresh_trash_count(app)
+        images = list_trash_images(app_config.trash_dir)
+        return jsonify(
+            {
+                "images": [_trash_image_json(path.name) for path in images],
+                "trash_count": len(images),
+            }
+        )
+
+    @app.post("/api/trash/<path:filename>/restore")
+    @require_api_csrf
+    def api_restore_trash_image(filename: str):
+        app_config = app.config["IMAGEGEN_APP_CONFIG"]
+        try:
+            restored_path = restore_trash_image(
+                filename,
+                trash_dir=app_config.trash_dir,
+                output_dir=app_config.output_dir,
+            )
+        except FileNotFoundError:
+            return jsonify({"error": "Trash image not found."}), 404
+        return jsonify(
+            {
+                "filename": restored_path.name,
+                "image_count": count_gallery_images(app_config.output_dir),
+                "trash_count": count_trash_images(app_config.trash_dir),
+            }
+        )
+
+    @app.post("/api/trash/empty")
+    @require_api_csrf
+    def api_empty_trash():
+        app_config = app.config["IMAGEGEN_APP_CONFIG"]
+        deleted = empty_trash(app_config.trash_dir)
+        return jsonify(
+            {
+                "deleted": [path.name for path in deleted],
+                "image_count": count_gallery_images(app_config.output_dir),
+                "trash_count": count_trash_images(app_config.trash_dir),
             }
         )
 
@@ -565,6 +614,14 @@ def _gallery_image_json(app: Flask, image: GalleryImage) -> dict[str, str | None
             filename=image.filename,
         )
     return payload
+
+
+def _trash_image_json(filename: str) -> dict[str, str]:
+    return {
+        "filename": filename,
+        "url": url_for("trash_file", filename=filename),
+        "restore_url": url_for("api_restore_trash_image", filename=filename),
+    }
 
 
 def _palette_json(palette: Palette) -> dict[str, object]:

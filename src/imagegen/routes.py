@@ -157,6 +157,16 @@ def register_routes(app: Flask) -> None:
             abort(404)
         return _metadata_json(metadata.to_json(), image_path.parent)
 
+    @app.get("/trash/<path:filename>")
+    def trash_file(filename: str):
+        safe_name = safe_image_filename(filename)
+        if safe_name is None:
+            abort(404)
+        return send_from_directory(
+            app.config["IMAGEGEN_APP_CONFIG"].trash_dir,
+            safe_name,
+        )
+
 
 def safe_image_filename(filename: str) -> str | None:
     safe_name = secure_filename(filename)
