@@ -11,7 +11,7 @@ import os
 
 import pytest
 
-from imagegen.gallery import (
+from imagegen.trash import (
     count_trash_images,
     empty_trash,
     list_trash_images,

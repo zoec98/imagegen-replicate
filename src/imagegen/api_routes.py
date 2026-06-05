@@ -11,7 +11,6 @@ from __future__ import annotations
 from base64 import b64decode
 from binascii import Error as Base64Error
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 from flask import Flask, jsonify, request, url_for
@@ -22,14 +21,8 @@ from imagegen.filenames import safe_image_filename
 from imagegen.gallery import (
     GalleryImage,
     count_gallery_images,
-    count_trash_images,
-    empty_trash,
     list_gallery_images,
-    list_trash_images,
     mask_filename,
-    move_gallery_image_to_trash,
-    purge_old_trash,
-    restore_trash_image,
 )
 from imagegen.generation_log import GenerationLog
 from imagegen.immich_client import ImmichClient, ImmichUploadError
@@ -55,6 +48,14 @@ from imagegen.prompt_annotations import strip_prompt_annotations
 from imagegen.provider_requests import build_provider_request
 from imagegen.request_store import GenerationRequest, RequestStore
 from imagegen.security import require_api_csrf
+from imagegen.trash import (
+    count_trash_images,
+    empty_trash,
+    list_trash_images,
+    move_gallery_image_to_trash,
+    refresh_trash_count,
+    restore_trash_image,
+)
 from imagegen.validation import ValidationError, validate_generation_payload
 from imagegen.worker import GenerationWorker
 
@@ -383,11 +384,10 @@ def _immich_enabled(app: Flask) -> bool:
 
 def _refresh_trash_count(app: Flask) -> int:
     app_config = app.config["IMAGEGEN_APP_CONFIG"]
-    retention_days = app_config.trashcan_hold_limit_days
-    if retention_days is not None:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
-        purge_old_trash(app_config.trash_dir, cutoff=cutoff)
-    return count_trash_images(app_config.trash_dir)
+    return refresh_trash_count(
+        app_config.trash_dir,
+        retention_days=app_config.trashcan_hold_limit_days,
+    )
 
 
 def _immich_client(app: Flask) -> ImmichClient:

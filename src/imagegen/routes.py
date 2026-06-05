@@ -20,7 +20,7 @@ from flask import (
 
 from imagegen.app_version import app_checksum
 from imagegen.filenames import safe_image_filename
-from imagegen.gallery import count_trash_images, list_gallery_images
+from imagegen.gallery import list_gallery_images
 from imagegen.image_export import ImageExportError, clean_image_export
 from imagegen.model_registry import (
     CustomDimensionsControl,
@@ -37,6 +37,7 @@ from imagegen.model_registry import (
 )
 from imagegen.palettes import Palette, PaletteFragment, PaletteRepository
 from imagegen.security import ensure_csrf_token
+from imagegen.trash import count_trash_images
 
 
 def register_routes(app: Flask) -> None:
