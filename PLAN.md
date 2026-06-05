@@ -209,6 +209,8 @@ Test focus:
 
 ## Ticket 9: Document Trashcan Workflow
 
+Status: Completed.
+
 Goal: Explain trash management to users.
 
 Scope:

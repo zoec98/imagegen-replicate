@@ -74,6 +74,9 @@ You may want to change the data directory so that it does not overlap with the e
 ```bash
 # Directory where runtime data, images, palettes, trash, and SQLite live.
 IMAGEGEN_DATA_DIR=data
+
+# Days to keep trash before automatic purge. Use 0 to disable.
+TRASHCAN_HOLD_LIMIT_DAYS=7
 ```
 
 Make a new directory `outputs` and set `IMAGEGEN_DATA_DIR=outputs`.
@@ -234,6 +237,15 @@ The app derives generated images, palette fragments, gallery trash, and SQLite h
 
 Gallery delete moves files from `IMAGEGEN_DATA_DIR/images` to `IMAGEGEN_DATA_DIR/trash` by default.
 If a trashed filename already exists, the app creates a unique trash filename instead of overwriting it.
+
+Use the trashcan button next to the palette controls to open the trash overlay.
+The button label shows the current number of images in trash.
+Inside the overlay, use `Restore` to move an image back to the main gallery, or `Empty trash` to permanently delete all eligible trashed images.
+
+Trash is automatically purged when the gallery refreshes.
+By default, files older than 7 days are deleted from `IMAGEGEN_DATA_DIR/trash`.
+Set `TRASHCAN_HOLD_LIMIT_DAYS` in `.env` to change the retention period.
+Set it to `0`, or to an invalid value, to disable automatic purging.
 
 The committed `data-example/` tree is sample/reference data.
 The `data/` tree is the default local runtime directory for real generations, uploads, palette edits, trash,
