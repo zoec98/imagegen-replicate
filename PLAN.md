@@ -4,6 +4,8 @@ Source stories: [USER-STORY.md](USER-STORY.md)
 
 ## Ticket 1: Add Trash Repository Helpers
 
+Status: Completed.
+
 Goal: Centralize safe filesystem operations for trash listing, counting, restoring, emptying, and purging.
 
 Scope:
