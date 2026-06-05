@@ -134,6 +134,8 @@ Test focus:
 
 ## Ticket 6: Implement Trash Overlay Browser Behavior
 
+Status: Completed.
+
 Goal: Let users open, browse, and close the trash overlay without page navigation.
 
 Scope:

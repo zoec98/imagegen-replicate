@@ -27,6 +27,12 @@
   const sourceSelectionStatus = form.querySelector(".source-selection-status");
   const messages = form.querySelector(".messages");
   const gallery = document.querySelector(".gallery");
+  const trashcanToggle = form.querySelector(".trashcan-toggle");
+  const trashcanCount = form.querySelector(".trashcan-count");
+  const trashOverlay = document.querySelector(".trash-overlay");
+  const trashClose = trashOverlay?.querySelector(".trash-close");
+  const trashGallery = trashOverlay?.querySelector(".trash-gallery");
+  const trashEmptyState = trashOverlay?.querySelector(".trash-empty-state");
   const maskEditorOverlay = document.querySelector(".mask-editor-overlay");
   const maskEditorStage = maskEditorOverlay?.querySelector(".mask-editor-stage");
   const maskEditorWrap = maskEditorOverlay?.querySelector(".mask-editor-canvas-wrap");
@@ -1585,6 +1591,105 @@
     return link;
   }
 
+  function setTrashCount(value) {
+    if (!trashcanCount) {
+      return;
+    }
+    const count = Number.parseInt(value, 10);
+    trashcanCount.textContent = String(Number.isFinite(count) ? Math.max(count, 0) : 0);
+  }
+
+  function trashFigure(image) {
+    const figure = document.createElement("figure");
+    figure.className = "gallery-item trash-item";
+    figure.dataset.filename = image.filename || "";
+    if (image.restore_url) {
+      figure.dataset.restoreUrl = image.restore_url;
+    }
+
+    const link = document.createElement("a");
+    link.href = image.url || "#";
+    link.target = "_blank";
+    link.rel = "noopener";
+
+    const img = document.createElement("img");
+    img.src = image.url || "";
+    img.alt = image.filename || "Trash image";
+    link.append(img);
+
+    const caption = document.createElement("figcaption");
+    const actions = document.createElement("div");
+    actions.className = "gallery-actions";
+    actions.setAttribute("aria-label", "Trash image actions");
+
+    const infoWrap = document.createElement("span");
+    infoWrap.className = "image-info-wrap";
+    const infoButton = iconButton(
+      "gallery-info",
+      `Trash image information for ${image.filename || "image"}`,
+      "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 8h2v7h-2zm0-3h2v2h-2z",
+    );
+    const tooltip = document.createElement("span");
+    tooltip.className = "image-info-tooltip";
+    tooltip.setAttribute("role", "tooltip");
+    const tooltipLine = document.createElement("span");
+    tooltipLine.className = "tooltip-line";
+    tooltipLine.textContent = image.filename || "Image";
+    tooltip.append(tooltipLine);
+    infoWrap.append(infoButton, tooltip);
+    actions.append(infoWrap);
+    caption.append(actions);
+    figure.append(link, caption);
+    return figure;
+  }
+
+  function renderTrashImages(images) {
+    if (!trashGallery || !trashEmptyState) {
+      return;
+    }
+    trashGallery.replaceChildren();
+    if (!Array.isArray(images) || images.length === 0) {
+      trashEmptyState.hidden = false;
+      return;
+    }
+    trashEmptyState.hidden = true;
+    images.forEach((image) => trashGallery.append(trashFigure(image)));
+  }
+
+  async function refreshTrash() {
+    const url = trashcanToggle?.dataset.apiTrashUrl;
+    if (!url) {
+      return;
+    }
+    const response = await fetch(url, {
+      credentials: "same-origin",
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Trash refresh failed.");
+    }
+    setTrashCount(data.trash_count);
+    renderTrashImages(data.images);
+  }
+
+  function openTrashOverlay() {
+    if (!trashOverlay) {
+      return;
+    }
+    trashOverlay.hidden = false;
+    trashClose?.focus();
+    refreshTrash().catch((error) => {
+      showMessage(error.message || "Trash refresh failed.", "error");
+    });
+  }
+
+  function closeTrashOverlay() {
+    if (!trashOverlay) {
+      return;
+    }
+    trashOverlay.hidden = true;
+  }
+
   async function refreshGallery() {
     if (!gallery || !form.dataset.apiImagesUrl) {
       return;
@@ -1596,6 +1701,9 @@
     const data = await response.json();
     if (!response.ok) {
       throw new Error(data.error || "Gallery refresh failed.");
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "trash_count")) {
+      setTrashCount(data.trash_count);
     }
     gallery.replaceChildren();
     if (!Array.isArray(data.images) || data.images.length === 0) {
@@ -1791,6 +1899,17 @@
       showMessage(error.message || "Palette fragment could not be deleted.", "error");
     });
   });
+  trashcanToggle?.addEventListener("click", () => {
+    openTrashOverlay();
+  });
+  trashClose?.addEventListener("click", () => {
+    closeTrashOverlay();
+  });
+  trashOverlay?.addEventListener("click", (event) => {
+    if (event.target === trashOverlay) {
+      closeTrashOverlay();
+    }
+  });
   gallery?.addEventListener("click", (event) => {
     const infoButton = event.target.closest(".gallery-info");
     if (infoButton) {
@@ -1877,6 +1996,10 @@
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && maskEditorOverlay && !maskEditorOverlay.hidden) {
       closeMaskEditor();
+      return;
+    }
+    if (event.key === "Escape" && trashOverlay && !trashOverlay.hidden) {
+      closeTrashOverlay();
     }
   });
   gallery?.addEventListener("mouseover", (event) => {
