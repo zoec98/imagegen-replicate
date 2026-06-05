@@ -1,4 +1,4 @@
-# Security Report
+# Security Boundary
 
 This document describes the security model for `imagegen`, the threats it is
 intended to address, and the controls expected to remain in place as the app is
