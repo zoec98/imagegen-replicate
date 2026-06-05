@@ -307,10 +307,10 @@ def test_index_renders_trashcan_button_and_overlay_shell(app_config, app_factory
     assert b'<span class="trashcan-count" aria-live="polite">1</span>' in (
         response.data
     )
-    assert response.data.index(b'class="palette-editor-toggle"') < (
-        response.data.index(b'class="trashcan-toggle"')
-    )
     assert response.data.index(b'class="trashcan-toggle"') < (
+        response.data.index(b'class="palette-editor-toggle"')
+    )
+    assert response.data.index(b'class="palette-editor-toggle"') < (
         response.data.index(b'class="pricing-info"')
     )
     assert b'class="trash-overlay"' in response.data

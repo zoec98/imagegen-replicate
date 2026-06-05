@@ -67,11 +67,6 @@
             </div>
             <div class="generate-controls">
               <button
-                class="palette-editor-toggle"
-                type="button"
-                {% if not palettes %}hidden{% endif %}
-              >Palettes</button>
-              <button
                 class="trashcan-toggle"
                 type="button"
                 data-api-trash-url="{{ url_for('api_trash') }}"
@@ -84,6 +79,11 @@
                 <span>Trash</span>
                 <span class="trashcan-count" aria-live="polite">{{ trash_count }}</span>
               </button>
+              <button
+                class="palette-editor-toggle"
+                type="button"
+                {% if not palettes %}hidden{% endif %}
+              >Palettes</button>
               <span class="pricing-popover">
                 <button
                   class="pricing-info"
