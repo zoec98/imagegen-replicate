@@ -16,7 +16,7 @@ from io import BytesIO
 from PIL import Image
 
 from imagegen.app import create_app
-from imagegen.api_routes import (
+from imagegen.mask_store import (
     MASK_PNG_ABSOLUTE_DECODED_LIMIT_BYTES,
     MASK_DATA_URL_PREFIX,
     MASK_JSON_FIXED_OVERHEAD_BYTES,
