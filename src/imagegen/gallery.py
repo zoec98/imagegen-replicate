@@ -13,12 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
-from werkzeug.utils import secure_filename
-
+from imagegen.filenames import IMAGE_EXTENSIONS, safe_image_filename
 from imagegen.metadata import EmbeddedImageMetadataProvider, ImageMetadataProvider
-
-
-IMAGE_EXTENSIONS = {".jpeg", ".jpg", ".png", ".webp"}
 
 
 @dataclass(frozen=True)
@@ -131,13 +127,6 @@ def purge_old_trash(trash_dir: Path, *, cutoff: datetime) -> list[Path]:
         path.unlink()
         deleted.append(path)
     return deleted
-
-
-def safe_image_filename(filename: str) -> str | None:
-    safe_name = secure_filename(filename)
-    if safe_name != filename or Path(filename).suffix.lower() not in IMAGE_EXTENSIONS:
-        return None
-    return safe_name
 
 
 def _gallery_image(

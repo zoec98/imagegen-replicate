@@ -18,6 +18,7 @@ from flask import Flask, jsonify, request, url_for
 from PIL import Image, UnidentifiedImageError
 
 from imagegen.app_version import app_checksum
+from imagegen.filenames import safe_image_filename
 from imagegen.gallery import (
     GalleryImage,
     count_gallery_images,
@@ -56,7 +57,6 @@ from imagegen.request_store import GenerationRequest, RequestStore
 from imagegen.security import require_api_csrf
 from imagegen.validation import ValidationError, validate_generation_payload
 from imagegen.worker import GenerationWorker
-from imagegen.routes import safe_image_filename
 
 
 MASK_PNG_BYTES_PER_PIXEL_LIMIT = 4

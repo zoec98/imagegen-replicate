@@ -17,10 +17,10 @@ from flask import (
     send_from_directory,
     url_for,
 )
-from werkzeug.utils import secure_filename
 
 from imagegen.app_version import app_checksum
-from imagegen.gallery import IMAGE_EXTENSIONS, count_trash_images, list_gallery_images
+from imagegen.filenames import safe_image_filename
+from imagegen.gallery import count_trash_images, list_gallery_images
 from imagegen.image_export import ImageExportError, clean_image_export
 from imagegen.model_registry import (
     CustomDimensionsControl,
@@ -178,13 +178,6 @@ def _initial_provider_model(app_config) -> ProviderModel | None:
         return resolve_model(selected_provider, app_config.model_alias)
     except RegistryLookupError:
         return default_model_for_provider(selected_provider)
-
-
-def safe_image_filename(filename: str) -> str | None:
-    safe_name = secure_filename(filename)
-    if safe_name != filename or Path(filename).suffix.lower() not in IMAGE_EXTENSIONS:
-        return None
-    return safe_name
 
 
 def _metadata_json(

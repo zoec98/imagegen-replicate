@@ -9,9 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from werkzeug.utils import secure_filename
-
-from imagegen.gallery import IMAGE_EXTENSIONS
+from imagegen.filenames import safe_image_filename
 
 
 class SourceImageError(ValueError):
@@ -46,8 +44,8 @@ def validate_source_image_filename(filename: object, *, output_dir: Path) -> str
         raise SourceImageError("source_images entries must be filenames.")
 
     filename = filename.strip()
-    safe_name = secure_filename(filename)
-    if safe_name != filename or Path(filename).suffix.lower() not in IMAGE_EXTENSIONS:
+    safe_name = safe_image_filename(filename)
+    if safe_name is None:
         raise SourceImageError(f"Invalid source image filename: {filename}.")
 
     path = source_image_path(safe_name, output_dir=output_dir)
