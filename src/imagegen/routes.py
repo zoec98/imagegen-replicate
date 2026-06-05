@@ -30,9 +30,11 @@ from imagegen.model_registry import (
     ProviderInfo,
     ProviderModel,
     ReplicateModel,
+    RegistryLookupError,
     default_model_for_provider,
     list_models_for_provider,
     list_providers,
+    resolve_model,
 )
 from imagegen.palettes import Palette, PaletteFragment, PaletteRepository
 from imagegen.security import ensure_csrf_token
@@ -44,7 +46,7 @@ def register_routes(app: Flask) -> None:
         app_config = app.config["IMAGEGEN_APP_CONFIG"]
         selected_provider = app_config.selected_provider
         selected_provider_model = (
-            default_model_for_provider(selected_provider)
+            _initial_provider_model(app_config)
             if selected_provider is not None
             else None
         )
@@ -167,6 +169,16 @@ def register_routes(app: Flask) -> None:
             app.config["IMAGEGEN_APP_CONFIG"].trash_dir,
             safe_name,
         )
+
+
+def _initial_provider_model(app_config) -> ProviderModel | None:
+    selected_provider = app_config.selected_provider
+    if selected_provider is None:
+        return None
+    try:
+        return resolve_model(selected_provider, app_config.model_alias)
+    except RegistryLookupError:
+        return default_model_for_provider(selected_provider)
 
 
 def safe_image_filename(filename: str) -> str | None:

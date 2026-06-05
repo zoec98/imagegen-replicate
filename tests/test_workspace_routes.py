@@ -151,6 +151,21 @@ def test_index_exposes_model_registry_metadata(app_factory):
     assert "prompt" not in {parameter["name"] for parameter in flux["parameters"]}
 
 
+def test_index_honors_configured_start_model(app_config, app_factory):
+    configured = replace(
+        app_config,
+        model_alias="gpt-image-2",
+        model=MODEL_REGISTRY["gpt-image-2"],
+    )
+    client = app_factory(IMAGEGEN_APP_CONFIG=configured).test_client()
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b'value="gpt-image-2" selected' in response.data
+    assert b'value="seedream45" selected' not in response.data
+
+
 def test_index_renders_only_enabled_provider_options(app_config, app_factory):
     app = app_factory(
         IMAGEGEN_APP_CONFIG=replace(
