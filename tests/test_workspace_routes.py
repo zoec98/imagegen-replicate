@@ -9,7 +9,9 @@ Behaviors protected:
 from dataclasses import replace
 from urllib.parse import parse_qs, urlparse
 
+from imagegen.metadata import EmbeddedImageMetadataProvider
 from imagegen.model_registry import MODEL_REGISTRY
+from imagegen.routes import _workspace_context
 from route_helpers import (
     extract_app_checksum,
     extract_attribute,
@@ -164,6 +166,52 @@ def test_index_honors_configured_start_model(app_config, app_factory):
     assert response.status_code == 200
     assert b'value="gpt-image-2" selected' in response.data
     assert b'value="seedream45" selected' not in response.data
+
+
+def test_workspace_context_honors_configured_start_model(app_config):
+    configured = replace(
+        app_config,
+        model_alias="gpt-image-2",
+        model=MODEL_REGISTRY["gpt-image-2"],
+    )
+
+    context = _workspace_context(
+        configured,
+        image_url=lambda filename: f"/images/{filename}",
+        metadata_url=lambda filename: f"/images/{filename}/metadata",
+        metadata_provider=EmbeddedImageMetadataProvider(),
+        csrf_token="token",
+        app_checksum_value="checksum",
+    )
+
+    assert context["selected_provider_model"].alias == "gpt-image-2"
+    assert context["parameters"]
+
+
+def test_workspace_context_falls_back_when_configured_model_is_unavailable(
+    app_config,
+):
+    configured = replace(
+        app_config,
+        fal_key="fal-key",
+        enabled_providers=("falai",),
+        selected_provider="falai",
+        model_alias="flux-flex",
+        model=MODEL_REGISTRY["flux-flex"],
+    )
+
+    context = _workspace_context(
+        configured,
+        image_url=lambda filename: f"/images/{filename}",
+        metadata_url=lambda filename: f"/images/{filename}/metadata",
+        metadata_provider=EmbeddedImageMetadataProvider(),
+        csrf_token="token",
+        app_checksum_value="checksum",
+    )
+
+    assert context["selected_provider_model"].provider == "falai"
+    assert context["selected_provider_model"].alias == "bria-fibo"
+    assert {provider["id"] for provider in context["providers"]} == {"falai"}
 
 
 def test_index_renders_only_enabled_provider_options(app_config, app_factory):

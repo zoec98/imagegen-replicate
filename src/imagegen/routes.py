@@ -44,58 +44,19 @@ def register_routes(app: Flask) -> None:
     @app.get("/")
     def index():
         app_config = app.config["IMAGEGEN_APP_CONFIG"]
-        selected_provider = app_config.selected_provider
-        selected_provider_model = (
-            _initial_provider_model(app_config)
-            if selected_provider is not None
-            else None
-        )
-        target = (
-            selected_provider_model.text_target
-            if selected_provider_model is not None
-            else None
-        )
         return render_template(
             "index.html",
-            images=list_gallery_images(
-                app_config.output_dir,
+            **_workspace_context(
+                app_config,
                 image_url=lambda filename: url_for("image_file", filename=filename),
                 metadata_url=lambda filename: url_for(
                     "image_metadata",
                     filename=filename,
                 ),
                 metadata_provider=app.config["IMAGEGEN_METADATA_PROVIDER"],
+                csrf_token=ensure_csrf_token(),
+                app_checksum_value=app_checksum(),
             ),
-            model=app_config.model,
-            selected_provider=selected_provider,
-            selected_provider_model=selected_provider_model,
-            has_generation_provider=app_config.has_generation_provider,
-            providers=[
-                _provider_json(provider)
-                for provider in list_providers()
-                if provider.id in app_config.enabled_providers
-            ],
-            model_registry=[
-                _provider_model_json(provider_model)
-                for provider in app_config.enabled_providers
-                for provider_model in list_models_for_provider(provider)
-            ],
-            palettes=[
-                _palette_json(palette)
-                for palette in PaletteRepository(
-                    app_config.fragment_root
-                ).list_palettes()
-            ],
-            app_config=app_config,
-            parameters=[
-                parameter
-                for parameter in _target_parameters(selected_provider_model, target)
-            ],
-            prompt="",
-            csrf_token=ensure_csrf_token(),
-            app_checksum=app_checksum(),
-            immich_enabled=app_config.immich_enabled,
-            trash_count=count_trash_images(app_config.trash_dir),
         )
 
     @app.get("/images/<path:filename>")
@@ -179,6 +140,61 @@ def _initial_provider_model(app_config) -> ProviderModel | None:
         return resolve_model(selected_provider, app_config.model_alias)
     except RegistryLookupError:
         return default_model_for_provider(selected_provider)
+
+
+def _workspace_context(
+    app_config,
+    *,
+    image_url,
+    metadata_url,
+    metadata_provider,
+    csrf_token: str,
+    app_checksum_value: str,
+) -> dict[str, object]:
+    selected_provider = app_config.selected_provider
+    selected_provider_model = (
+        _initial_provider_model(app_config) if selected_provider is not None else None
+    )
+    target = (
+        selected_provider_model.text_target
+        if selected_provider_model is not None
+        else None
+    )
+    return {
+        "images": list_gallery_images(
+            app_config.output_dir,
+            image_url=image_url,
+            metadata_url=metadata_url,
+            metadata_provider=metadata_provider,
+        ),
+        "model": app_config.model,
+        "selected_provider": selected_provider,
+        "selected_provider_model": selected_provider_model,
+        "has_generation_provider": app_config.has_generation_provider,
+        "providers": [
+            _provider_json(provider)
+            for provider in list_providers()
+            if provider.id in app_config.enabled_providers
+        ],
+        "model_registry": [
+            _provider_model_json(provider_model)
+            for provider in app_config.enabled_providers
+            for provider_model in list_models_for_provider(provider)
+        ],
+        "palettes": [
+            _palette_json(palette)
+            for palette in PaletteRepository(app_config.fragment_root).list_palettes()
+        ],
+        "app_config": app_config,
+        "parameters": [
+            parameter for parameter in _target_parameters(selected_provider_model, target)
+        ],
+        "prompt": "",
+        "csrf_token": csrf_token,
+        "app_checksum": app_checksum_value,
+        "immich_enabled": app_config.immich_enabled,
+        "trash_count": count_trash_images(app_config.trash_dir),
+    }
 
 
 def _metadata_json(
