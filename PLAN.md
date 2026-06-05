@@ -159,6 +159,8 @@ Test focus:
 
 ## Ticket 7: Implement Restore from Trash in the Browser
 
+Status: Completed.
+
 Goal: Let users restore individual trash images from the trash overlay.
 
 Scope:

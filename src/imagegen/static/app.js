@@ -1637,7 +1637,16 @@
     tooltipLine.textContent = image.filename || "Image";
     tooltip.append(tooltipLine);
     infoWrap.append(infoButton, tooltip);
-    actions.append(infoWrap);
+    const restoreButton = document.createElement("button");
+    restoreButton.className = "trash-restore";
+    restoreButton.type = "button";
+    restoreButton.textContent = "Restore";
+    restoreButton.disabled = !image.restore_url;
+    restoreButton.setAttribute(
+      "aria-label",
+      `Restore ${image.filename || "image"}`,
+    );
+    actions.append(infoWrap, restoreButton);
     caption.append(actions);
     figure.append(link, caption);
     return figure;
@@ -1688,6 +1697,38 @@
       return;
     }
     trashOverlay.hidden = true;
+  }
+
+  async function restoreTrashImage(figure) {
+    const restoreUrl = figure?.dataset.restoreUrl;
+    const filename = figure?.dataset.filename || "image";
+    if (!restoreUrl) {
+      showMessage("This trash image cannot be restored.", "error");
+      return;
+    }
+    if (!csrfToken) {
+      showMessage("Missing CSRF token.", "error");
+      return;
+    }
+    const response = await fetch(restoreUrl, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+      },
+      body: JSON.stringify({}),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || `Could not restore ${filename}.`);
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "trash_count")) {
+      setTrashCount(data.trash_count);
+    }
+    await refreshGallery();
+    await refreshTrash();
+    showMessage(`${data.filename || filename} restored.`, "success");
   }
 
   async function refreshGallery() {
@@ -1909,6 +1950,17 @@
     if (event.target === trashOverlay) {
       closeTrashOverlay();
     }
+  });
+  trashGallery?.addEventListener("click", (event) => {
+    const restoreButton = event.target.closest(".trash-restore");
+    if (!restoreButton) {
+      return;
+    }
+    restoreButton.disabled = true;
+    restoreTrashImage(restoreButton.closest(".trash-item")).catch((error) => {
+      restoreButton.disabled = false;
+      showMessage(error.message || "Trash image could not be restored.", "error");
+    });
   });
   gallery?.addEventListener("click", (event) => {
     const infoButton = event.target.closest(".gallery-info");

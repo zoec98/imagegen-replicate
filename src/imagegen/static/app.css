@@ -622,6 +622,28 @@ select {
   border-color: #8f001a;
 }
 
+.trash-restore {
+  background: #ffffff;
+  border: 1px solid #0f766e;
+  border-radius: 6px;
+  color: #0f766e;
+  font: inherit;
+  font-weight: 650;
+  margin-left: auto;
+  min-height: 2rem;
+  padding: 0 0.75rem;
+}
+
+.trash-restore:hover,
+.trash-restore:focus-visible {
+  background: #f0fdfa;
+}
+
+.trash-restore:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
 .trash-empty-state {
   color: #5f6b7a;
   margin: 0;
