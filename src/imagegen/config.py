@@ -50,6 +50,11 @@ ENV_SETTINGS: tuple[EnvSetting, ...] = (
         comment="Directory where runtime data, images, palettes, trash, and SQLite live.",
     ),
     EnvSetting(
+        name="TRASHCAN_HOLD_LIMIT_DAYS",
+        default="7",
+        comment="Days to keep trash before automatic purge. Use 0 to disable.",
+    ),
+    EnvSetting(
         name="AUTHOR",
         default="Noname Changeme Nescio",
         comment="Author name embedded in generated image metadata.",
@@ -117,6 +122,7 @@ class AppConfig:
     flask_secret_key: str
     replicate_poll_seconds: float
     replicate_timeout_seconds: float
+    trashcan_hold_limit_days: int | None
 
     @property
     def has_generation_provider(self) -> bool:
@@ -219,6 +225,10 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
             "IMAGEGEN_REPLICATE_TIMEOUT_SECONDS",
             60.0,
         ),
+        trashcan_hold_limit_days=_optional_positive_int_env(
+            "TRASHCAN_HOLD_LIMIT_DAYS",
+            7,
+        ),
     )
 
 
@@ -317,6 +327,19 @@ def _float_env(name: str, default: float) -> float:
     if parsed <= 0:
         msg = f"{name} must be greater than zero."
         raise ValueError(msg)
+    return parsed
+
+
+def _optional_positive_int_env(name: str, default: int) -> int | None:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        return default
+    try:
+        parsed = int(value)
+    except ValueError:
+        return None
+    if parsed <= 0:
+        return None
     return parsed
 
 

@@ -33,6 +33,8 @@ Test focus:
 
 ## Ticket 2: Add Trash Retention Configuration
 
+Status: Completed.
+
 Goal: Make automatic trash retention configurable through `.env`.
 
 Scope:

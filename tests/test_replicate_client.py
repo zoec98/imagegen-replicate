@@ -72,6 +72,7 @@ def app_config(tmp_path):
         flask_secret_key="test-secret",
         replicate_poll_seconds=1.0,
         replicate_timeout_seconds=60.0,
+        trashcan_hold_limit_days=7,
     )
 
 

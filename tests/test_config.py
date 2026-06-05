@@ -37,6 +37,7 @@ def test_ensure_env_file_creates_expected_defaults(tmp_path):
     assert secret != "dev-secret-change-me"
     assert "IMAGEGEN_REPLICATE_POLL_SECONDS=1.0" in content
     assert "IMAGEGEN_REPLICATE_TIMEOUT_SECONDS=180.0" in content
+    assert "TRASHCAN_HOLD_LIMIT_DAYS=7" in content
 
 
 def test_ensure_env_file_preserves_existing_values(tmp_path):
@@ -69,6 +70,7 @@ def test_ensure_env_file_preserves_existing_values(tmp_path):
     assert secret != "dev-secret-change-me"
     assert "IMAGEGEN_REPLICATE_POLL_SECONDS=1.0" in content
     assert "IMAGEGEN_REPLICATE_TIMEOUT_SECONDS=180.0" in content
+    assert "TRASHCAN_HOLD_LIMIT_DAYS=7" in content
 
 
 def test_ensure_env_file_preserves_existing_flask_secret(tmp_path):
@@ -116,6 +118,7 @@ def test_write_env_example_uses_non_secret_defaults(tmp_path):
     assert "IMAGEGEN_MODEL=seedream45" in content
     assert "IMAGEGEN_FLASK_SECRET_KEY=" in content
     assert "IMAGEGEN_FLASK_SECRET_KEY=dev-secret-change-me" not in content
+    assert "TRASHCAN_HOLD_LIMIT_DAYS=7" in content
 
 
 def test_load_config_reads_env_file(tmp_path, monkeypatch):
@@ -130,6 +133,7 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     monkeypatch.delenv("IMAGEGEN_FLASK_SECRET_KEY", raising=False)
     monkeypatch.delenv("IMAGEGEN_REPLICATE_POLL_SECONDS", raising=False)
     monkeypatch.delenv("IMAGEGEN_REPLICATE_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("TRASHCAN_HOLD_LIMIT_DAYS", raising=False)
     env_path = tmp_path / ".env"
     env_path.write_text(
         "REPLICATE_API_TOKEN=test-token\n"
@@ -168,6 +172,32 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     assert config.flask_secret_key == "test-secret"
     assert config.replicate_poll_seconds == 2.5
     assert config.replicate_timeout_seconds == 30.0
+    assert config.trashcan_hold_limit_days == 7
+
+
+def test_load_config_reads_trashcan_hold_limit_days(tmp_path, monkeypatch):
+    monkeypatch.delenv("TRASHCAN_HOLD_LIMIT_DAYS", raising=False)
+    env_path = tmp_path / ".env"
+    env_path.write_text("TRASHCAN_HOLD_LIMIT_DAYS=14\n", encoding="utf-8")
+
+    config = load_config(env_path)
+
+    assert config.trashcan_hold_limit_days == 14
+
+
+@pytest.mark.parametrize("value", ["0", "invalid", "-3", "1.5"])
+def test_load_config_disables_trash_purge_for_invalid_or_zero_limit(
+    tmp_path,
+    monkeypatch,
+    value,
+):
+    monkeypatch.delenv("TRASHCAN_HOLD_LIMIT_DAYS", raising=False)
+    env_path = tmp_path / ".env"
+    env_path.write_text(f"TRASHCAN_HOLD_LIMIT_DAYS={value}\n", encoding="utf-8")
+
+    config = load_config(env_path)
+
+    assert config.trashcan_hold_limit_days is None
 
 
 def test_synthesize_copyright_uses_generation_year():
