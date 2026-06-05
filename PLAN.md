@@ -185,6 +185,8 @@ Test focus:
 
 ## Ticket 8: Implement Empty Trash in the Browser
 
+Status: Completed.
+
 Goal: Let users permanently clear trash from the overlay.
 
 Scope:

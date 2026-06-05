@@ -31,6 +31,7 @@
   const trashcanCount = form.querySelector(".trashcan-count");
   const trashOverlay = document.querySelector(".trash-overlay");
   const trashClose = trashOverlay?.querySelector(".trash-close");
+  const trashEmptyButton = trashOverlay?.querySelector(".trash-empty");
   const trashGallery = trashOverlay?.querySelector(".trash-gallery");
   const trashEmptyState = trashOverlay?.querySelector(".trash-empty-state");
   const maskEditorOverlay = document.querySelector(".mask-editor-overlay");
@@ -1731,6 +1732,40 @@
     showMessage(`${data.filename || filename} restored.`, "success");
   }
 
+  async function emptyTrash() {
+    const url = trashcanToggle?.dataset.apiEmptyTrashUrl;
+    if (!url) {
+      showMessage("Empty trash URL is unavailable.", "error");
+      return;
+    }
+    if (!csrfToken) {
+      showMessage("Missing CSRF token.", "error");
+      return;
+    }
+    const response = await fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+      },
+      body: JSON.stringify({}),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Trash could not be emptied.");
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "trash_count")) {
+      setTrashCount(data.trash_count);
+    }
+    await refreshTrash();
+    const deleted = Array.isArray(data.deleted) ? data.deleted.length : 0;
+    showMessage(
+      deleted === 1 ? "1 trash image deleted." : `${deleted} trash images deleted.`,
+      "success",
+    );
+  }
+
   async function refreshGallery() {
     if (!gallery || !form.dataset.apiImagesUrl) {
       return;
@@ -1945,6 +1980,14 @@
   });
   trashClose?.addEventListener("click", () => {
     closeTrashOverlay();
+  });
+  trashEmptyButton?.addEventListener("click", () => {
+    trashEmptyButton.disabled = true;
+    emptyTrash().catch((error) => {
+      showMessage(error.message || "Trash could not be emptied.", "error");
+    }).finally(() => {
+      trashEmptyButton.disabled = false;
+    });
   });
   trashOverlay?.addEventListener("click", (event) => {
     if (event.target === trashOverlay) {
