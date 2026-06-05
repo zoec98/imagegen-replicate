@@ -29,7 +29,6 @@ from imagegen.model_registry import (
     ModelParameter,
     ProviderInfo,
     ProviderModel,
-    ReplicateModel,
     RegistryLookupError,
     default_model_for_provider,
     list_models_for_provider,
@@ -228,27 +227,6 @@ def _metadata_json(
 def clean_download_name(filename: str) -> str:
     path = Path(filename)
     return f"{path.stem}-clean{path.suffix}"
-
-
-def _model_json(model: ReplicateModel) -> dict[str, object]:
-    return {
-        "alias": model.alias,
-        "display_name": model.display_name,
-        "replicate_model": model.replicate_model,
-        "edit_capable": model.edit_capable,
-        "source_image_parameter": model.source_image_parameter,
-        "source_image_max": model.source_image_max,
-        "custom_dimensions": _custom_dimensions_json(model.custom_dimensions),
-        "pricing": [_pricing_json(pricing) for pricing in model.pricing],
-        "parameters": [
-            _parameter_json(parameter)
-            for parameter in sorted(
-                model.parameters,
-                key=lambda item: item.order if item.order is not None else 999,
-            )
-            if parameter.name not in {"prompt", model.source_image_parameter}
-        ],
-    }
 
 
 def _provider_json(provider: ProviderInfo) -> dict[str, object]:

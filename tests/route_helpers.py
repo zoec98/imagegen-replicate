@@ -30,13 +30,6 @@ def extract_model_registry(response):
     return json.loads(response.data[start:end].decode("utf-8"))
 
 
-def extract_json_script(response, script_id):
-    marker = f'<script id="{script_id}" type="application/json">'.encode()
-    start = response.data.index(marker) + len(marker)
-    end = response.data.index(b"</script>", start)
-    return json.loads(response.data[start:end].decode("utf-8"))
-
-
 def extract_palette_data(response):
     marker = b'<script id="palette-data" type="application/json">'
     start = response.data.index(marker) + len(marker)
