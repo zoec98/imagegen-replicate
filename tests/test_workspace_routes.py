@@ -397,7 +397,10 @@ def test_index_renders_upload_button_and_overlay_shell(app_factory):
     assert b'class="upload-toggle"' in response.data
     assert b'aria-haspopup="dialog"' in response.data
     assert b'class="upload-overlay"' in response.data
+    assert b'role="dialog"' in response.data
+    assert b'aria-modal="true"' in response.data
     assert b'aria-labelledby="upload-title"' in response.data
+    assert b'aria-labelledby="upload-title"\n      data-api-import-url=' in response.data
     assert b'data-api-import-url="/api/images/import-url"' in response.data
     assert b'data-api-upload-url="/api/images/import-upload"' in response.data
     assert b'id="upload-title">Upload' in response.data

@@ -504,7 +504,8 @@ select {
 }
 
 .mask-editor-bar,
-.trash-bar {
+.trash-bar,
+.upload-bar {
   align-items: center;
   display: flex;
   gap: 0.75rem;
@@ -512,7 +513,8 @@ select {
 }
 
 .mask-editor-bar h2,
-.trash-bar h2 {
+.trash-bar h2,
+.upload-bar h2 {
   font-size: 1rem;
   margin: 0;
 }
@@ -673,6 +675,87 @@ select {
   max-height: calc(100vh - 11rem);
   overflow: auto;
   padding-right: 0.25rem;
+}
+
+.upload-url-row {
+  align-items: end;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.upload-url-field {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.upload-url-field span {
+  color: #435063;
+  font-size: 0.8125rem;
+}
+
+.upload-url {
+  border: 1px solid #8b98a8;
+  border-radius: 6px;
+  box-sizing: border-box;
+  font: inherit;
+  min-height: 2.5rem;
+  min-width: 0;
+  padding: 0 0.75rem;
+  width: 100%;
+}
+
+.upload-url-load,
+.upload-close {
+  border-radius: 6px;
+  font: inherit;
+  min-height: 2.5rem;
+  padding: 0 0.75rem;
+}
+
+.upload-drop-target {
+  align-items: center;
+  border: 2px dashed #8b98a8;
+  border-radius: 8px;
+  color: #334155;
+  display: grid;
+  gap: 0.25rem;
+  justify-items: center;
+  min-height: 8rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.upload-drop-target-active {
+  background: #f0fdfa;
+  border-color: #0f766e;
+}
+
+.upload-drop-target-busy {
+  cursor: wait;
+  opacity: 0.75;
+}
+
+.upload-drop-hint,
+.upload-status {
+  color: #5f6b7a;
+  font-size: 0.875rem;
+}
+
+.upload-status {
+  margin: 0;
+}
+
+.upload-status-error {
+  color: #b00020;
+}
+
+.upload-status-success {
+  color: #0a6b2b;
+}
+
+.upload-status-info {
+  color: #1d4ed8;
 }
 
 .mask-editor-stage {
