@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import httpx
 from flask import Flask, jsonify, request, url_for
 
 from imagegen.app_version import app_checksum
@@ -21,6 +22,12 @@ from imagegen.gallery import (
 )
 from imagegen.generation_log import GenerationLog
 from imagegen.immich_client import ImmichClient, ImmichUploadError
+from imagegen.image_imports import (
+    ImageImportError,
+    ImageImportFetchError,
+    MAX_UPLOAD_BYTES,
+    import_image_from_url,
+)
 from imagegen.mask_store import MaskPayloadError, save_mask_payload
 from imagegen.model_registry import (
     GenerationTarget,
@@ -129,6 +136,35 @@ def register_api_routes(app: Flask) -> None:
                 "trash_count": trash_count,
             }
         )
+
+    @app.post("/api/images/import-url")
+    @require_api_csrf
+    def api_import_image_url():
+        payload = request.get_json(silent=True) or {}
+        app_config = app.config["IMAGEGEN_APP_CONFIG"]
+        close_client = False
+        http_client = _image_import_http_client(app)
+        if http_client is None:
+            http_client = httpx.Client(timeout=30.0, follow_redirects=False)
+            close_client = True
+        try:
+            imported = import_image_from_url(
+                payload.get("url") if isinstance(payload, dict) else None,
+                output_dir=app_config.output_dir,
+                client=http_client,
+                max_bytes=app.config.get(
+                    "IMAGEGEN_IMAGE_IMPORT_MAX_BYTES",
+                    MAX_UPLOAD_BYTES,
+                ),
+            )
+        except (ImageImportError, ImageImportFetchError) as error:
+            return jsonify({"error": str(error)}), 400
+        finally:
+            if close_client:
+                http_client.close()
+
+        image = _gallery_image_by_filename(app, imported.path.name)
+        return jsonify({"image": _gallery_image_json(app, image)}), 201
 
     @app.get("/api/trash")
     def api_trash():
@@ -373,6 +409,16 @@ def _refresh_trash_count(app: Flask) -> int:
     )
 
 
+def _image_import_http_client(app: Flask) -> httpx.Client | None:
+    configured = app.config.get("IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT")
+    if configured is None:
+        return None
+    if not hasattr(configured, "stream"):
+        msg = "IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT must provide stream(...)."
+        raise TypeError(msg)
+    return configured
+
+
 def _immich_client(app: Flask) -> ImmichClient:
     configured = app.config.get("IMAGEGEN_IMMICH_CLIENT")
     if configured is not None:
@@ -523,6 +569,26 @@ def _gallery_image_json(app: Flask, image: GalleryImage) -> dict[str, str | None
             filename=image.filename,
         )
     return payload
+
+
+def _gallery_image_by_filename(app: Flask, filename: str) -> GalleryImage:
+    app_config = app.config["IMAGEGEN_APP_CONFIG"]
+    images = list_gallery_images(
+        app_config.output_dir,
+        image_url=lambda image_filename: url_for(
+            "image_file",
+            filename=image_filename,
+        ),
+        metadata_url=lambda image_filename: url_for(
+            "image_metadata",
+            filename=image_filename,
+        ),
+        metadata_provider=app.config["IMAGEGEN_METADATA_PROVIDER"],
+    )
+    for image in images:
+        if image.filename == filename:
+            return image
+    raise FileNotFoundError(filename)
 
 
 def _trash_image_json(filename: str) -> dict[str, str]:

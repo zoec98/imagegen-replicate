@@ -13,6 +13,7 @@ from base64 import b64encode
 from dataclasses import replace
 from io import BytesIO
 
+import httpx
 from PIL import Image
 
 from imagegen.app import create_app
@@ -152,6 +153,16 @@ def test_image_download_clean_rejects_missing_file(app_factory):
 def write_sample_png(path):
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (8, 8), (255, 0, 0)).save(path, "PNG")
+
+
+def route_image_bytes(image_format):
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8), (255, 0, 0)).save(buffer, image_format)
+    return buffer.getvalue()
+
+
+def import_response_client(response):
+    return httpx.Client(transport=httpx.MockTransport(lambda request: response))
 
 
 def test_image_metadata_route_serves_embedded_metadata(app_config, app_factory):
@@ -391,6 +402,213 @@ def test_api_images_includes_embedded_metadata(app_config, app_factory):
         ],
         "trash_count": 0,
     }
+
+
+def test_api_import_image_url_stores_http_image(app_config, app_factory):
+    http_client = import_response_client(
+        httpx.Response(
+            200,
+            content=route_image_bytes("PNG"),
+            request=httpx.Request("GET", "http://example.test/image.png"),
+        )
+    )
+    app = app_factory(IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client)
+    client = app.test_client()
+    token = extract_csrf_token(client.get("/"))
+
+    response = client.post(
+        "/api/images/import-url",
+        json={"url": "http://example.test/image.png"},
+        headers={"X-CSRF-Token": token},
+    )
+
+    assert response.status_code == 201
+    image = response.json["image"]
+    assert image == {
+        "clean_download_url": f"/images/{image['filename']}/download-clean",
+        "delete_url": f"/api/images/{image['filename']}/delete",
+        "download_url": f"/images/{image['filename']}/download",
+        "filename": image["filename"],
+        "mask_save_url": f"/api/images/{image['filename']}/mask",
+        "mask_url": f"/images/{image['filename'].removesuffix('.png')}-mask.png",
+        "url": f"/images/{image['filename']}",
+        "metadata_url": None,
+        "content_type": None,
+        "created_at": None,
+    }
+    assert image["filename"].startswith("import-")
+    assert image["filename"].endswith(".png")
+    with Image.open(app_config.output_dir / image["filename"]) as stored:
+        assert stored.format == "PNG"
+
+
+def test_api_import_image_url_stores_https_image(app_config, app_factory):
+    http_client = import_response_client(
+        httpx.Response(
+            200,
+            content=route_image_bytes("JPEG"),
+            request=httpx.Request("GET", "https://example.test/image.jpg"),
+        )
+    )
+    client = app_factory(IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client).test_client()
+    token = extract_csrf_token(client.get("/"))
+
+    response = client.post(
+        "/api/images/import-url",
+        json={"url": "https://example.test/image.jpg"},
+        headers={"X-CSRF-Token": token},
+    )
+
+    assert response.status_code == 201
+    assert response.json["image"]["filename"].startswith("import-")
+    assert response.json["image"]["filename"].endswith(".jpg")
+
+
+def test_api_import_image_url_rejects_non_http_scheme(app_factory):
+    client = app_factory().test_client()
+    token = extract_csrf_token(client.get("/"))
+
+    response = client.post(
+        "/api/images/import-url",
+        json={"url": "file:///tmp/image.png"},
+        headers={"X-CSRF-Token": token},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Image URL must use http or https."}
+
+
+def test_api_import_image_url_rejects_missing_or_invalid_payload(app_factory):
+    client = app_factory().test_client()
+    token = extract_csrf_token(client.get("/"))
+
+    response = client.post(
+        "/api/images/import-url",
+        json={},
+        headers={"X-CSRF-Token": token},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Image URL is required."}
+
+
+def test_api_import_image_url_rejects_malformed_url(app_factory):
+    client = app_factory().test_client()
+    token = extract_csrf_token(client.get("/"))
+
+    response = client.post(
+        "/api/images/import-url",
+        json={"url": "https://"},
+        headers={"X-CSRF-Token": token},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Image URL must include a host."}
+
+
+def test_api_import_image_url_reports_fetch_failures(app_factory):
+    def handler(request):
+        raise httpx.ConnectError("connection failed", request=request)
+
+    http_client = httpx.Client(transport=httpx.MockTransport(handler))
+    client = app_factory(IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client).test_client()
+    token = extract_csrf_token(client.get("/"))
+
+    response = client.post(
+        "/api/images/import-url",
+        json={"url": "https://example.test/image.png"},
+        headers={"X-CSRF-Token": token},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Image URL request failed."}
+
+
+def test_api_import_image_url_rejects_oversized_response(app_factory):
+    http_client = import_response_client(
+        httpx.Response(
+            200,
+            headers={"content-length": "9"},
+            content=b"too large",
+            request=httpx.Request("GET", "https://example.test/image.png"),
+        )
+    )
+    client = app_factory(
+        IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client,
+        IMAGEGEN_IMAGE_IMPORT_MAX_BYTES=8,
+    ).test_client()
+    token = extract_csrf_token(client.get("/"))
+
+    response = client.post(
+        "/api/images/import-url",
+        json={"url": "https://example.test/image.png"},
+        headers={"X-CSRF-Token": token},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Image download is too large."}
+
+
+def test_api_import_image_url_rejects_non_image_response(app_factory):
+    http_client = import_response_client(
+        httpx.Response(
+            200,
+            content=b"not an image",
+            request=httpx.Request("GET", "https://example.test/image.txt"),
+        )
+    )
+    client = app_factory(IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client).test_client()
+    token = extract_csrf_token(client.get("/"))
+
+    response = client.post(
+        "/api/images/import-url",
+        json={"url": "https://example.test/image.txt"},
+        headers={"X-CSRF-Token": token},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Uploaded file is not a valid image."}
+
+
+def test_api_import_image_url_rejects_unsupported_image_format(app_factory):
+    http_client = import_response_client(
+        httpx.Response(
+            200,
+            content=route_image_bytes("GIF"),
+            request=httpx.Request("GET", "https://example.test/image.gif"),
+        )
+    )
+    client = app_factory(IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client).test_client()
+    token = extract_csrf_token(client.get("/"))
+
+    response = client.post(
+        "/api/images/import-url",
+        json={"url": "https://example.test/image.gif"},
+        headers={"X-CSRF-Token": token},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Unsupported image format: GIF."}
+
+
+def test_api_import_image_url_requires_csrf(app_factory):
+    http_client = import_response_client(
+        httpx.Response(
+            200,
+            content=route_image_bytes("PNG"),
+            request=httpx.Request("GET", "https://example.test/image.png"),
+        )
+    )
+    client = app_factory(IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client).test_client()
+    client.get("/")
+
+    response = client.post(
+        "/api/images/import-url",
+        json={"url": "https://example.test/image.png"},
+    )
+
+    assert response.status_code == 403
+    assert response.json == {"error": "Invalid CSRF token."}
 
 
 def test_trash_route_serves_trashed_file(app_config, app_factory):
