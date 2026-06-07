@@ -41,8 +41,13 @@ def ensure_csrf_token() -> str:
     return token
 
 
-def validate_api_request() -> tuple[dict[str, str], int] | None:
-    if not request.is_json:
+def validate_api_request(
+    *,
+    allow_multipart: bool = False,
+) -> tuple[dict[str, str], int] | None:
+    if not request.is_json and not (
+        allow_multipart and request.mimetype == "multipart/form-data"
+    ):
         return {"error": "API requests must use application/json."}, 415
 
     session_token = session.get(CSRF_SESSION_KEY)
@@ -61,6 +66,18 @@ def require_api_csrf(handler: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(handler)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         error = validate_api_request()
+        if error is not None:
+            body, status = error
+            return jsonify(body), status
+        return handler(*args, **kwargs)
+
+    return wrapper
+
+
+def require_multipart_api_csrf(handler: Callable[..., Any]) -> Callable[..., Any]:
+    @wraps(handler)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        error = validate_api_request(allow_multipart=True)
         if error is not None:
             body, status = error
             return jsonify(body), status

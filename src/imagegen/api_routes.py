@@ -27,6 +27,7 @@ from imagegen.image_imports import (
     ImageImportFetchError,
     MAX_UPLOAD_BYTES,
     import_image_from_url,
+    store_imported_image,
 )
 from imagegen.mask_store import MaskPayloadError, save_mask_payload
 from imagegen.model_registry import (
@@ -50,7 +51,7 @@ from imagegen.palettes import (
 from imagegen.prompt_annotations import strip_prompt_annotations
 from imagegen.provider_requests import build_provider_request
 from imagegen.request_store import GenerationRequest, RequestStore
-from imagegen.security import require_api_csrf
+from imagegen.security import require_api_csrf, require_multipart_api_csrf
 from imagegen.trash import (
     count_trash_images,
     empty_trash,
@@ -162,6 +163,37 @@ def register_api_routes(app: Flask) -> None:
         finally:
             if close_client:
                 http_client.close()
+
+        image = _gallery_image_by_filename(app, imported.path.name)
+        return jsonify({"image": _gallery_image_json(app, image)}), 201
+
+    @app.post("/api/images/import-upload")
+    @require_multipart_api_csrf
+    def api_import_uploaded_image():
+        app_config = app.config["IMAGEGEN_APP_CONFIG"]
+        files = [
+            uploaded_file
+            for field_name in request.files
+            for uploaded_file in request.files.getlist(field_name)
+        ]
+        if not files:
+            return jsonify({"error": "Image file is required."}), 400
+        if len(files) > 1:
+            return jsonify(
+                {"error": "Only one image file can be uploaded at a time."}
+            ), 400
+
+        try:
+            imported = store_imported_image(
+                files[0].read(),
+                output_dir=app_config.output_dir,
+                max_bytes=app.config.get(
+                    "IMAGEGEN_IMAGE_IMPORT_MAX_BYTES",
+                    MAX_UPLOAD_BYTES,
+                ),
+            )
+        except ImageImportError as error:
+            return jsonify({"error": str(error)}), 400
 
         image = _gallery_image_by_filename(app, imported.path.name)
         return jsonify({"image": _gallery_image_json(app, image)}), 201
