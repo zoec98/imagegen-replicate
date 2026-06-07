@@ -21,7 +21,14 @@ from imagegen.gallery import (
     list_gallery_images,
 )
 from imagegen.generation_log import GenerationLog
-from imagegen.immich_client import ImmichClient, ImmichUploadError
+from imagegen.immich_client import (
+    IMMICH_GALLERY_PAGE_SIZE,
+    ImmichClient,
+    ImmichGalleryAsset,
+    ImmichGalleryError,
+    ImmichGalleryPage,
+    ImmichUploadError,
+)
 from imagegen.image_imports import (
     ImageImportError,
     ImageImportFetchError,
@@ -192,6 +199,51 @@ def register_api_routes(app: Flask) -> None:
                     MAX_UPLOAD_BYTES,
                 ),
             )
+        except ImageImportError as error:
+            return jsonify({"error": str(error)}), 400
+
+        image = _gallery_image_by_filename(app, imported.path.name)
+        return jsonify({"image": _gallery_image_json(app, image)}), 201
+
+    @app.get("/api/immich/assets")
+    def api_immich_assets():
+        if not _immich_enabled(app):
+            return jsonify({"error": "Immich import is not configured."}), 404
+        try:
+            page_number = _positive_page_number(request.args.get("page"))
+        except ValueError as error:
+            return jsonify({"error": str(error)}), 400
+        try:
+            page = _immich_client(app).list_main_gallery_assets(
+                page=page_number,
+                page_size=IMMICH_GALLERY_PAGE_SIZE,
+            )
+        except ImmichGalleryError as error:
+            return jsonify({"error": str(error)}), 502
+        return jsonify(_immich_gallery_page_json(page))
+
+    @app.post("/api/immich/assets/import")
+    @require_api_csrf
+    def api_import_immich_asset():
+        if not _immich_enabled(app):
+            return jsonify({"error": "Immich import is not configured."}), 404
+        payload = request.get_json(silent=True) or {}
+        asset_id = payload.get("asset_id") if isinstance(payload, dict) else None
+        if not isinstance(asset_id, str) or not asset_id.strip():
+            return jsonify({"error": "Immich asset id is required."}), 400
+        app_config = app.config["IMAGEGEN_APP_CONFIG"]
+        try:
+            image_bytes = _immich_client(app).download_asset(asset_id.strip())
+            imported = store_imported_image(
+                image_bytes,
+                output_dir=app_config.output_dir,
+                max_bytes=app.config.get(
+                    "IMAGEGEN_IMAGE_IMPORT_MAX_BYTES",
+                    MAX_UPLOAD_BYTES,
+                ),
+            )
+        except ImmichGalleryError as error:
+            return jsonify({"error": str(error)}), 502
         except ImageImportError as error:
             return jsonify({"error": str(error)}), 400
 
@@ -454,8 +506,14 @@ def _image_import_http_client(app: Flask) -> httpx.Client | None:
 def _immich_client(app: Flask) -> ImmichClient:
     configured = app.config.get("IMAGEGEN_IMMICH_CLIENT")
     if configured is not None:
-        if not hasattr(configured, "upload_image"):
-            msg = "IMAGEGEN_IMMICH_CLIENT must provide upload_image(image_path)."
+        if not any(
+            hasattr(configured, method)
+            for method in ("upload_image", "list_main_gallery_assets", "download_asset")
+        ):
+            msg = (
+                "IMAGEGEN_IMMICH_CLIENT must provide an Immich client method "
+                "such as upload_image, list_main_gallery_assets, or download_asset."
+            )
             raise TypeError(msg)
         return configured
     app_config = app.config["IMAGEGEN_APP_CONFIG"]
@@ -621,6 +679,40 @@ def _gallery_image_by_filename(app: Flask, filename: str) -> GalleryImage:
         if image.filename == filename:
             return image
     raise FileNotFoundError(filename)
+
+
+def _positive_page_number(value: str | None) -> int:
+    if value is None or not value.strip():
+        return 1
+    try:
+        page = int(value)
+    except ValueError as error:
+        raise ValueError("Immich page must be a positive integer.") from error
+    if page < 1:
+        raise ValueError("Immich page must be a positive integer.")
+    return page
+
+
+def _immich_gallery_page_json(page: ImmichGalleryPage) -> dict[str, object]:
+    return {
+        "assets": [_immich_gallery_asset_json(asset) for asset in page.assets],
+        "page": page.page,
+        "page_size": page.page_size,
+        "next_page": page.next_page,
+        "previous_page": page.previous_page,
+    }
+
+
+def _immich_gallery_asset_json(asset: ImmichGalleryAsset) -> dict[str, object]:
+    return {
+        "asset_id": asset.asset_id,
+        "thumbnail_url": asset.thumbnail_url,
+        "label": asset.label,
+        "created_at": asset.created_at,
+        "width": asset.width,
+        "height": asset.height,
+        "import_eligible": asset.import_eligible,
+    }
 
 
 def _trash_image_json(filename: str) -> dict[str, str]:
