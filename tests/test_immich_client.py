@@ -99,8 +99,9 @@ def test_immich_client_raises_sanitized_upload_error(tmp_path):
         album_id="album-123",
     )
 
-    with pytest.raises(ImmichUploadError, match="status 403"):
+    with pytest.raises(ImmichUploadError, match=r"key \[redacted\] cannot upload") as error:
         client.upload_image(image_path, client=http_client)
+    assert "test-key" not in str(error.value)
 
 
 def test_immich_client_raises_when_album_attach_fails(tmp_path):
@@ -123,7 +124,7 @@ def test_immich_client_raises_when_album_attach_fails(tmp_path):
         album_id="album-123",
     )
 
-    with pytest.raises(ImmichUploadError, match="album attach failed with status 403"):
+    with pytest.raises(ImmichUploadError, match="forbidden"):
         client.upload_image(image_path, client=http_client)
 
 
@@ -246,7 +247,7 @@ def test_immich_client_raises_sanitized_gallery_api_error():
     def handler(request):
         return httpx.Response(
             403,
-            json={"message": "key test-key cannot read assets"},
+            json={"message": "Missing required permission: asset.read"},
             request=request,
         )
 
@@ -257,7 +258,7 @@ def test_immich_client_raises_sanitized_gallery_api_error():
         album_id="album-123",
     )
 
-    with pytest.raises(ImmichGalleryError, match="request failed with status 403"):
+    with pytest.raises(ImmichGalleryError, match="Missing required permission: asset.read"):
         client.list_main_gallery_assets(client=http_client)
 
 
@@ -319,5 +320,55 @@ def test_immich_client_raises_sanitized_asset_download_error():
         album_id="album-123",
     )
 
-    with pytest.raises(ImmichGalleryError, match="download failed with status 404"):
+    with pytest.raises(ImmichGalleryError, match=r"asset missing for key \[redacted\]") as error:
         client.download_asset("missing-asset", client=http_client)
+    assert "test-key" not in str(error.value)
+
+
+def test_immich_client_downloads_asset_thumbnail():
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(
+            200,
+            content=b"thumbnail bytes",
+            headers={"Content-Type": "image/webp; charset=utf-8"},
+            request=request,
+        )
+
+    http_client = httpx.Client(transport=httpx.MockTransport(handler))
+    client = ImmichClient(
+        base_url="https://immich.example.test",
+        api_key="test-key",
+        album_id="album-123",
+    )
+
+    content, content_type = client.download_thumbnail("asset 1", client=http_client)
+
+    assert content == b"thumbnail bytes"
+    assert content_type == "image/webp"
+    assert calls[0].method == "GET"
+    assert str(calls[0].url) == (
+        "https://immich.example.test/api/assets/asset%201/thumbnail?size=thumbnail"
+    )
+    assert calls[0].headers["x-api-key"] == "test-key"
+
+
+def test_immich_client_raises_sanitized_asset_thumbnail_error():
+    def handler(request):
+        return httpx.Response(
+            403,
+            json={"message": "Missing required permission: asset.view"},
+            request=request,
+        )
+
+    http_client = httpx.Client(transport=httpx.MockTransport(handler))
+    client = ImmichClient(
+        base_url="https://immich.example.test",
+        api_key="test-key",
+        album_id="album-123",
+    )
+
+    with pytest.raises(ImmichGalleryError, match="Missing required permission: asset.view"):
+        client.download_thumbnail("asset-1", client=http_client)

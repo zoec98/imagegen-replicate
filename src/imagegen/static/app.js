@@ -615,35 +615,68 @@
     image.src = asset.thumbnail_url || "";
     image.alt = asset.label || "Immich image";
     image.loading = "lazy";
+    image.addEventListener("error", () => {
+      figure.classList.add("upload-immich-item-thumbnail-error");
+      reportImmichThumbnailError(asset.thumbnail_url);
+    });
 
     const caption = document.createElement("figcaption");
-    const label = document.createElement("span");
-    label.className = "upload-immich-label";
-    label.textContent = asset.label || asset.created_at || asset.asset_id || "Immich image";
+    const metadata = document.createElement("span");
+    metadata.className = "upload-immich-metadata";
 
-    const details = document.createElement("span");
-    details.className = "upload-immich-details";
     const dimensions =
       asset.width && asset.height ? `${asset.width} x ${asset.height}` : "";
-    details.textContent = [dimensions, asset.created_at].filter(Boolean).join(" | ");
+    const sizeLine = document.createElement("span");
+    sizeLine.className = "upload-immich-size";
+    sizeLine.textContent = dimensions || "Size unavailable";
+    const dateLine = document.createElement("span");
+    dateLine.className = "upload-immich-date";
+    dateLine.textContent = asset.created_at || "Date unavailable";
+    metadata.append(sizeLine, dateLine);
 
     const importButton = document.createElement("button");
     importButton.className = "upload-immich-import";
     importButton.type = "button";
-    importButton.textContent = "Import";
     importButton.disabled = !asset.import_eligible || !asset.asset_id;
+    importButton.setAttribute("title", "Import image");
     importButton.setAttribute(
       "aria-label",
       `Import ${asset.label || asset.asset_id || "Immich image"}`,
     );
+    const importIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    importIcon.setAttribute("aria-hidden", "true");
+    importIcon.setAttribute("viewBox", "0 0 24 24");
+    const importPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    importPath.setAttribute(
+      "d",
+      "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 12h3l-5 5-5-5h3V8h4z",
+    );
+    importIcon.append(importPath);
+    importButton.append(importIcon);
 
-    caption.append(label);
-    if (details.textContent) {
-      caption.append(details);
-    }
+    caption.append(metadata);
     caption.append(importButton);
     figure.append(image, caption);
     return figure;
+  }
+
+  async function reportImmichThumbnailError(thumbnailUrl) {
+    if (!thumbnailUrl) {
+      setUploadStatus("Immich thumbnail could not be loaded.", "error");
+      return;
+    }
+    try {
+      const response = await fetch(thumbnailUrl, {
+        credentials: "same-origin",
+      });
+      if (response.ok) {
+        return;
+      }
+      const data = await readApiJson(response, "Immich thumbnail could not be loaded.");
+      setUploadStatus(data.error || "Immich thumbnail could not be loaded.", "error");
+    } catch (error) {
+      setUploadStatus(error.message || "Immich thumbnail could not be loaded.", "error");
+    }
   }
 
   function renderImmichAssets(data) {
@@ -652,7 +685,9 @@
     }
     const assets = Array.isArray(data.assets) ? data.assets : [];
     immichCurrentPage = Number.isFinite(data.page) ? data.page : immichCurrentPage;
-    immichNextPage = data.next_page || null;
+    const pageSize = Number.isFinite(data.page_size) ? data.page_size : 20;
+    immichNextPage =
+      data.next_page || (assets.length >= pageSize ? immichCurrentPage + 1 : null);
     immichPreviousPage = data.previous_page || null;
     setImmichPageLabel(`Page ${immichCurrentPage}`);
     uploadImmichGallery.replaceChildren();

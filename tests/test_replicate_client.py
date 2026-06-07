@@ -65,7 +65,7 @@ def app_config(tmp_path):
         data_dir=tmp_path,
         author="Test Author",
         immich_url="",
-        immich_gallery_id="",
+        immich_upload_album_id="",
         immich_api_key="",
         model_alias="seedream45",
         model=MODEL_REGISTRY["seedream45"],

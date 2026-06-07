@@ -103,7 +103,14 @@ class ImmichClient:
             )
             if response.status_code != 200:
                 raise ImmichGalleryError(
-                    f"Immich gallery request failed with status {response.status_code}."
+                    _response_error_message(
+                        response,
+                        (
+                            "Immich gallery request failed with status "
+                            f"{response.status_code}."
+                        ),
+                        secret=self.api_key,
+                    )
                 )
             payload = _json_response(response)
             assets, total = self._gallery_assets(payload)
@@ -138,9 +145,50 @@ class ImmichClient:
             )
             if response.status_code != 200:
                 raise ImmichGalleryError(
-                    f"Immich asset download failed with status {response.status_code}."
+                    _response_error_message(
+                        response,
+                        (
+                            "Immich asset download failed with status "
+                            f"{response.status_code}."
+                        ),
+                        secret=self.api_key,
+                    )
                 )
             return response.content
+        finally:
+            if close_client:
+                http_client.close()
+
+    def download_thumbnail(
+        self,
+        asset_id: str,
+        *,
+        client: httpx.Client | None = None,
+    ) -> tuple[bytes, str]:
+        if not asset_id.strip():
+            raise ImmichGalleryError("Immich asset id is required.")
+
+        close_client = client is None
+        http_client = client or httpx.Client(timeout=self.timeout)
+        try:
+            response = http_client.get(
+                self._api_url(
+                    f"/api/assets/{quote(asset_id)}/thumbnail?size=thumbnail"
+                ),
+                headers=self._headers(),
+            )
+            if response.status_code != 200:
+                raise ImmichGalleryError(
+                    _response_error_message(
+                        response,
+                        (
+                            "Immich asset thumbnail failed with status "
+                            f"{response.status_code}."
+                        ),
+                        secret=self.api_key,
+                    )
+                )
+            return response.content, _content_type(response)
         finally:
             if close_client:
                 http_client.close()
@@ -172,7 +220,11 @@ class ImmichClient:
             )
         if response.status_code not in {200, 201}:
             raise ImmichUploadError(
-                f"Immich upload failed with status {response.status_code}."
+                _response_error_message(
+                    response,
+                    f"Immich upload failed with status {response.status_code}.",
+                    secret=self.api_key,
+                )
             )
         payload = _json_response(response)
         upload_status = str(payload.get("status", "")).lower()
@@ -189,7 +241,11 @@ class ImmichClient:
         )
         if response.status_code not in {200, 201}:
             raise ImmichUploadError(
-                f"Immich album attach failed with status {response.status_code}."
+                _response_error_message(
+                    response,
+                    f"Immich album attach failed with status {response.status_code}.",
+                    secret=self.api_key,
+                )
             )
 
         payload = _json_response(response)
@@ -254,6 +310,32 @@ def _json_response(response: httpx.Response) -> Any:
         return response.json()
     except ValueError:
         return {}
+
+
+def _content_type(response: httpx.Response) -> str:
+    content_type = response.headers.get("Content-Type", "").split(";", 1)[0].strip()
+    return content_type or "image/jpeg"
+
+
+def _response_error_message(
+    response: httpx.Response,
+    fallback: str,
+    *,
+    secret: str,
+) -> str:
+    payload = _json_response(response)
+    message = payload.get("message") if isinstance(payload, dict) else None
+    if isinstance(message, list):
+        message = " ".join(str(item) for item in message if str(item).strip())
+    if not isinstance(message, str) or not message.strip():
+        return fallback
+    return _redact_secret(message.strip(), secret=secret)
+
+
+def _redact_secret(message: str, *, secret: str) -> str:
+    if not secret:
+        return message
+    return message.replace(secret, "[redacted]")
 
 
 def _search_items(payload: Any) -> tuple[list[Any] | None, int | None]:

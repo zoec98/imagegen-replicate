@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import httpx
-from flask import Flask, jsonify, request, url_for
+from flask import Flask, Response, jsonify, request, url_for
 
 from imagegen.app_version import app_checksum
 from imagegen.filenames import safe_image_filename
@@ -207,7 +207,7 @@ def register_api_routes(app: Flask) -> None:
 
     @app.get("/api/immich/assets")
     def api_immich_assets():
-        if not _immich_enabled(app):
+        if not _immich_import_enabled(app):
             return jsonify({"error": "Immich import is not configured."}), 404
         try:
             page_number = _positive_page_number(request.args.get("page"))
@@ -222,10 +222,24 @@ def register_api_routes(app: Flask) -> None:
             return jsonify({"error": str(error)}), 502
         return jsonify(_immich_gallery_page_json(page))
 
+    @app.get("/api/immich/assets/<path:asset_id>/thumbnail")
+    def api_immich_asset_thumbnail(asset_id: str):
+        if not _immich_import_enabled(app):
+            return jsonify({"error": "Immich import is not configured."}), 404
+        if not asset_id.strip():
+            return jsonify({"error": "Immich asset id is required."}), 400
+        try:
+            thumbnail, content_type = _immich_client(app).download_thumbnail(
+                asset_id.strip()
+            )
+        except ImmichGalleryError as error:
+            return jsonify({"error": str(error)}), 502
+        return Response(thumbnail, content_type=content_type)
+
     @app.post("/api/immich/assets/import")
     @require_api_csrf
     def api_import_immich_asset():
-        if not _immich_enabled(app):
+        if not _immich_import_enabled(app):
             return jsonify({"error": "Immich import is not configured."}), 404
         payload = request.get_json(silent=True) or {}
         asset_id = payload.get("asset_id") if isinstance(payload, dict) else None
@@ -366,7 +380,7 @@ def register_api_routes(app: Flask) -> None:
     @app.post("/api/images/<path:filename>/immich-upload")
     @require_api_csrf
     def api_immich_upload(filename: str):
-        if not _immich_enabled(app):
+        if not _immich_upload_enabled(app):
             return jsonify({"error": "Immich upload is not configured."}), 404
         safe_name = safe_image_filename(filename)
         if safe_name is None:
@@ -481,8 +495,12 @@ def _fragment_payload(
     return str(name), content
 
 
-def _immich_enabled(app: Flask) -> bool:
-    return bool(app.config["IMAGEGEN_APP_CONFIG"].immich_enabled)
+def _immich_import_enabled(app: Flask) -> bool:
+    return bool(app.config["IMAGEGEN_APP_CONFIG"].immich_import_enabled)
+
+
+def _immich_upload_enabled(app: Flask) -> bool:
+    return bool(app.config["IMAGEGEN_APP_CONFIG"].immich_upload_enabled)
 
 
 def _refresh_trash_count(app: Flask) -> int:
@@ -508,11 +526,17 @@ def _immich_client(app: Flask) -> ImmichClient:
     if configured is not None:
         if not any(
             hasattr(configured, method)
-            for method in ("upload_image", "list_main_gallery_assets", "download_asset")
+            for method in (
+                "upload_image",
+                "list_main_gallery_assets",
+                "download_asset",
+                "download_thumbnail",
+            )
         ):
             msg = (
                 "IMAGEGEN_IMMICH_CLIENT must provide an Immich client method "
-                "such as upload_image, list_main_gallery_assets, or download_asset."
+                "such as upload_image, list_main_gallery_assets, download_asset, "
+                "or download_thumbnail."
             )
             raise TypeError(msg)
         return configured
@@ -520,7 +544,7 @@ def _immich_client(app: Flask) -> ImmichClient:
     return ImmichClient(
         base_url=app_config.immich_url,
         api_key=app_config.immich_api_key,
-        album_id=app_config.immich_gallery_id,
+        album_id=app_config.immich_upload_album_id,
     )
 
 
@@ -653,7 +677,7 @@ def _gallery_image_json(app: Flask, image: GalleryImage) -> dict[str, str | None
         "created_at": image.created_at,
     }
     app_config = app.config["IMAGEGEN_APP_CONFIG"]
-    if app_config.immich_enabled:
+    if app_config.immich_upload_enabled:
         payload["immich_upload_url"] = url_for(
             "api_immich_upload",
             filename=image.filename,
@@ -706,7 +730,10 @@ def _immich_gallery_page_json(page: ImmichGalleryPage) -> dict[str, object]:
 def _immich_gallery_asset_json(asset: ImmichGalleryAsset) -> dict[str, object]:
     return {
         "asset_id": asset.asset_id,
-        "thumbnail_url": asset.thumbnail_url,
+        "thumbnail_url": url_for(
+            "api_immich_asset_thumbnail",
+            asset_id=asset.asset_id,
+        ),
         "label": asset.label,
         "created_at": asset.created_at,
         "width": asset.width,

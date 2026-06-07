@@ -424,7 +424,7 @@ def test_index_renders_upload_immich_browser_when_configured(
     immich_config = replace(
         app_config,
         immich_url="https://immich.example.test",
-        immich_gallery_id="album-123",
+        immich_upload_album_id="",
         immich_api_key="immich-key",
     )
     client = app_factory(IMAGEGEN_APP_CONFIG=immich_config).test_client()
@@ -448,6 +448,30 @@ def test_index_renders_upload_immich_browser_when_configured(
     assert b'class="upload-immich-gallery" aria-label="Immich images"' in (
         response.data
     )
+
+
+def test_index_hides_immich_upload_action_without_upload_album(
+    app_config,
+    app_factory,
+):
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "source.png").write_bytes(b"image")
+    immich_config = replace(
+        app_config,
+        immich_url="https://immich.example.test",
+        immich_upload_album_id="",
+        immich_api_key="immich-key",
+    )
+    client = app_factory(IMAGEGEN_APP_CONFIG=immich_config).test_client()
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b'data-api-immich-assets-url="/api/immich/assets"' in response.data
+    assert b'data-immich-upload-url="/api/images/source.png/immich-upload"' not in (
+        response.data
+    )
+    assert b"class=\"gallery-action gallery-immich\"" not in response.data
 
 
 def test_index_excludes_invalid_palette_fragments(app_config, app_factory):
@@ -552,7 +576,7 @@ def test_index_renders_immich_upload_action_when_configured(
     immich_config = replace(
         app_config,
         immich_url="https://immich.example.test",
-        immich_gallery_id="album-123",
+        immich_upload_album_id="album-123",
         immich_api_key="immich-key",
     )
     client = app_factory(IMAGEGEN_APP_CONFIG=immich_config).test_client()

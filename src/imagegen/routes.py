@@ -192,7 +192,8 @@ def _workspace_context(
         "prompt": "",
         "csrf_token": csrf_token,
         "app_checksum": app_checksum_value,
-        "immich_enabled": app_config.immich_enabled,
+        "immich_import_enabled": app_config.immich_import_enabled,
+        "immich_upload_enabled": app_config.immich_upload_enabled,
         "trash_count": count_trash_images(app_config.trash_dir),
     }
 

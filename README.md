@@ -84,22 +84,34 @@ You can change this at any time, and for example, switch between a `clean` and `
 
 The server needs to be stopped and restarted after any change to `.env`.
 
-If you want the upload overlay to browse and import from Immich, configure all
-three Immich settings:
+If you want the upload overlay to browse and import from the Immich main
+gallery, configure the Immich server URL and an API key:
 
 ```bash
 # Immich server base URL.
 IMMICH_URL=https://immich.example.com
 
-# Immich album or gallery id used by this app.
-IMMICH_GALLERY_ID=...
-
 # Immich API key.
 IMMICH_API_KEY=...
 ```
 
-Immich browsing is optional. Without these settings, URL imports and local file
-uploads still work, but the Immich browser is hidden.
+The Immich API key needs `asset.read` to list main-gallery images, `asset.view`
+to display thumbnails, and `asset.download` to import a selected original image.
+
+If you also want the local gallery's per-image Immich upload action, configure
+an upload album id:
+
+```bash
+# Immich album id used only when uploading local gallery images to Immich.
+IMMICH_UPLOAD_ALBUM_ID=...
+```
+
+That album id is not used for browsing the Immich main gallery. Existing `.env`
+files that still use `IMMICH_GALLERY_ID` are treated as the upload album id for
+backward compatibility.
+
+Immich browsing is optional. Without `IMMICH_URL` and `IMMICH_API_KEY`, URL
+imports and local file uploads still work, but the Immich browser is hidden.
 
 ## Running
 
@@ -166,8 +178,8 @@ The upload overlay supports:
 
 - URL import: paste an `http` or `https` image URL and press `Load`.
 - Local file upload: drop one local image file into the drop target.
-- Immich import: when Immich is configured, browse the Immich gallery in pages
-  of 20 images and import one selected image.
+- Immich import: when Immich main-gallery import is configured, browse the
+  Immich main gallery in pages of 20 images and import one selected image.
 
 Imported files are stored in the configured images directory with generated
 local filenames such as `import-...png`. The app does not preserve remote,

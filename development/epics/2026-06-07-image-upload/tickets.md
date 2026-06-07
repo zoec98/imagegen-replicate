@@ -1,6 +1,6 @@
 # Image Upload Tickets
 
-Source story: `development/epics/image-upload/user-story.md`.
+Source story: `development/epics/2026-06-07-image-upload/user-story.md`.
 
 ## Decisions Applied
 
@@ -353,4 +353,3 @@ and Immich imports work.
 - Documentation review.
 - `uv run pytest`
 - `uv run ruff check src tests`
-

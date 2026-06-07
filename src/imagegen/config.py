@@ -62,19 +62,20 @@ ENV_SETTINGS: tuple[EnvSetting, ...] = (
     EnvSetting(
         name="IMMICH_URL",
         default="",
-        comment="Optional Immich server URL for uploading gallery images.",
+        comment="Optional Immich server URL for importing from or uploading to Immich.",
     ),
     EnvSetting(
-        name="IMMICH_GALLERY_ID",
+        name="IMMICH_UPLOAD_ALBUM_ID",
         default="",
-        comment="Optional Immich album id to attach uploaded images to.",
+        comment="Optional Immich album id to attach local gallery uploads to.",
     ),
     EnvSetting(
         name="IMMICH_API_KEY",
         default="",
         comment=(
-            "Optional Immich API key. Required permissions: asset.upload and "
-            "albumAsset.create."
+            "Optional Immich API key. Main-gallery import needs asset.read, "
+            "asset.view, and asset.download. Uploading local images to Immich "
+            "also needs asset.upload and albumAsset.create."
         ),
     ),
     EnvSetting(
@@ -115,7 +116,7 @@ class AppConfig:
     data_dir: Path
     author: str
     immich_url: str
-    immich_gallery_id: str
+    immich_upload_album_id: str
     immich_api_key: str
     model_alias: str
     model: ReplicateModel
@@ -149,12 +150,22 @@ class AppConfig:
         return self.data_dir / "imagegen.sqlite3"
 
     @property
+    def immich_import_enabled(self) -> bool:
+        return bool(self.immich_url.strip() and self.immich_api_key.strip())
+
+    @property
+    def immich_upload_enabled(self) -> bool:
+        return bool(self.immich_import_enabled and self.immich_upload_album_id.strip())
+
+    @property
     def immich_enabled(self) -> bool:
-        return bool(
-            self.immich_url.strip()
-            and self.immich_gallery_id.strip()
-            and self.immich_api_key.strip()
-        )
+        return self.immich_import_enabled
+
+    @property
+    def immich_gallery_id(self) -> str:
+        """Backward-compatible alias for the Immich upload album id."""
+
+        return self.immich_upload_album_id
 
 
 def ensure_env_file(path: str | Path = ".env") -> Path:
@@ -212,7 +223,7 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
         data_dir=data_dir,
         author=os.getenv("AUTHOR", "Noname Changeme Nescio").strip(),
         immich_url=os.getenv("IMMICH_URL", "").strip().rstrip("/"),
-        immich_gallery_id=os.getenv("IMMICH_GALLERY_ID", "").strip(),
+        immich_upload_album_id=_immich_upload_album_id(),
         immich_api_key=os.getenv("IMMICH_API_KEY", "").strip(),
         model_alias=model_alias,
         model=model,
@@ -354,6 +365,13 @@ def _enabled_providers(
     if fal_key:
         providers.append("falai")
     return tuple(providers)
+
+
+def _immich_upload_album_id() -> str:
+    explicit = os.getenv("IMMICH_UPLOAD_ALBUM_ID", "").strip()
+    if explicit:
+        return explicit
+    return os.getenv("IMMICH_GALLERY_ID", "").strip()
 
 
 def _selected_provider(

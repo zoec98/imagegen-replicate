@@ -201,7 +201,7 @@
             data-delete-url="{{ url_for('api_delete_image', filename=image.filename) }}"
             data-mask-url="{{ image.mask_url }}"
             data-mask-save-url="{{ url_for('api_save_mask', filename=image.filename) }}"
-            {% if immich_enabled %}data-immich-upload-url="{{ url_for('api_immich_upload', filename=image.filename) }}"{% endif %}
+            {% if immich_upload_enabled %}data-immich-upload-url="{{ url_for('api_immich_upload', filename=image.filename) }}"{% endif %}
             {% if image.metadata_url %}data-metadata-url="{{ image.metadata_url }}"{% endif %}
             {% if image.content_type %}data-content-type="{{ image.content_type }}"{% endif %}
           >
@@ -273,7 +273,7 @@
                   <path d="M7 20c-1.7 0-3-1.3-3-3 0-1.1.6-2.1 1.5-2.6L15 4.9c.9-.9 2.3-.9 3.2 0l.9.9c.9.9.9 2.3 0 3.2l-9.5 9.5C9.1 19.4 8.1 20 7 20zm1.2-3.1 8.8-8.8-1.1-1.1-8.8 8.8c-.4.4-.4.9 0 1.2.3.3.8.3 1.1-.1z"/>
                 </svg>
               </button>
-              {% if immich_enabled %}
+              {% if immich_upload_enabled %}
               <button
                 class="gallery-action gallery-immich"
                 type="button"
@@ -360,7 +360,7 @@
       aria-labelledby="upload-title"
       data-api-import-url="{{ url_for('api_import_image_url') }}"
       data-api-upload-url="{{ url_for('api_import_uploaded_image') }}"
-      {% if immich_enabled %}
+      {% if immich_import_enabled %}
       data-api-immich-assets-url="{{ url_for('api_immich_assets') }}"
       data-api-immich-import-url="{{ url_for('api_import_immich_asset') }}"
       {% endif %}
@@ -392,7 +392,7 @@
           <span class="upload-drop-hint">image/*</span>
         </div>
         <p class="upload-status" aria-live="polite"></p>
-        {% if immich_enabled %}
+        {% if immich_import_enabled %}
         <section class="upload-immich-browser" aria-label="Immich main gallery">
           <div class="upload-immich-bar">
             <h3>Immich</h3>

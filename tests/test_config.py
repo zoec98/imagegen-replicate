@@ -29,7 +29,7 @@ def test_ensure_env_file_creates_expected_defaults(tmp_path):
     assert "IMAGEGEN_FRAGMENT_ROOT" not in content
     assert "IMAGEGEN_DB_PATH" not in content
     assert "IMMICH_URL=" in content
-    assert "IMMICH_GALLERY_ID=" in content
+    assert "IMMICH_UPLOAD_ALBUM_ID=" in content
     assert "IMMICH_API_KEY=" in content
     assert "IMAGEGEN_MODEL=seedream45" in content
     secret = setting_value(content, "IMAGEGEN_FLASK_SECRET_KEY")
@@ -113,7 +113,7 @@ def test_write_env_example_uses_non_secret_defaults(tmp_path):
     assert "IMAGEGEN_FRAGMENT_ROOT" not in content
     assert "IMAGEGEN_DB_PATH" not in content
     assert "IMMICH_URL=" in content
-    assert "IMMICH_GALLERY_ID=" in content
+    assert "IMMICH_UPLOAD_ALBUM_ID=" in content
     assert "IMMICH_API_KEY=" in content
     assert "IMAGEGEN_MODEL=seedream45" in content
     assert "IMAGEGEN_FLASK_SECRET_KEY=" in content
@@ -129,6 +129,7 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     monkeypatch.delenv("IMAGEGEN_MODEL", raising=False)
     monkeypatch.delenv("IMMICH_URL", raising=False)
     monkeypatch.delenv("IMMICH_GALLERY_ID", raising=False)
+    monkeypatch.delenv("IMMICH_UPLOAD_ALBUM_ID", raising=False)
     monkeypatch.delenv("IMMICH_API_KEY", raising=False)
     monkeypatch.delenv("IMAGEGEN_FLASK_SECRET_KEY", raising=False)
     monkeypatch.delenv("IMAGEGEN_REPLICATE_POLL_SECONDS", raising=False)
@@ -141,7 +142,7 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
         "IMAGEGEN_DATA_DIR=custom-data\n"
         "AUTHOR=Zoé Cordelier\n"
         "IMMICH_URL=https://immich.example.test/\n"
-        "IMMICH_GALLERY_ID=album-123\n"
+        "IMMICH_UPLOAD_ALBUM_ID=album-123\n"
         "IMMICH_API_KEY=immich-key\n"
         "IMAGEGEN_MODEL=seedream45\n"
         "IMAGEGEN_FLASK_SECRET_KEY=test-secret\n"
@@ -164,9 +165,12 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     assert config.trash_dir == tmp_path / "custom-data/trash"
     assert config.generation_log_path == tmp_path / "custom-data/imagegen.sqlite3"
     assert config.immich_url == "https://immich.example.test"
+    assert config.immich_upload_album_id == "album-123"
     assert config.immich_gallery_id == "album-123"
     assert config.immich_api_key == "immich-key"
     assert config.immich_enabled is True
+    assert config.immich_import_enabled is True
+    assert config.immich_upload_enabled is True
     assert config.model_alias == "seedream45"
     assert config.model is MODEL_REGISTRY["seedream45"]
     assert config.flask_secret_key == "test-secret"
@@ -220,9 +224,13 @@ def test_load_config_rejects_unknown_model(tmp_path, monkeypatch):
         load_config(env_path)
 
 
-def test_load_config_disables_immich_unless_all_values_are_set(tmp_path, monkeypatch):
+def test_load_config_enables_immich_import_without_upload_album(
+    tmp_path,
+    monkeypatch,
+):
     monkeypatch.delenv("IMMICH_URL", raising=False)
     monkeypatch.delenv("IMMICH_GALLERY_ID", raising=False)
+    monkeypatch.delenv("IMMICH_UPLOAD_ALBUM_ID", raising=False)
     monkeypatch.delenv("IMMICH_API_KEY", raising=False)
     env_path = tmp_path / ".env"
     env_path.write_text(
@@ -232,7 +240,41 @@ def test_load_config_disables_immich_unless_all_values_are_set(tmp_path, monkeyp
 
     config = load_config(env_path)
 
-    assert config.immich_enabled is False
+    assert config.immich_import_enabled is True
+    assert config.immich_upload_enabled is False
+    assert config.immich_enabled is True
+
+
+def test_load_config_reads_legacy_immich_gallery_id_as_upload_album(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.delenv("IMMICH_GALLERY_ID", raising=False)
+    monkeypatch.delenv("IMMICH_UPLOAD_ALBUM_ID", raising=False)
+    env_path = tmp_path / ".env"
+    env_path.write_text("IMMICH_GALLERY_ID=legacy-album\n", encoding="utf-8")
+
+    config = load_config(env_path)
+
+    assert config.immich_upload_album_id == "legacy-album"
+
+
+def test_load_config_prefers_immich_upload_album_id_over_legacy_name(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.delenv("IMMICH_GALLERY_ID", raising=False)
+    monkeypatch.delenv("IMMICH_UPLOAD_ALBUM_ID", raising=False)
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "IMMICH_GALLERY_ID=legacy-album\n"
+        "IMMICH_UPLOAD_ALBUM_ID=upload-album\n",
+        encoding="utf-8",
+    )
+
+    config = load_config(env_path)
+
+    assert config.immich_upload_album_id == "upload-album"
 
 
 def test_load_config_does_not_override_existing_environment(tmp_path, monkeypatch):

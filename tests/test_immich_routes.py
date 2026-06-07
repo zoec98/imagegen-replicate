@@ -30,10 +30,21 @@ def test_api_images_exposes_immich_upload_url_only_when_configured(
     app_config.output_dir.mkdir(parents=True)
     (app_config.output_dir / "sample.png").write_bytes(b"image")
     disabled = app_factory().test_client().get("/api/images")
+    import_only_config = replace(
+        app_config,
+        immich_url="https://immich.example.test",
+        immich_upload_album_id="",
+        immich_api_key="immich-key",
+    )
+    import_only = (
+        app_factory(IMAGEGEN_APP_CONFIG=import_only_config)
+        .test_client()
+        .get("/api/images")
+    )
     immich_config = replace(
         app_config,
         immich_url="https://immich.example.test",
-        immich_gallery_id="album-123",
+        immich_upload_album_id="album-123",
         immich_api_key="immich-key",
     )
     enabled = (
@@ -42,6 +53,8 @@ def test_api_images_exposes_immich_upload_url_only_when_configured(
 
     assert disabled.status_code == 200
     assert "immich_upload_url" not in disabled.json["images"][0]
+    assert import_only.status_code == 200
+    assert "immich_upload_url" not in import_only.json["images"][0]
     assert enabled.status_code == 200
     assert enabled.json["images"][0]["immich_upload_url"] == (
         "/api/images/sample.png/immich-upload"
@@ -66,13 +79,37 @@ def test_api_immich_upload_requires_configuration(app_config, app_factory):
     assert response.json == {"error": "Immich upload is not configured."}
 
 
+def test_api_immich_upload_requires_upload_album(app_config, app_factory):
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "sample.png").write_bytes(b"image")
+    immich_config = replace(
+        app_config,
+        immich_url="https://immich.example.test",
+        immich_upload_album_id="",
+        immich_api_key="immich-key",
+    )
+    client = app_factory(IMAGEGEN_APP_CONFIG=immich_config).test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/immich-upload",
+        json={},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 404
+    assert response.json == {"error": "Immich upload is not configured."}
+
+
 def test_api_immich_upload_requires_csrf(app_config, app_factory):
     app_config.output_dir.mkdir(parents=True)
     (app_config.output_dir / "sample.png").write_bytes(b"image")
     immich_config = replace(
         app_config,
         immich_url="https://immich.example.test",
-        immich_gallery_id="album-123",
+        immich_upload_album_id="album-123",
         immich_api_key="immich-key",
     )
     client = app_factory(IMAGEGEN_APP_CONFIG=immich_config).test_client()
@@ -89,7 +126,7 @@ def test_api_immich_upload_rejects_missing_or_unsafe_filename(
     immich_config = replace(
         app_config,
         immich_url="https://immich.example.test",
-        immich_gallery_id="album-123",
+        immich_upload_album_id="album-123",
         immich_api_key="immich-key",
     )
     client = app_factory(IMAGEGEN_APP_CONFIG=immich_config).test_client()
@@ -132,7 +169,7 @@ def test_api_immich_upload_calls_configured_backend_client(
     immich_config = replace(
         app_config,
         immich_url="https://immich.example.test",
-        immich_gallery_id="album-123",
+        immich_upload_album_id="album-123",
         immich_api_key="immich-key",
     )
     immich_client = RecordingImmichClient()
@@ -168,7 +205,7 @@ def test_api_immich_upload_treats_already_present_as_success(
     immich_config = replace(
         app_config,
         immich_url="https://immich.example.test",
-        immich_gallery_id="album-123",
+        immich_upload_album_id="album-123",
         immich_api_key="immich-key",
     )
     client = app_factory(
@@ -202,7 +239,7 @@ def test_api_immich_upload_returns_sanitized_error(
     immich_config = replace(
         app_config,
         immich_url="https://immich.example.test",
-        immich_gallery_id="album-123",
+        immich_upload_album_id="album-123",
         immich_api_key="immich-secret-key",
     )
     client = app_factory(
@@ -271,7 +308,7 @@ def test_api_immich_assets_returns_first_page(app_config, app_factory):
         "assets": [
             {
                 "asset_id": "asset-1",
-                "thumbnail_url": "https://immich.example.test/thumb",
+                "thumbnail_url": "/api/immich/assets/asset-1/thumbnail",
                 "label": "sample.jpg",
                 "created_at": "2026-06-07T12:00:00Z",
                 "width": 1200,
@@ -285,6 +322,49 @@ def test_api_immich_assets_returns_first_page(app_config, app_factory):
         "previous_page": None,
     }
     assert immich_client.calls == [(1, 20)]
+
+
+def test_api_immich_asset_thumbnail_proxies_authenticated_request(
+    app_config,
+    app_factory,
+):
+    class ThumbnailImmichClient:
+        def __init__(self):
+            self.asset_ids = []
+
+        def download_thumbnail(self, asset_id):
+            self.asset_ids.append(asset_id)
+            return b"thumbnail", "image/webp"
+
+    immich_client = ThumbnailImmichClient()
+    client = app_factory(
+        IMAGEGEN_APP_CONFIG=immich_enabled_config(app_config),
+        IMAGEGEN_IMMICH_CLIENT=immich_client,
+    ).test_client()
+
+    response = client.get("/api/immich/assets/asset-1/thumbnail")
+
+    assert response.status_code == 200
+    assert response.data == b"thumbnail"
+    assert response.content_type == "image/webp"
+    assert immich_client.asset_ids == ["asset-1"]
+
+
+def test_api_immich_asset_thumbnail_returns_api_errors(app_config, app_factory):
+    class FailingThumbnailImmichClient:
+        def download_thumbnail(self, asset_id):
+            raise ImmichGalleryError("Missing required permission: asset.view")
+
+    client = app_factory(
+        IMAGEGEN_APP_CONFIG=immich_enabled_config(app_config, api_key="secret-key"),
+        IMAGEGEN_IMMICH_CLIENT=FailingThumbnailImmichClient(),
+    ).test_client()
+
+    response = client.get("/api/immich/assets/asset-1/thumbnail")
+
+    assert response.status_code == 502
+    assert response.json == {"error": "Missing required permission: asset.view"}
+    assert "secret-key" not in response.get_data(as_text=True)
 
 
 def test_api_immich_assets_returns_next_page(app_config, app_factory):
@@ -360,7 +440,7 @@ def test_api_immich_assets_returns_empty_result(app_config, app_factory):
 def test_api_immich_assets_returns_sanitized_api_failure(app_config, app_factory):
     class FailingImmichClient:
         def list_main_gallery_assets(self, *, page, page_size):
-            raise ImmichGalleryError("Immich gallery request failed with status 403.")
+            raise ImmichGalleryError("Missing required permission: asset.read")
 
     client = app_factory(
         IMAGEGEN_APP_CONFIG=immich_enabled_config(app_config, api_key="secret-key"),
@@ -370,9 +450,7 @@ def test_api_immich_assets_returns_sanitized_api_failure(app_config, app_factory
     response = client.get("/api/immich/assets")
 
     assert response.status_code == 502
-    assert response.json == {
-        "error": "Immich gallery request failed with status 403."
-    }
+    assert response.json == {"error": "Missing required permission: asset.read"}
     assert "secret-key" not in response.get_data(as_text=True)
 
 
@@ -526,7 +604,7 @@ def immich_enabled_config(app_config, *, api_key="immich-key"):
     return replace(
         app_config,
         immich_url="https://immich.example.test",
-        immich_gallery_id="album-123",
+        immich_upload_album_id="album-123",
         immich_api_key=api_key,
     )
 
