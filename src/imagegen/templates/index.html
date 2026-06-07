@@ -80,6 +80,16 @@
                 <span class="trashcan-count" aria-live="polite">{{ trash_count }}</span>
               </button>
               <button
+                class="upload-toggle"
+                type="button"
+                aria-haspopup="dialog"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M5 20h14v-2H5zm7-16 5 5h-3v6h-4V9H7z"/>
+                </svg>
+                <span>Upload</span>
+              </button>
+              <button
                 class="palette-editor-toggle"
                 type="button"
                 {% if not palettes %}hidden{% endif %}
@@ -341,6 +351,61 @@
         </div>
         <p class="trash-empty-state" hidden>Trash is empty.</p>
         <div class="trash-gallery" aria-label="Trash images"></div>
+      </div>
+    </div>
+    <div
+      class="upload-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="upload-title"
+      data-api-import-url="{{ url_for('api_import_image_url') }}"
+      data-api-upload-url="{{ url_for('api_import_uploaded_image') }}"
+      {% if immich_enabled %}
+      data-api-immich-assets-url="{{ url_for('api_immich_assets') }}"
+      data-api-immich-import-url="{{ url_for('api_import_immich_asset') }}"
+      {% endif %}
+      hidden
+    >
+      <div class="upload-pane">
+        <div class="upload-bar">
+          <h2 id="upload-title">Upload</h2>
+          <button class="upload-close" type="button" aria-label="Close upload" title="Close">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4z"/>
+            </svg>
+          </button>
+        </div>
+        <div class="upload-url-row">
+          <label class="upload-url-field" for="upload-url">
+            <span>URL</span>
+            <input id="upload-url" class="upload-url" type="url" inputmode="url" autocomplete="url">
+          </label>
+          <button class="upload-url-load" type="button">Load</button>
+        </div>
+        <div
+          class="upload-drop-target"
+          role="button"
+          tabindex="0"
+          aria-label="Drop one image file to upload"
+        >
+          <span>Drop one image file here</span>
+          <span class="upload-drop-hint">image/*</span>
+        </div>
+        <p class="upload-status" aria-live="polite"></p>
+        {% if immich_enabled %}
+        <section class="upload-immich-browser" aria-label="Immich main gallery">
+          <div class="upload-immich-bar">
+            <h3>Immich</h3>
+            <div class="upload-immich-pagination">
+              <button class="upload-immich-prev" type="button" disabled>Previous</button>
+              <span class="upload-immich-page" aria-live="polite">Page 1</span>
+              <button class="upload-immich-next" type="button" disabled>Next</button>
+            </div>
+          </div>
+          <p class="upload-immich-empty" hidden>No Immich images loaded.</p>
+          <div class="upload-immich-gallery" aria-label="Immich images"></div>
+        </section>
+        {% endif %}
       </div>
     </div>
   </body>

@@ -371,6 +371,9 @@ def test_index_renders_trashcan_button_and_overlay_shell(app_config, app_factory
         response.data
     )
     assert response.data.index(b'class="trashcan-toggle"') < (
+        response.data.index(b'class="upload-toggle"')
+    )
+    assert response.data.index(b'class="upload-toggle"') < (
         response.data.index(b'class="palette-editor-toggle"')
     )
     assert response.data.index(b'class="palette-editor-toggle"') < (
@@ -383,6 +386,65 @@ def test_index_renders_trashcan_button_and_overlay_shell(app_config, app_factory
     assert b'class="trash-empty-state" hidden>Trash is empty.' in response.data
     assert b'class="trash-gallery" aria-label="Trash images"' in response.data
     assert b'class="trash-close"' in response.data
+
+
+def test_index_renders_upload_button_and_overlay_shell(app_factory):
+    client = app_factory().test_client()
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b'class="upload-toggle"' in response.data
+    assert b'aria-haspopup="dialog"' in response.data
+    assert b'class="upload-overlay"' in response.data
+    assert b'aria-labelledby="upload-title"' in response.data
+    assert b'data-api-import-url="/api/images/import-url"' in response.data
+    assert b'data-api-upload-url="/api/images/import-upload"' in response.data
+    assert b'id="upload-title">Upload' in response.data
+    assert b'class="upload-close"' in response.data
+    assert b'id="upload-url"' in response.data
+    assert b'class="upload-url"' in response.data
+    assert b'class="upload-url-load" type="button">Load' in response.data
+    assert b'class="upload-drop-target"' in response.data
+    assert b'aria-label="Drop one image file to upload"' in response.data
+    assert b'image/*' in response.data
+    assert b'class="upload-status" aria-live="polite"' in response.data
+    assert b'class="upload-immich-browser"' not in response.data
+    assert b'data-api-immich-assets-url' not in response.data
+    assert b'data-api-immich-import-url' not in response.data
+
+
+def test_index_renders_upload_immich_browser_when_configured(
+    app_config,
+    app_factory,
+):
+    immich_config = replace(
+        app_config,
+        immich_url="https://immich.example.test",
+        immich_gallery_id="album-123",
+        immich_api_key="immich-key",
+    )
+    client = app_factory(IMAGEGEN_APP_CONFIG=immich_config).test_client()
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b'data-api-immich-assets-url="/api/immich/assets"' in response.data
+    assert b'data-api-immich-import-url="/api/immich/assets/import"' in response.data
+    assert b'class="upload-immich-browser" aria-label="Immich main gallery"' in (
+        response.data
+    )
+    assert b'class="upload-immich-prev" type="button" disabled>Previous' in (
+        response.data
+    )
+    assert b'class="upload-immich-page" aria-live="polite">Page 1' in response.data
+    assert b'class="upload-immich-next" type="button" disabled>Next' in response.data
+    assert b'class="upload-immich-empty" hidden>No Immich images loaded.' in (
+        response.data
+    )
+    assert b'class="upload-immich-gallery" aria-label="Immich images"' in (
+        response.data
+    )
 
 
 def test_index_excludes_invalid_palette_fragments(app_config, app_factory):
