@@ -484,8 +484,15 @@
     }
     uploadStatus.textContent = text || "";
     uploadStatus.className = "upload-status";
+    uploadDropTarget?.classList.remove(
+      "upload-drop-target-empty",
+      "upload-drop-target-error",
+      "upload-drop-target-info",
+      "upload-drop-target-success",
+    );
     if (text) {
       uploadStatus.classList.add(`upload-status-${category}`);
+      uploadDropTarget?.classList.add(`upload-drop-target-${category}`);
     }
   }
 
