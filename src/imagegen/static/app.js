@@ -41,6 +41,12 @@
   const uploadUrlLoad = uploadOverlay?.querySelector(".upload-url-load");
   const uploadDropTarget = uploadOverlay?.querySelector(".upload-drop-target");
   const uploadStatus = uploadOverlay?.querySelector(".upload-status");
+  const uploadImmichBrowser = uploadOverlay?.querySelector(".upload-immich-browser");
+  const uploadImmichPrev = uploadOverlay?.querySelector(".upload-immich-prev");
+  const uploadImmichNext = uploadOverlay?.querySelector(".upload-immich-next");
+  const uploadImmichPage = uploadOverlay?.querySelector(".upload-immich-page");
+  const uploadImmichEmpty = uploadOverlay?.querySelector(".upload-immich-empty");
+  const uploadImmichGallery = uploadOverlay?.querySelector(".upload-immich-gallery");
   const maskEditorOverlay = document.querySelector(".mask-editor-overlay");
   const maskEditorStage = maskEditorOverlay?.querySelector(".mask-editor-stage");
   const maskEditorWrap = maskEditorOverlay?.querySelector(".mask-editor-canvas-wrap");
@@ -100,6 +106,10 @@
   let maskEditorPainting = false;
   let maskEditorBrushSize = 48;
   let maskEditorBrushFalloff = 0.65;
+  let immichCurrentPage = 1;
+  let immichNextPage = null;
+  let immichPreviousPage = null;
+  let immichLoading = false;
 
   function selectedProvider() {
     return providerSelector?.value || null;
@@ -500,6 +510,11 @@
     uploadOverlay.hidden = false;
     setUploadStatus("Add an image URL or drop one image file.", "empty");
     uploadUrlInput?.focus();
+    if (uploadOverlay.dataset.apiImmichAssetsUrl) {
+      loadImmichPage(1).catch((error) => {
+        setUploadStatus(error.message || "Immich gallery could not be loaded.", "error");
+      });
+    }
   }
 
   function closeUploadOverlay() {
@@ -565,6 +580,140 @@
     await refreshGallery();
     const filename = data?.image?.filename;
     setUploadStatus(filename ? `${filename} imported.` : message, "success");
+  }
+
+  function setImmichLoading(isLoading) {
+    immichLoading = isLoading;
+    uploadImmichGallery?.setAttribute("aria-busy", isLoading ? "true" : "false");
+    if (uploadImmichPrev) {
+      uploadImmichPrev.disabled = isLoading || !immichPreviousPage;
+    }
+    if (uploadImmichNext) {
+      uploadImmichNext.disabled = isLoading || !immichNextPage;
+    }
+  }
+
+  function setImmichPageLabel(text) {
+    if (uploadImmichPage) {
+      uploadImmichPage.textContent = text;
+    }
+  }
+
+  function immichAssetFigure(asset) {
+    const figure = document.createElement("figure");
+    figure.className = "upload-immich-item";
+    figure.dataset.assetId = asset.asset_id || "";
+
+    const image = document.createElement("img");
+    image.src = asset.thumbnail_url || "";
+    image.alt = asset.label || "Immich image";
+    image.loading = "lazy";
+
+    const caption = document.createElement("figcaption");
+    const label = document.createElement("span");
+    label.className = "upload-immich-label";
+    label.textContent = asset.label || asset.created_at || asset.asset_id || "Immich image";
+
+    const details = document.createElement("span");
+    details.className = "upload-immich-details";
+    const dimensions =
+      asset.width && asset.height ? `${asset.width} x ${asset.height}` : "";
+    details.textContent = [dimensions, asset.created_at].filter(Boolean).join(" | ");
+
+    const importButton = document.createElement("button");
+    importButton.className = "upload-immich-import";
+    importButton.type = "button";
+    importButton.textContent = "Import";
+    importButton.disabled = !asset.import_eligible || !asset.asset_id;
+    importButton.setAttribute(
+      "aria-label",
+      `Import ${asset.label || asset.asset_id || "Immich image"}`,
+    );
+
+    caption.append(label);
+    if (details.textContent) {
+      caption.append(details);
+    }
+    caption.append(importButton);
+    figure.append(image, caption);
+    return figure;
+  }
+
+  function renderImmichAssets(data) {
+    if (!uploadImmichGallery || !uploadImmichEmpty) {
+      return;
+    }
+    const assets = Array.isArray(data.assets) ? data.assets : [];
+    immichCurrentPage = Number.isFinite(data.page) ? data.page : immichCurrentPage;
+    immichNextPage = data.next_page || null;
+    immichPreviousPage = data.previous_page || null;
+    setImmichPageLabel(`Page ${immichCurrentPage}`);
+    uploadImmichGallery.replaceChildren();
+    if (assets.length === 0) {
+      uploadImmichEmpty.hidden = false;
+      return;
+    }
+    uploadImmichEmpty.hidden = true;
+    assets.forEach((asset) => {
+      uploadImmichGallery.append(immichAssetFigure(asset));
+    });
+  }
+
+  async function loadImmichPage(page) {
+    const baseUrl = uploadOverlay?.dataset.apiImmichAssetsUrl;
+    if (!baseUrl || !uploadImmichBrowser || immichLoading) {
+      return;
+    }
+    setImmichPageLabel("Loading");
+    setImmichLoading(true);
+    if (uploadImmichEmpty) {
+      uploadImmichEmpty.hidden = true;
+    }
+    const url = new URL(baseUrl, window.location.href);
+    url.searchParams.set("page", String(page));
+    try {
+      const response = await fetch(url.toString(), {
+        credentials: "same-origin",
+      });
+      const data = await readApiJson(response, "Immich gallery could not be loaded.");
+      renderImmichAssets(data);
+    } catch (error) {
+      setImmichPageLabel(`Page ${immichCurrentPage}`);
+      throw error;
+    } finally {
+      setImmichLoading(false);
+    }
+  }
+
+  async function importImmichAsset(figure) {
+    const assetId = figure?.dataset.assetId || "";
+    const button = figure?.querySelector(".upload-immich-import");
+    if (!assetId) {
+      setUploadStatus("Immich asset id is unavailable.", "error");
+      return;
+    }
+    if (button) {
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+    }
+    setUploadStatus("Importing Immich image.", "info");
+    try {
+      const data = await postUploadJson(
+        uploadOverlay?.dataset.apiImmichImportUrl,
+        { asset_id: assetId },
+        "Immich image could not be imported.",
+      );
+      await finishUploadImport(data, "Immich image imported.");
+    } catch (error) {
+      if (button) {
+        button.disabled = false;
+      }
+      setUploadStatus(error.message || "Immich image could not be imported.", "error");
+    } finally {
+      if (button) {
+        button.removeAttribute("aria-busy");
+      }
+    }
   }
 
   async function importUploadUrl() {
@@ -2237,6 +2386,31 @@
     importDroppedImage(file).catch((error) => {
       setUploadBusy(false);
       setUploadStatus(error.message || "Image file could not be uploaded.", "error");
+    });
+  });
+  uploadImmichPrev?.addEventListener("click", () => {
+    if (!immichPreviousPage || immichLoading) {
+      return;
+    }
+    loadImmichPage(immichPreviousPage).catch((error) => {
+      setUploadStatus(error.message || "Immich gallery could not be loaded.", "error");
+    });
+  });
+  uploadImmichNext?.addEventListener("click", () => {
+    if (!immichNextPage || immichLoading) {
+      return;
+    }
+    loadImmichPage(immichNextPage).catch((error) => {
+      setUploadStatus(error.message || "Immich gallery could not be loaded.", "error");
+    });
+  });
+  uploadImmichGallery?.addEventListener("click", (event) => {
+    const importButton = event.target.closest(".upload-immich-import");
+    if (!importButton) {
+      return;
+    }
+    importImmichAsset(importButton.closest(".upload-immich-item")).catch((error) => {
+      setUploadStatus(error.message || "Immich image could not be imported.", "error");
     });
   });
   gallery?.addEventListener("click", (event) => {
