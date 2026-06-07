@@ -84,6 +84,23 @@ You can change this at any time, and for example, switch between a `clean` and `
 
 The server needs to be stopped and restarted after any change to `.env`.
 
+If you want the upload overlay to browse and import from Immich, configure all
+three Immich settings:
+
+```bash
+# Immich server base URL.
+IMMICH_URL=https://immich.example.com
+
+# Immich album or gallery id used by this app.
+IMMICH_GALLERY_ID=...
+
+# Immich API key.
+IMMICH_API_KEY=...
+```
+
+Immich browsing is optional. Without these settings, URL imports and local file
+uploads still work, but the Immich browser is hidden.
+
 ## Running
 
 After making these changes you can start the server again, and connect to 127.0.0.1:5002.
@@ -131,13 +148,36 @@ It will notice if the application has updated and will ask you to reload if it i
 2. Choose a model from the model selector.
 3. Enter a prompt.
 4. Set model-specific parameters such as image size, aspect ratio, guidance, seed, output format, or custom dimensions.
-5. For image edits, enable `Edit`, select one or more existing gallery images as sources, then submit the request.
-6. Press `Generate`.
-7. Watch request status in the message area.
-8. Use the gallery to open generated images, download metadata-rich or clean copies, inspect metadata, load metadata back into the workspace, create edit masks, or delete local images.
+5. Use `Upload` when you want to import an existing image from a URL, one dropped local image file, or a configured Immich gallery.
+6. For image edits, enable `Edit`, select one or more existing gallery images as sources, then submit the request.
+7. Press `Generate`.
+8. Watch request status in the message area.
+9. Use the gallery to open generated or imported images, download metadata-rich or clean copies, inspect metadata, load metadata back into the workspace, create edit masks, or delete local images.
 
 Image edit sources are selected from local gallery images.
 Generated images are stored under `IMAGEGEN_DATA_DIR/images`, `data/images` by default.
+
+## Image Uploads
+
+Use the `Upload` button next to the trash control to add existing images to the
+local gallery.
+
+The upload overlay supports:
+
+- URL import: paste an `http` or `https` image URL and press `Load`.
+- Local file upload: drop one local image file into the drop target.
+- Immich import: when Immich is configured, browse the Immich gallery in pages
+  of 20 images and import one selected image.
+
+Imported files are stored in the configured images directory with generated
+local filenames such as `import-...png`. The app does not preserve remote,
+uploaded, or Immich filenames as local paths.
+
+The first drag-and-drop implementation accepts one file at a time. Multi-file
+drops are rejected in the browser, and the server still validates every upload.
+
+The Immich browser is paginated and loads one batch of 20 images at a time. It
+does not include search, filtering, or bulk import yet.
 
 ## Prompt Palettes
 
@@ -188,7 +228,7 @@ but creating or deleting whole palette directories is a filesystem task.
 
 ## Gallery
 
-Generated images appear in the local gallery. Each gallery card provides:
+Generated and imported images appear in the local gallery. Each gallery card provides:
 
 - The image itself as an open/view link to the stored local file. This version of the image contains EXIF metadata.
 - An information button with filename, model, dimensions, and prompt.
@@ -230,6 +270,8 @@ Unpainted pixels are black, fully painted pixels are white, and soft brush fallo
 ## Storage
 
 Generated files are downloaded from the model provider into `data/images` by default.
+Imported URL, dropped local, and Immich images are stored in the same gallery
+directory.
 Supported local image formats are PNG, JPEG, and WebP.
 
 Set `IMAGEGEN_DATA_DIR` to move the runtime data root.
