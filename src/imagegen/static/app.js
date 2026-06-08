@@ -1963,13 +1963,14 @@
 
   function trashFigure(image) {
     const figure = document.createElement("figure");
-    figure.className = "gallery-item trash-item";
+    figure.className = "gallery-item image-card trash-item";
     figure.dataset.filename = image.filename || "";
     if (image.restore_url) {
       figure.dataset.restoreUrl = image.restore_url;
     }
 
     const link = document.createElement("a");
+    link.className = "image-card-media";
     link.href = image.url || "#";
     link.target = "_blank";
     link.rel = "noopener";
@@ -1980,6 +1981,7 @@
     link.append(img);
 
     const caption = document.createElement("figcaption");
+    caption.className = "image-card-ribbon";
     const actions = document.createElement("div");
     actions.className = "gallery-actions";
     actions.setAttribute("aria-label", "Trash image actions");
