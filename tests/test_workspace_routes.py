@@ -545,6 +545,10 @@ def test_index_exposes_gallery_filenames_for_source_selection(app_config, app_fa
     response = client.get("/")
 
     assert response.status_code == 200
+    assert b'class="gallery image-gallery"' in response.data
+    assert b'class="gallery-item image-card"' in response.data
+    assert b'class="image-card-media" href="/images/source.png"' in response.data
+    assert b'class="image-card-ribbon"' in response.data
     assert b'data-filename="source.png"' in response.data
     assert b'data-delete-url="/api/images/source.png/delete"' in response.data
     assert b'data-mask-url="/images/source-mask.png"' in response.data
