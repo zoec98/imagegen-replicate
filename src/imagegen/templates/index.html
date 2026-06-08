@@ -193,10 +193,10 @@
         <div class="section-bar">
           <h1>Images</h1>
         </div>
-        <div class="gallery">
+        <div class="gallery image-gallery">
         {% for image in images %}
           <figure
-            class="gallery-item"
+            class="gallery-item image-card"
             data-filename="{{ image.filename }}"
             data-delete-url="{{ url_for('api_delete_image', filename=image.filename) }}"
             data-mask-url="{{ image.mask_url }}"
@@ -205,7 +205,7 @@
             {% if image.metadata_url %}data-metadata-url="{{ image.metadata_url }}"{% endif %}
             {% if image.content_type %}data-content-type="{{ image.content_type }}"{% endif %}
           >
-            <a href="{{ image.url }}" target="_blank" rel="noopener">
+            <a class="image-card-media" href="{{ image.url }}" target="_blank" rel="noopener">
               <img src="{{ image.url }}" alt="{{ image.filename }}">
             </a>
             <button
@@ -213,7 +213,7 @@
               type="button"
               aria-label="Select {{ image.filename }} as source image"
             ></button>
-            <figcaption>
+            <figcaption class="image-card-ribbon">
               <div class="gallery-actions" aria-label="Image actions">
               <span class="image-info-wrap">
                 <button
