@@ -1770,7 +1770,7 @@
 
   function imageFigure(image) {
     const figure = document.createElement("figure");
-    figure.className = "gallery-item";
+    figure.className = "gallery-item image-card";
     figure.dataset.filename = image.filename;
     if (image.delete_url) {
       figure.dataset.deleteUrl = image.delete_url;
@@ -1801,6 +1801,7 @@
     }
 
     const link = document.createElement("a");
+    link.className = "image-card-media";
     link.href = image.url;
     link.target = "_blank";
     link.rel = "noopener";
@@ -1810,6 +1811,7 @@
     img.alt = image.filename;
 
     const caption = document.createElement("figcaption");
+    caption.className = "image-card-ribbon";
 
     link.append(img);
     const actions = document.createElement("div");
