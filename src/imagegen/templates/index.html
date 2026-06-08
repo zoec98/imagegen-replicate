@@ -384,11 +384,11 @@
         </div>
         <div
           class="upload-drop-target"
-          role="button"
-          tabindex="0"
-          aria-label="Drop one image file to upload"
+          aria-label="Choose or drop one image file to upload"
         >
           <span>Drop one image file here</span>
+          <input class="upload-file-input" type="file" accept="image/*" hidden>
+          <button class="upload-file-choose" type="button">Choose image</button>
           <span class="upload-drop-hint">image/*</span>
         </div>
         <p class="upload-status" aria-live="polite"></p>

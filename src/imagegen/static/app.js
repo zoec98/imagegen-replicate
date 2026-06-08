@@ -40,6 +40,8 @@
   const uploadUrlInput = uploadOverlay?.querySelector(".upload-url");
   const uploadUrlLoad = uploadOverlay?.querySelector(".upload-url-load");
   const uploadDropTarget = uploadOverlay?.querySelector(".upload-drop-target");
+  const uploadFileInput = uploadOverlay?.querySelector(".upload-file-input");
+  const uploadFileChoose = uploadOverlay?.querySelector(".upload-file-choose");
   const uploadStatus = uploadOverlay?.querySelector(".upload-status");
   const uploadImmichBrowser = uploadOverlay?.querySelector(".upload-immich-browser");
   const uploadImmichPrev = uploadOverlay?.querySelector(".upload-immich-prev");
@@ -508,6 +510,12 @@
       uploadDropTarget.classList.toggle("upload-drop-target-busy", isBusy);
       uploadDropTarget.setAttribute("aria-disabled", isBusy ? "true" : "false");
     }
+    if (uploadFileInput) {
+      uploadFileInput.disabled = isBusy;
+    }
+    if (uploadFileChoose) {
+      uploadFileChoose.disabled = isBusy;
+    }
   }
 
   function openUploadOverlay() {
@@ -515,7 +523,7 @@
       return;
     }
     uploadOverlay.hidden = false;
-    setUploadStatus("Add an image URL or drop one image file.", "empty");
+    setUploadStatus("Add an image URL, choose one image file, or drop one image file.", "empty");
     uploadUrlInput?.focus();
     if (uploadOverlay.dataset.apiImmichAssetsUrl) {
       loadImmichPage(1).catch((error) => {
@@ -782,6 +790,10 @@
     return Array.from(event.dataTransfer?.files || []);
   }
 
+  function selectedUploadFiles() {
+    return Array.from(uploadFileInput?.files || []);
+  }
+
   function validateDroppedImage(files) {
     if (files.length === 0) {
       return null;
@@ -813,6 +825,13 @@
     } finally {
       setUploadBusy(false);
     }
+  }
+
+  function importUploadFile(file) {
+    importDroppedImage(file).catch((error) => {
+      setUploadBusy(false);
+      setUploadStatus(error.message || "Image file could not be uploaded.", "error");
+    });
   }
 
   function sourceImageLimit(model) {
@@ -2405,6 +2424,31 @@
       setUploadStatus(error.message || "Image URL could not be imported.", "error");
     });
   });
+  uploadFileChoose?.addEventListener("click", () => {
+    if (uploadDropTarget?.classList.contains("upload-drop-target-busy")) {
+      return;
+    }
+    uploadFileInput?.click();
+  });
+  uploadFileInput?.addEventListener("change", () => {
+    if (uploadDropTarget?.classList.contains("upload-drop-target-busy")) {
+      return;
+    }
+    let file = null;
+    try {
+      file = validateDroppedImage(selectedUploadFiles());
+    } catch (error) {
+      uploadFileInput.value = "";
+      setUploadStatus(error.message || "Selected file is not an image.", "error");
+      return;
+    }
+    if (!file) {
+      setUploadStatus("Choose one image file.", "empty");
+      return;
+    }
+    importUploadFile(file);
+    uploadFileInput.value = "";
+  });
   uploadDropTarget?.addEventListener("dragenter", (event) => {
     event.preventDefault();
     uploadDropTarget.classList.add("upload-drop-target-active");
@@ -2439,10 +2483,7 @@
       setUploadStatus("Drop one image file.", "empty");
       return;
     }
-    importDroppedImage(file).catch((error) => {
-      setUploadBusy(false);
-      setUploadStatus(error.message || "Image file could not be uploaded.", "error");
-    });
+    importUploadFile(file);
   });
   uploadImmichPrev?.addEventListener("click", () => {
     if (!immichPreviousPage || immichLoading) {
