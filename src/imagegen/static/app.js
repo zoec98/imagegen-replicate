@@ -607,26 +607,21 @@
   }
 
   function immichAssetFigure(asset) {
-    const figure = document.createElement("figure");
-    figure.className = "image-card upload-immich-item";
+    const figure = createImageCard("image-card upload-immich-item");
     figure.dataset.assetId = asset.asset_id || "";
 
-    const media = document.createElement("span");
-    media.className = "image-card-media upload-immich-media";
-
-    const image = document.createElement("img");
-    image.src = asset.thumbnail_url || "";
-    image.alt = asset.label || "Immich image";
-    image.loading = "lazy";
-    image.addEventListener("error", () => {
-      figure.classList.add("upload-immich-item-thumbnail-error");
-      reportImmichThumbnailError(asset.thumbnail_url);
+    const media = createImageMedia({
+      alt: asset.label || "Immich image",
+      className: "upload-immich-media",
+      loading: "lazy",
+      onError: () => {
+        figure.classList.add("upload-immich-item-thumbnail-error");
+        reportImmichThumbnailError(asset.thumbnail_url);
+      },
+      src: asset.thumbnail_url || "",
     });
 
-    media.append(image);
-
-    const caption = document.createElement("figcaption");
-    caption.className = "image-card-ribbon";
+    const caption = createImageCardRibbon();
     const metadata = document.createElement("span");
     metadata.className = "upload-immich-metadata";
 
@@ -649,15 +644,9 @@
       "aria-label",
       `Import ${asset.label || asset.asset_id || "Immich image"}`,
     );
-    const importIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    importIcon.setAttribute("aria-hidden", "true");
-    importIcon.setAttribute("viewBox", "0 0 24 24");
-    const importPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    importPath.setAttribute(
-      "d",
+    const importIcon = createSvgIcon(
       "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 12h3l-5 5-5-5h3V8h4z",
     );
-    importIcon.append(importPath);
     importButton.append(importIcon);
 
     caption.append(metadata);
@@ -1774,9 +1763,76 @@
     return `Generation status: ${data.status}.`;
   }
 
-  function imageFigure(image) {
+  function createImageCard(className) {
     const figure = document.createElement("figure");
-    figure.className = "gallery-item image-card";
+    figure.className = className;
+    return figure;
+  }
+
+  function createImageMedia({
+    alt,
+    className = "",
+    href = null,
+    loading = null,
+    onError = null,
+    src,
+  }) {
+    const media = href ? document.createElement("a") : document.createElement("span");
+    media.className = ["image-card-media", className].filter(Boolean).join(" ");
+    if (href) {
+      media.href = href;
+      media.target = "_blank";
+      media.rel = "noopener";
+    }
+
+    const img = document.createElement("img");
+    img.src = src;
+    img.alt = alt;
+    if (loading) {
+      img.loading = loading;
+    }
+    if (onError) {
+      img.addEventListener("error", onError);
+    }
+
+    media.append(img);
+    return media;
+  }
+
+  function createImageCardRibbon() {
+    const caption = document.createElement("figcaption");
+    caption.className = "image-card-ribbon";
+    return caption;
+  }
+
+  function createActionRibbon(label) {
+    const actions = document.createElement("div");
+    actions.className = "gallery-actions";
+    actions.setAttribute("aria-label", label);
+    return actions;
+  }
+
+  function createInfoAction({ label, tooltipText }) {
+    const infoWrap = document.createElement("span");
+    infoWrap.className = "image-info-wrap";
+    const infoButton = iconButton(
+      "gallery-info",
+      label,
+      "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 8h2v7h-2zm0-3h2v2h-2z",
+    );
+    const tooltip = document.createElement("span");
+    tooltip.className = "image-info-tooltip";
+    tooltip.setAttribute("role", "tooltip");
+    const tooltipLine = document.createElement("span");
+    tooltipLine.className = "tooltip-line";
+    tooltipLine.textContent = tooltipText;
+    tooltip.append(tooltipLine);
+    infoWrap.append(infoButton, tooltip);
+    return infoWrap;
+  }
+
+  function imageFigure(image) {
+    const figure = createImageCard("gallery-item image-card");
     figure.dataset.filename = image.filename;
     if (image.delete_url) {
       figure.dataset.deleteUrl = image.delete_url;
@@ -1806,39 +1862,17 @@
       figure.dataset.createdAt = image.created_at;
     }
 
-    const link = document.createElement("a");
-    link.className = "image-card-media";
-    link.href = image.url;
-    link.target = "_blank";
-    link.rel = "noopener";
-
-    const img = document.createElement("img");
-    img.src = image.url;
-    img.alt = image.filename;
-
-    const caption = document.createElement("figcaption");
-    caption.className = "image-card-ribbon";
-
-    link.append(img);
-    const actions = document.createElement("div");
-    actions.className = "gallery-actions";
-    actions.setAttribute("aria-label", "Image actions");
-
-    const infoWrap = document.createElement("span");
-    infoWrap.className = "image-info-wrap";
-    const infoButton = iconButton(
-      "gallery-info",
-      `Image information for ${image.filename}`,
-      "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 8h2v7h-2zm0-3h2v2h-2z",
-    );
-    const tooltip = document.createElement("span");
-    tooltip.className = "image-info-tooltip";
-    tooltip.setAttribute("role", "tooltip");
-    const tooltipLine = document.createElement("span");
-    tooltipLine.className = "tooltip-line";
-    tooltipLine.textContent = image.filename;
-    tooltip.append(tooltipLine);
-    infoWrap.append(infoButton, tooltip);
+    const link = createImageMedia({
+      alt: image.filename,
+      href: image.url,
+      src: image.url,
+    });
+    const caption = createImageCardRibbon();
+    const actions = createActionRibbon("Image actions");
+    const infoWrap = createInfoAction({
+      label: `Image information for ${image.filename}`,
+      tooltipText: image.filename,
+    });
 
     let immichButton = null;
     if (image.immich_upload_url) {
@@ -1910,14 +1944,7 @@
     button.type = "button";
     button.setAttribute("aria-label", label);
     button.setAttribute("title", title);
-
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("aria-hidden", "true");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", pathData);
-    svg.append(path);
-    button.append(svg);
+    button.append(createSvgIcon(pathData));
     return button;
   }
 
@@ -1938,25 +1965,24 @@
       link.setAttribute("aria-disabled", "true");
     }
 
+    link.append(createSvgIcon(pathData));
+
+    if (sparklePathData) {
+      const sparkle = createSvgIcon(sparklePathData);
+      sparkle.classList.add("sparkle");
+      link.append(sparkle);
+    }
+    return link;
+  }
+
+  function createSvgIcon(pathData) {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("aria-hidden", "true");
     svg.setAttribute("viewBox", "0 0 24 24");
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("d", pathData);
     svg.append(path);
-    link.append(svg);
-
-    if (sparklePathData) {
-      const sparkle = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      sparkle.setAttribute("aria-hidden", "true");
-      sparkle.setAttribute("viewBox", "0 0 24 24");
-      sparkle.classList.add("sparkle");
-      const sparklePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      sparklePath.setAttribute("d", sparklePathData);
-      sparkle.append(sparklePath);
-      link.append(sparkle);
-    }
-    return link;
+    return svg;
   }
 
   function setTrashCount(value) {
@@ -1968,45 +1994,23 @@
   }
 
   function trashFigure(image) {
-    const figure = document.createElement("figure");
-    figure.className = "gallery-item image-card trash-item";
+    const figure = createImageCard("gallery-item image-card trash-item");
     figure.dataset.filename = image.filename || "";
     if (image.restore_url) {
       figure.dataset.restoreUrl = image.restore_url;
     }
 
-    const link = document.createElement("a");
-    link.className = "image-card-media";
-    link.href = image.url || "#";
-    link.target = "_blank";
-    link.rel = "noopener";
-
-    const img = document.createElement("img");
-    img.src = image.url || "";
-    img.alt = image.filename || "Trash image";
-    link.append(img);
-
-    const caption = document.createElement("figcaption");
-    caption.className = "image-card-ribbon";
-    const actions = document.createElement("div");
-    actions.className = "gallery-actions";
-    actions.setAttribute("aria-label", "Trash image actions");
-
-    const infoWrap = document.createElement("span");
-    infoWrap.className = "image-info-wrap";
-    const infoButton = iconButton(
-      "gallery-info",
-      `Trash image information for ${image.filename || "image"}`,
-      "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 8h2v7h-2zm0-3h2v2h-2z",
-    );
-    const tooltip = document.createElement("span");
-    tooltip.className = "image-info-tooltip";
-    tooltip.setAttribute("role", "tooltip");
-    const tooltipLine = document.createElement("span");
-    tooltipLine.className = "tooltip-line";
-    tooltipLine.textContent = image.filename || "Image";
-    tooltip.append(tooltipLine);
-    infoWrap.append(infoButton, tooltip);
+    const link = createImageMedia({
+      alt: image.filename || "Trash image",
+      href: image.url || "#",
+      src: image.url || "",
+    });
+    const caption = createImageCardRibbon();
+    const actions = createActionRibbon("Trash image actions");
+    const infoWrap = createInfoAction({
+      label: `Trash image information for ${image.filename || "image"}`,
+      tooltipText: image.filename || "Image",
+    });
     const restoreButton = document.createElement("button");
     restoreButton.className = "trash-restore";
     restoreButton.type = "button";
