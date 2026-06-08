@@ -890,12 +890,13 @@ select {
   grid-template-rows: auto auto;
 }
 
-.upload-immich-item img {
-  aspect-ratio: 1 / 1;
+.upload-immich-media {
   background: #f1f5f9;
+}
+
+.upload-immich-item .upload-immich-media img {
   box-sizing: border-box;
   display: block;
-  height: 100cqw;
   object-fit: cover;
   width: 100%;
 }

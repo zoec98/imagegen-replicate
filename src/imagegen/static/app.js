@@ -608,8 +608,11 @@
 
   function immichAssetFigure(asset) {
     const figure = document.createElement("figure");
-    figure.className = "upload-immich-item";
+    figure.className = "image-card upload-immich-item";
     figure.dataset.assetId = asset.asset_id || "";
+
+    const media = document.createElement("span");
+    media.className = "image-card-media upload-immich-media";
 
     const image = document.createElement("img");
     image.src = asset.thumbnail_url || "";
@@ -620,7 +623,10 @@
       reportImmichThumbnailError(asset.thumbnail_url);
     });
 
+    media.append(image);
+
     const caption = document.createElement("figcaption");
+    caption.className = "image-card-ribbon";
     const metadata = document.createElement("span");
     metadata.className = "upload-immich-metadata";
 
@@ -656,7 +662,7 @@
 
     caption.append(metadata);
     caption.append(importButton);
-    figure.append(image, caption);
+    figure.append(media, caption);
     return figure;
   }
 
