@@ -55,3 +55,19 @@ setup functions.
 Use jsdom for fast workflow coverage. Keep manual browser validation notes for
 behavior jsdom cannot represent reliably, such as canvas drawing fidelity,
 browser-specific file input behavior, or visual layout.
+
+## Browser-Level Testing Decision
+
+Do not add Playwright by default. It is a large dependency and the current app
+does not have a workflow need that justifies the browser install burden.
+
+Use Vitest with jsdom for automated JavaScript behavior coverage. Use manual
+browser validation for gaps that need a real browser or human judgment:
+
+- Canvas drawing fidelity and mask appearance.
+- Native file input and drag/drop behavior.
+- Visual layout and responsive behavior.
+- End-to-end workflow feel across overlay-heavy UI.
+
+Reconsider browser automation only if a concrete regression class appears that
+jsdom and Flask route tests cannot catch reliably.

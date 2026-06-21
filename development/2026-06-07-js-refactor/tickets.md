@@ -475,6 +475,8 @@ Completed verification:
 
 ## Ticket 13: Decide On Browser-Level Test Coverage
 
+Status: completed on 2026-06-21.
+
 ### Goal
 
 Decide whether jsdom coverage is sufficient or whether selected workflows need
@@ -501,6 +503,51 @@ Playwright or another real-browser test layer.
 - Documentation review.
 - If Playwright is adopted, add at least one smoke test and include it in the JS
   check workflow.
+- `npm run js:check`
+- `uv run pytest`
+- `uv run ruff check src tests`
+
+### Decision
+
+Do not add Playwright or another real-browser automation dependency now.
+
+Use Vitest with jsdom as the automated browser-JavaScript test layer. Keep
+manual in-browser validation for behavior that jsdom cannot represent
+reliably.
+
+### Rationale
+
+- Playwright adds a large dependency and browser-install burden.
+- The current workflow modules are mostly DOM event handling, state updates,
+  `fetch` orchestration, and generated markup. Vitest with jsdom covers those
+  paths well.
+- The remaining gaps need real browser/runtime judgment more than automated DOM
+  assertions: canvas drawing feel, visual layout, native file inputs,
+  drag-and-drop behavior, and mask output appearance.
+- No current workflow need justifies the added dependency weight.
+
+### Coverage Gaps And Manual Validation Checkpoints
+
+Run manual browser validation for risky UI changes and before releases. At
+minimum, check:
+
+- Workspace load with no console errors.
+- Provider/model switching and parameter rendering.
+- Generation submit, polling, success, and failure status display.
+- Gallery refresh, metadata load, source image selection, delete, download
+  links, and Immich upload when configured.
+- Trash overlay open/close, list, restore, empty, and gallery refresh.
+- Palette insertion and palette editor create/update/delete.
+- Upload overlay open/close, URL import, file upload, drag/drop rejection and
+  success paths, and Immich import when configured.
+- Mask editor open/close, brush size/falloff controls, drawing, invert, save,
+  and resulting mask appearance.
+- Responsive layout sanity at narrow and desktop widths.
+
+Completed verification:
+
+- Documentation review.
+- No Playwright or browser automation dependency added.
 - `npm run js:check`
 - `uv run pytest`
 - `uv run ruff check src tests`
