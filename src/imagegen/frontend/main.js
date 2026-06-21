@@ -5,6 +5,7 @@ import {
   readJsonScript,
   setBooleanAttribute,
 } from "./dom.js";
+import { setupPalettes } from "./palettes.js";
 import { setupTrash } from "./trash.js";
 
 (() => {
@@ -19,16 +20,6 @@ import { setupTrash } from "./trash.js";
   const pricingInfo = form.querySelector(".pricing-info");
   const pricingTooltip = form.querySelector(".pricing-tooltip");
   const parameterGrid = form.querySelector(".parameter-grid");
-  const paletteControls = form.querySelector(".palette-controls");
-  const paletteEditorToggle = form.querySelector(".palette-editor-toggle");
-  const paletteEditor = form.querySelector(".palette-editor");
-  const paletteEditorPalette = form.querySelector("#palette-editor-palette");
-  const paletteEditorFragment = form.querySelector("#palette-editor-fragment");
-  const paletteEditorName = form.querySelector("#palette-editor-name");
-  const paletteEditorContent = form.querySelector("#palette-editor-content");
-  const paletteEditorCreate = form.querySelector(".palette-editor-create");
-  const paletteEditorUpdate = form.querySelector(".palette-editor-update");
-  const paletteEditorDelete = form.querySelector(".palette-editor-delete");
   const generateButton = form.querySelector(".generate-button");
   const editToggle = form.querySelector(".edit-toggle");
   const sourceCounter = form.querySelector(".source-counter");
@@ -92,7 +83,6 @@ import { setupTrash } from "./trash.js";
   }
 
   const modelRegistry = loadJsonArray("#model-registry-data");
-  let paletteData = loadJsonArray("#palette-data");
   const parameterState = {};
   const selectedSourceImages = new Set();
   let armedDeleteButton = null;
@@ -160,305 +150,6 @@ import { setupTrash } from "./trash.js";
     message.className = `message message-${category}`;
     message.textContent = text;
     messages.append(message);
-  }
-
-  function promptAnnotations(prompt) {
-    const annotations = [];
-    let index = 0;
-    while (index < prompt.length) {
-      if (prompt[index] !== "(") {
-        index += 1;
-        continue;
-      }
-      const match = prompt.slice(index).match(/^\(([A-Za-z][A-Za-z0-9_-]*):/);
-      if (!match) {
-        index += 1;
-        continue;
-      }
-      const annotation = readPromptAnnotation(prompt, index, match[1]);
-      annotations.push(annotation);
-      index = annotation.end;
-    }
-    return annotations;
-  }
-
-  function readPromptAnnotation(prompt, start, paletteName) {
-    let cursor = start + paletteName.length + 2;
-    cursor = requireAnnotationWhitespace(prompt, cursor);
-    const fragmentStart = cursor;
-    while (
-      cursor < prompt.length &&
-      !/\s/.test(prompt[cursor]) &&
-      prompt[cursor] !== ")"
-    ) {
-      cursor += 1;
-    }
-    const fragmentName = prompt.slice(fragmentStart, cursor);
-    if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(fragmentName)) {
-      throw new Error("Prompt annotation has an invalid fragment name.");
-    }
-    cursor = requireAnnotationWhitespace(prompt, cursor);
-    const contentStart = cursor;
-    while (cursor < prompt.length) {
-      if (prompt[cursor] === ")") {
-        if (cursor === contentStart) {
-          throw new Error("Prompt annotation content is required.");
-        }
-        return {
-          start,
-          end: cursor + 1,
-          paletteName,
-          fragmentName,
-          content: prompt.slice(contentStart, cursor),
-        };
-      }
-      if (prompt[cursor] === "(") {
-        throw new Error("Prompt annotations may not be nested.");
-      }
-      if (prompt[cursor] === ":") {
-        throw new Error("Prompt annotation content may not contain ':'.");
-      }
-      cursor += 1;
-    }
-    throw new Error("Prompt annotation is missing a closing ')'.");
-  }
-
-  function requireAnnotationWhitespace(prompt, cursor) {
-    if (cursor >= prompt.length || !/\s/.test(prompt[cursor])) {
-      throw new Error(
-        "Prompt annotation must use '(palette: fragment content)' syntax.",
-      );
-    }
-    while (cursor < prompt.length && /\s/.test(prompt[cursor])) {
-      cursor += 1;
-    }
-    return cursor;
-  }
-
-  function fragmentForPalette(paletteName, fragmentName) {
-    const palette = paletteData.find((item) => item.name === paletteName);
-    if (!palette || !Array.isArray(palette.fragments)) {
-      return null;
-    }
-    return palette.fragments.find((fragment) => fragment.name === fragmentName) || null;
-  }
-
-  function annotationText(paletteName, fragment) {
-    return `(${paletteName}: ${fragment.name} ${fragment.content})`;
-  }
-
-  function annotationAtCursor(annotations, cursor) {
-    return (
-      annotations.find(
-        (annotation) => cursor > annotation.start && cursor < annotation.end,
-      ) || null
-    );
-  }
-
-  function insertPaletteFragment(paletteName, fragmentName) {
-    if (!promptInput) {
-      return;
-    }
-    const fragment = fragmentForPalette(paletteName, fragmentName);
-    if (!fragment) {
-      showMessage("Palette fragment is unavailable.", "error");
-      return;
-    }
-
-    let annotations;
-    try {
-      annotations = promptAnnotations(promptInput.value);
-    } catch (error) {
-      showMessage(error.message || "Prompt annotations are invalid.", "error");
-      return;
-    }
-
-    const cursor = promptInput.selectionStart ?? promptInput.value.length;
-    const activeAnnotation = annotationAtCursor(annotations, cursor);
-    const nextText = annotationText(paletteName, fragment);
-    if (activeAnnotation && activeAnnotation.paletteName !== paletteName) {
-      showMessage(
-        `Move the cursor outside the ${activeAnnotation.paletteName} annotation first.`,
-        "error",
-      );
-      return;
-    }
-
-    promptInput.focus();
-    if (activeAnnotation) {
-      promptInput.setSelectionRange(activeAnnotation.start, activeAnnotation.end);
-    }
-    promptInput.setRangeText(
-      nextText,
-      promptInput.selectionStart,
-      promptInput.selectionEnd,
-      "end",
-    );
-    showMessage(`${fragment.display_name} inserted.`, "success");
-  }
-
-  function setPaletteEditorOpen(isOpen) {
-    if (paletteEditor) {
-      paletteEditor.hidden = !isOpen;
-    }
-    paletteEditorToggle?.classList.toggle("palette-editor-toggle-active", isOpen);
-    setBooleanAttribute(paletteEditorToggle, "aria-pressed", isOpen);
-  }
-
-  function paletteUrl(path = "") {
-    const base = form.dataset.apiPalettesUrl || "/api/palettes";
-    return `${base}${path}`;
-  }
-
-  function encoded(value) {
-    return encodeURIComponent(value);
-  }
-
-  function renderPromptPaletteControls() {
-    if (!paletteControls) {
-      return;
-    }
-    paletteControls.replaceChildren();
-    paletteData.forEach((palette) => {
-      const label = document.createElement("label");
-      label.className = "palette-field";
-      label.htmlFor = `palette-${palette.name}`;
-
-      const text = document.createElement("span");
-      text.textContent = palette.display_name;
-
-      const select = document.createElement("select");
-      select.id = `palette-${palette.name}`;
-      select.dataset.paletteName = palette.name;
-
-      const placeholder = document.createElement("option");
-      placeholder.value = "";
-      placeholder.textContent = `Select ${palette.display_name}`;
-      select.append(placeholder);
-
-      (palette.fragments || []).forEach((fragment) => {
-        const option = document.createElement("option");
-        option.value = fragment.name;
-        option.textContent = fragment.display_name;
-        select.append(option);
-      });
-
-      label.append(text, select);
-      paletteControls.append(label);
-    });
-  }
-
-  function populatePaletteEditor(selectedPalette = "", selectedFragment = "") {
-    if (!paletteEditorPalette || !paletteEditorFragment) {
-      return;
-    }
-    paletteEditorPalette.replaceChildren();
-    paletteData.forEach((palette) => {
-      const option = document.createElement("option");
-      option.value = palette.name;
-      option.textContent = palette.display_name;
-      option.selected = palette.name === selectedPalette;
-      paletteEditorPalette.append(option);
-    });
-    const palette =
-      paletteData.find((item) => item.name === paletteEditorPalette.value) ||
-      paletteData[0] ||
-      null;
-    paletteEditorFragment.replaceChildren();
-    if (!palette) {
-      return;
-    }
-    (palette.fragments || []).forEach((fragment) => {
-      const option = document.createElement("option");
-      option.value = fragment.name;
-      option.textContent = fragment.display_name;
-      option.selected = fragment.name === selectedFragment;
-      paletteEditorFragment.append(option);
-    });
-  }
-
-  async function refreshPaletteData(selectedPalette = "", selectedFragment = "") {
-    if (!form.dataset.apiPalettesUrl) {
-      return;
-    }
-    const data = await requestJson(form.dataset.apiPalettesUrl, {
-      fallbackMessage: "Palette refresh failed.",
-    });
-    paletteData = Array.isArray(data.palettes) ? data.palettes : [];
-    renderPromptPaletteControls();
-    populatePaletteEditor(selectedPalette, selectedFragment);
-  }
-
-  async function loadEditorFragment() {
-    if (!paletteEditorPalette?.value || !paletteEditorFragment?.value) {
-      if (paletteEditorContent) {
-        paletteEditorContent.value = "";
-      }
-      return;
-    }
-    const data = await requestJson(
-      paletteUrl(
-        `/${encoded(paletteEditorPalette.value)}/fragments/${encoded(
-          paletteEditorFragment.value,
-        )}`,
-      ),
-      { fallbackMessage: "Palette fragment could not be loaded." },
-    );
-    if (paletteEditorName) {
-      paletteEditorName.value = "";
-    }
-    if (paletteEditorContent) {
-      paletteEditorContent.value = data.fragment?.content || "";
-    }
-  }
-
-  async function writePaletteFragment(method, url, body) {
-    return csrfJsonRequest(url, body, {
-      csrfToken,
-      method,
-      fallbackMessage: "Palette edit failed.",
-    });
-  }
-
-  async function createPaletteFragment() {
-    const paletteName = paletteEditorPalette?.value || "";
-    const name = paletteEditorName?.value || "";
-    const content = paletteEditorContent?.value || "";
-    const data = await writePaletteFragment(
-      "POST",
-      paletteUrl(`/${encoded(paletteName)}/fragments`),
-      { name, content },
-    );
-    await refreshPaletteData(paletteName, data.fragment?.name || "");
-    showMessage(`${data.fragment?.display_name || "Fragment"} created.`, "success");
-  }
-
-  async function updatePaletteFragment() {
-    const paletteName = paletteEditorPalette?.value || "";
-    const fragmentName = paletteEditorFragment?.value || "";
-    const content = paletteEditorContent?.value || "";
-    const data = await writePaletteFragment(
-      "PUT",
-      paletteUrl(`/${encoded(paletteName)}/fragments/${encoded(fragmentName)}`),
-      { content },
-    );
-    await refreshPaletteData(paletteName, data.fragment?.name || fragmentName);
-    showMessage(`${data.fragment?.display_name || "Fragment"} updated.`, "success");
-  }
-
-  async function deletePaletteFragment() {
-    const paletteName = paletteEditorPalette?.value || "";
-    const fragmentName = paletteEditorFragment?.value || "";
-    const data = await writePaletteFragment(
-      "DELETE",
-      paletteUrl(`/${encoded(paletteName)}/fragments/${encoded(fragmentName)}`),
-      {},
-    );
-    await refreshPaletteData(paletteName, "");
-    if (paletteEditorContent) {
-      paletteEditorContent.value = "";
-    }
-    showMessage(`${data.deleted || "Fragment"} deleted.`, "success");
   }
 
   function setUploadStatus(text, category = "info") {
@@ -2056,6 +1747,10 @@ import { setupTrash } from "./trash.js";
     refreshGallery,
     showMessage,
   });
+  setupPalettes(document, {
+    csrfToken,
+    showMessage,
+  });
 
   checkAppFreshness().catch((error) => {
     showMessage(error.message || "App version check failed.", "error");
@@ -2087,56 +1782,6 @@ import { setupTrash } from "./trash.js";
   sourceClear?.addEventListener("click", () => {
     clearSelectedSources();
     sourceStatus("");
-  });
-  paletteEditorToggle?.addEventListener("click", () => {
-    if (!paletteEditor) {
-      return;
-    }
-    const nextOpen = paletteEditor.hidden;
-    setPaletteEditorOpen(nextOpen);
-    if (nextOpen) {
-      populatePaletteEditor(
-        paletteEditorPalette?.value || "",
-        paletteEditorFragment?.value || "",
-      );
-      loadEditorFragment().catch((error) => {
-        showMessage(error.message || "Palette fragment could not be loaded.", "error");
-      });
-    }
-  });
-  paletteControls?.addEventListener("change", (event) => {
-    const control = event.target;
-    if (!control?.dataset?.paletteName || !control.value) {
-      return;
-    }
-    insertPaletteFragment(control.dataset.paletteName, control.value);
-    control.value = "";
-  });
-  paletteEditorPalette?.addEventListener("change", () => {
-    populatePaletteEditor(paletteEditorPalette.value, "");
-    loadEditorFragment().catch((error) => {
-      showMessage(error.message || "Palette fragment could not be loaded.", "error");
-    });
-  });
-  paletteEditorFragment?.addEventListener("change", () => {
-    loadEditorFragment().catch((error) => {
-      showMessage(error.message || "Palette fragment could not be loaded.", "error");
-    });
-  });
-  paletteEditorCreate?.addEventListener("click", () => {
-    createPaletteFragment().catch((error) => {
-      showMessage(error.message || "Palette fragment could not be created.", "error");
-    });
-  });
-  paletteEditorUpdate?.addEventListener("click", () => {
-    updatePaletteFragment().catch((error) => {
-      showMessage(error.message || "Palette fragment could not be updated.", "error");
-    });
-  });
-  paletteEditorDelete?.addEventListener("click", () => {
-    deletePaletteFragment().catch((error) => {
-      showMessage(error.message || "Palette fragment could not be deleted.", "error");
-    });
   });
   uploadToggle?.addEventListener("click", () => {
     openUploadOverlay();
@@ -2383,8 +2028,6 @@ import { setupTrash } from "./trash.js";
   renderModelOptions(selectedProvider());
   renderPricing(selectedModel());
   renderParameters(selectedModel());
-  populatePaletteEditor();
-  setPaletteEditorOpen(!paletteEditor?.hidden);
   updateMaskBrushControls();
   updateSourceSelectionUi();
   form.addEventListener("submit", submitGeneration);
