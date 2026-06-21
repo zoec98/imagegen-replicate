@@ -48,6 +48,50 @@
 		}
 	}
 	//#endregion
+	//#region src/imagegen/frontend/dom.js
+	function readJsonScript(selector, { root = document, fallback = [] } = {}) {
+		const element = root.querySelector(selector);
+		if (!element?.textContent) return fallback;
+		try {
+			return JSON.parse(element.textContent);
+		} catch {
+			return fallback;
+		}
+	}
+	function createElement(tagName, options = {}) {
+		const element = document.createElement(tagName);
+		applyElementOptions(element, options);
+		return element;
+	}
+	function createSvgIcon(pathData) {
+		const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		svg.setAttribute("aria-hidden", "true");
+		svg.setAttribute("viewBox", "0 0 24 24");
+		const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+		path.setAttribute("d", pathData);
+		svg.append(path);
+		return svg;
+	}
+	function setBooleanAttribute(element, name, value) {
+		if (!element) return;
+		element.setAttribute(name, value ? "true" : "false");
+	}
+	function applyElementOptions(element, options) {
+		const { attributes = {}, children = [], className, dataset = {}, textContent, ...properties } = options;
+		if (className) element.className = className;
+		if (textContent !== void 0) element.textContent = textContent;
+		Object.entries(properties).forEach(([name, value]) => {
+			if (value !== void 0) element[name] = value;
+		});
+		Object.entries(attributes).forEach(([name, value]) => {
+			if (value !== void 0) element.setAttribute(name, String(value));
+		});
+		Object.entries(dataset).forEach(([name, value]) => {
+			if (value !== void 0) element.dataset[name] = String(value);
+		});
+		element.append(...children);
+	}
+	//#endregion
 	//#region src/imagegen/frontend/main.js
 	(() => {
 		const form = document.querySelector(".prompt-form");
@@ -120,18 +164,12 @@
 		const pollSeconds = Number.parseFloat(form.dataset.pollSeconds || "1");
 		const pollMilliseconds = Math.max(250, (Number.isFinite(pollSeconds) ? pollSeconds : 1) * 1e3);
 		let isPageStale = false;
-		function loadJsonData(selector) {
-			const element = document.querySelector(selector);
-			if (!element?.textContent) return [];
-			try {
-				const models = JSON.parse(element.textContent);
-				return Array.isArray(models) ? models : [];
-			} catch {
-				return [];
-			}
+		function loadJsonArray(selector) {
+			const value = readJsonScript(selector, { fallback: [] });
+			return Array.isArray(value) ? value : [];
 		}
-		const modelRegistry = loadJsonData("#model-registry-data");
-		let paletteData = loadJsonData("#palette-data");
+		const modelRegistry = loadJsonArray("#model-registry-data");
+		let paletteData = loadJsonArray("#palette-data");
 		const parameterState = {};
 		const selectedSourceImages = /* @__PURE__ */ new Set();
 		let armedDeleteButton = null;
@@ -272,7 +310,7 @@
 		function setPaletteEditorOpen(isOpen) {
 			if (paletteEditor) paletteEditor.hidden = !isOpen;
 			paletteEditorToggle?.classList.toggle("palette-editor-toggle-active", isOpen);
-			paletteEditorToggle?.setAttribute("aria-pressed", isOpen ? "true" : "false");
+			setBooleanAttribute(paletteEditorToggle, "aria-pressed", isOpen);
 		}
 		function paletteUrl(path = "") {
 			return `${form.dataset.apiPalettesUrl || "/api/palettes"}${path}`;
@@ -390,12 +428,12 @@
 		function setUploadBusy(isBusy) {
 			if (uploadUrlLoad) {
 				uploadUrlLoad.disabled = isBusy;
-				uploadUrlLoad.setAttribute("aria-busy", isBusy ? "true" : "false");
+				setBooleanAttribute(uploadUrlLoad, "aria-busy", isBusy);
 			}
 			if (uploadUrlInput) uploadUrlInput.disabled = isBusy;
 			if (uploadDropTarget) {
 				uploadDropTarget.classList.toggle("upload-drop-target-busy", isBusy);
-				uploadDropTarget.setAttribute("aria-disabled", isBusy ? "true" : "false");
+				setBooleanAttribute(uploadDropTarget, "aria-disabled", isBusy);
 			}
 			if (uploadFileInput) uploadFileInput.disabled = isBusy;
 			if (uploadFileChoose) uploadFileChoose.disabled = isBusy;
@@ -436,7 +474,7 @@
 		}
 		function setImmichLoading(isLoading) {
 			immichLoading = isLoading;
-			uploadImmichGallery?.setAttribute("aria-busy", isLoading ? "true" : "false");
+			setBooleanAttribute(uploadImmichGallery, "aria-busy", isLoading);
 			if (uploadImmichPrev) uploadImmichPrev.disabled = isLoading || !immichPreviousPage;
 			if (uploadImmichNext) uploadImmichNext.disabled = isLoading || !immichNextPage;
 		}
@@ -825,7 +863,7 @@
 			const count = selectedSourceImages.size;
 			if (editToggle) {
 				editToggle.disabled = !editCapable;
-				editToggle.setAttribute("aria-pressed", editModeEnabled ? "true" : "false");
+				setBooleanAttribute(editToggle, "aria-pressed", editModeEnabled);
 				editToggle.classList.toggle("edit-toggle-active", editModeEnabled);
 			}
 			if (sourceCounter) sourceCounter.textContent = `${count} selected`;
@@ -841,7 +879,7 @@
 				const button = figure.querySelector(".source-select");
 				if (!button) return;
 				button.disabled = !editModeEnabled;
-				button.setAttribute("aria-pressed", selected ? "true" : "false");
+				setBooleanAttribute(button, "aria-pressed", selected);
 				button.setAttribute("aria-label", `${selected ? "Deselect" : "Select"} ${filename || "image"} as source image`);
 			});
 		}
@@ -888,7 +926,7 @@
 			if (!generateButton) return;
 			const hasProviderModel = Boolean(selectedModel());
 			generateButton.disabled = isGenerating || isPageStale || !hasProviderModel;
-			generateButton.setAttribute("aria-busy", isGenerating ? "true" : "false");
+			setBooleanAttribute(generateButton, "aria-busy", isGenerating);
 			generateButton.textContent = isGenerating ? "Generating" : generateButton.dataset.defaultLabel || "Generate";
 		}
 		function markPageStale() {
@@ -1186,48 +1224,44 @@
 			return `Generation status: ${data.status}.`;
 		}
 		function createImageCard(className) {
-			const figure = document.createElement("figure");
-			figure.className = className;
-			return figure;
+			return createElement("figure", { className });
 		}
 		function createImageMedia({ alt, className = "", href = null, loading = null, onError = null, src }) {
-			const media = href ? document.createElement("a") : document.createElement("span");
-			media.className = ["image-card-media", className].filter(Boolean).join(" ");
+			const media = createElement(href ? "a" : "span", { className: ["image-card-media", className].filter(Boolean).join(" ") });
 			if (href) {
 				media.href = href;
 				media.target = "_blank";
 				media.rel = "noopener";
 			}
-			const img = document.createElement("img");
-			img.src = src;
-			img.alt = alt;
+			const img = createElement("img", {
+				alt,
+				src
+			});
 			if (loading) img.loading = loading;
 			if (onError) img.addEventListener("error", onError);
 			media.append(img);
 			return media;
 		}
 		function createImageCardRibbon() {
-			const caption = document.createElement("figcaption");
-			caption.className = "image-card-ribbon";
-			return caption;
+			return createElement("figcaption", { className: "image-card-ribbon" });
 		}
 		function createActionRibbon(label) {
-			const actions = document.createElement("div");
-			actions.className = "gallery-actions";
-			actions.setAttribute("aria-label", label);
-			return actions;
+			return createElement("div", {
+				attributes: { "aria-label": label },
+				className: "gallery-actions"
+			});
 		}
 		function createInfoAction({ label, tooltipText }) {
-			const infoWrap = document.createElement("span");
-			infoWrap.className = "image-info-wrap";
+			const infoWrap = createElement("span", { className: "image-info-wrap" });
 			const infoButton = iconButton("gallery-info", label, "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 8h2v7h-2zm0-3h2v2h-2z");
-			const tooltip = document.createElement("span");
-			tooltip.className = "image-info-tooltip";
-			tooltip.setAttribute("role", "tooltip");
-			const tooltipLine = document.createElement("span");
-			tooltipLine.className = "tooltip-line";
-			tooltipLine.textContent = tooltipText;
-			tooltip.append(tooltipLine);
+			const tooltip = createElement("span", {
+				attributes: { role: "tooltip" },
+				children: [createElement("span", {
+					className: "tooltip-line",
+					textContent: tooltipText
+				})],
+				className: "image-info-tooltip"
+			});
 			infoWrap.append(infoButton, tooltip);
 			return infoWrap;
 		}
@@ -1274,21 +1308,26 @@
 			return figure;
 		}
 		function iconButton(className, label, pathData, title = label) {
-			const button = document.createElement("button");
-			button.className = `gallery-action ${className}`;
-			button.type = "button";
-			button.setAttribute("aria-label", label);
-			button.setAttribute("title", title);
-			button.append(createSvgIcon(pathData));
-			return button;
+			return createElement("button", {
+				attributes: {
+					"aria-label": label,
+					title
+				},
+				children: [createSvgIcon(pathData)],
+				className: `gallery-action ${className}`,
+				type: "button"
+			});
 		}
 		function iconLink(className, label, href, pathData, sparklePathData = null, title = label) {
-			const link = document.createElement("a");
-			link.className = `gallery-action ${className}`;
-			link.href = href || "#";
-			link.setAttribute("aria-label", label);
-			link.setAttribute("title", title);
-			if (!href) link.setAttribute("aria-disabled", "true");
+			const link = createElement("a", {
+				attributes: {
+					"aria-label": label,
+					title
+				},
+				className: `gallery-action ${className}`,
+				href: href || "#"
+			});
+			if (!href) setBooleanAttribute(link, "aria-disabled", true);
 			link.append(createSvgIcon(pathData));
 			if (sparklePathData) {
 				const sparkle = createSvgIcon(sparklePathData);
@@ -1296,15 +1335,6 @@
 				link.append(sparkle);
 			}
 			return link;
-		}
-		function createSvgIcon(pathData) {
-			const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-			svg.setAttribute("aria-hidden", "true");
-			svg.setAttribute("viewBox", "0 0 24 24");
-			const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-			path.setAttribute("d", pathData);
-			svg.append(path);
-			return svg;
 		}
 		function setTrashCount(value) {
 			if (!trashcanCount) return;

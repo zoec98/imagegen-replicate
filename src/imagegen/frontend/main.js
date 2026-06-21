@@ -1,4 +1,10 @@
 import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
+import {
+  createElement,
+  createSvgIcon,
+  readJsonScript,
+  setBooleanAttribute,
+} from "./dom.js";
 
 (() => {
   const form = document.querySelector(".prompt-form");
@@ -86,21 +92,13 @@ import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
   );
   let isPageStale = false;
 
-  function loadJsonData(selector) {
-    const element = document.querySelector(selector);
-    if (!element?.textContent) {
-      return [];
-    }
-    try {
-      const models = JSON.parse(element.textContent);
-      return Array.isArray(models) ? models : [];
-    } catch {
-      return [];
-    }
+  function loadJsonArray(selector) {
+    const value = readJsonScript(selector, { fallback: [] });
+    return Array.isArray(value) ? value : [];
   }
 
-  const modelRegistry = loadJsonData("#model-registry-data");
-  let paletteData = loadJsonData("#palette-data");
+  const modelRegistry = loadJsonArray("#model-registry-data");
+  let paletteData = loadJsonArray("#palette-data");
   const parameterState = {};
   const selectedSourceImages = new Set();
   let armedDeleteButton = null;
@@ -310,7 +308,7 @@ import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
       paletteEditor.hidden = !isOpen;
     }
     paletteEditorToggle?.classList.toggle("palette-editor-toggle-active", isOpen);
-    paletteEditorToggle?.setAttribute("aria-pressed", isOpen ? "true" : "false");
+    setBooleanAttribute(paletteEditorToggle, "aria-pressed", isOpen);
   }
 
   function paletteUrl(path = "") {
@@ -490,14 +488,14 @@ import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
   function setUploadBusy(isBusy) {
     if (uploadUrlLoad) {
       uploadUrlLoad.disabled = isBusy;
-      uploadUrlLoad.setAttribute("aria-busy", isBusy ? "true" : "false");
+      setBooleanAttribute(uploadUrlLoad, "aria-busy", isBusy);
     }
     if (uploadUrlInput) {
       uploadUrlInput.disabled = isBusy;
     }
     if (uploadDropTarget) {
       uploadDropTarget.classList.toggle("upload-drop-target-busy", isBusy);
-      uploadDropTarget.setAttribute("aria-disabled", isBusy ? "true" : "false");
+      setBooleanAttribute(uploadDropTarget, "aria-disabled", isBusy);
     }
     if (uploadFileInput) {
       uploadFileInput.disabled = isBusy;
@@ -564,7 +562,7 @@ import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
 
   function setImmichLoading(isLoading) {
     immichLoading = isLoading;
-    uploadImmichGallery?.setAttribute("aria-busy", isLoading ? "true" : "false");
+    setBooleanAttribute(uploadImmichGallery, "aria-busy", isLoading);
     if (uploadImmichPrev) {
       uploadImmichPrev.disabled = isLoading || !immichPreviousPage;
     }
@@ -1153,7 +1151,7 @@ import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
 
     if (editToggle) {
       editToggle.disabled = !editCapable;
-      editToggle.setAttribute("aria-pressed", editModeEnabled ? "true" : "false");
+      setBooleanAttribute(editToggle, "aria-pressed", editModeEnabled);
       editToggle.classList.toggle("edit-toggle-active", editModeEnabled);
     }
     if (sourceCounter) {
@@ -1173,7 +1171,7 @@ import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
         return;
       }
       button.disabled = !editModeEnabled;
-      button.setAttribute("aria-pressed", selected ? "true" : "false");
+      setBooleanAttribute(button, "aria-pressed", selected);
       button.setAttribute(
         "aria-label",
         `${selected ? "Deselect" : "Select"} ${filename || "image"} as source image`,
@@ -1252,7 +1250,7 @@ import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
     }
     const hasProviderModel = Boolean(selectedModel());
     generateButton.disabled = isGenerating || isPageStale || !hasProviderModel;
-    generateButton.setAttribute("aria-busy", isGenerating ? "true" : "false");
+    setBooleanAttribute(generateButton, "aria-busy", isGenerating);
     generateButton.textContent = isGenerating
       ? "Generating"
       : generateButton.dataset.defaultLabel || "Generate";
@@ -1740,9 +1738,7 @@ import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
   }
 
   function createImageCard(className) {
-    const figure = document.createElement("figure");
-    figure.className = className;
-    return figure;
+    return createElement("figure", { className });
   }
 
   function createImageMedia({
@@ -1753,17 +1749,16 @@ import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
     onError = null,
     src,
   }) {
-    const media = href ? document.createElement("a") : document.createElement("span");
-    media.className = ["image-card-media", className].filter(Boolean).join(" ");
+    const media = createElement(href ? "a" : "span", {
+      className: ["image-card-media", className].filter(Boolean).join(" "),
+    });
     if (href) {
       media.href = href;
       media.target = "_blank";
       media.rel = "noopener";
     }
 
-    const img = document.createElement("img");
-    img.src = src;
-    img.alt = alt;
+    const img = createElement("img", { alt, src });
     if (loading) {
       img.loading = loading;
     }
@@ -1776,33 +1771,32 @@ import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
   }
 
   function createImageCardRibbon() {
-    const caption = document.createElement("figcaption");
-    caption.className = "image-card-ribbon";
-    return caption;
+    return createElement("figcaption", { className: "image-card-ribbon" });
   }
 
   function createActionRibbon(label) {
-    const actions = document.createElement("div");
-    actions.className = "gallery-actions";
-    actions.setAttribute("aria-label", label);
-    return actions;
+    return createElement("div", {
+      attributes: { "aria-label": label },
+      className: "gallery-actions",
+    });
   }
 
   function createInfoAction({ label, tooltipText }) {
-    const infoWrap = document.createElement("span");
-    infoWrap.className = "image-info-wrap";
+    const infoWrap = createElement("span", { className: "image-info-wrap" });
     const infoButton = iconButton(
       "gallery-info",
       label,
       "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 8h2v7h-2zm0-3h2v2h-2z",
     );
-    const tooltip = document.createElement("span");
-    tooltip.className = "image-info-tooltip";
-    tooltip.setAttribute("role", "tooltip");
-    const tooltipLine = document.createElement("span");
-    tooltipLine.className = "tooltip-line";
-    tooltipLine.textContent = tooltipText;
-    tooltip.append(tooltipLine);
+    const tooltipLine = createElement("span", {
+      className: "tooltip-line",
+      textContent: tooltipText,
+    });
+    const tooltip = createElement("span", {
+      attributes: { role: "tooltip" },
+      children: [tooltipLine],
+      className: "image-info-tooltip",
+    });
     infoWrap.append(infoButton, tooltip);
     return infoWrap;
   }
@@ -1912,13 +1906,15 @@ import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
   }
 
   function iconButton(className, label, pathData, title = label) {
-    const button = document.createElement("button");
-    button.className = `gallery-action ${className}`;
-    button.type = "button";
-    button.setAttribute("aria-label", label);
-    button.setAttribute("title", title);
-    button.append(createSvgIcon(pathData));
-    return button;
+    return createElement("button", {
+      attributes: {
+        "aria-label": label,
+        title,
+      },
+      children: [createSvgIcon(pathData)],
+      className: `gallery-action ${className}`,
+      type: "button",
+    });
   }
 
   function iconLink(
@@ -1929,13 +1925,16 @@ import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
     sparklePathData = null,
     title = label,
   ) {
-    const link = document.createElement("a");
-    link.className = `gallery-action ${className}`;
-    link.href = href || "#";
-    link.setAttribute("aria-label", label);
-    link.setAttribute("title", title);
+    const link = createElement("a", {
+      attributes: {
+        "aria-label": label,
+        title,
+      },
+      className: `gallery-action ${className}`,
+      href: href || "#",
+    });
     if (!href) {
-      link.setAttribute("aria-disabled", "true");
+      setBooleanAttribute(link, "aria-disabled", true);
     }
 
     link.append(createSvgIcon(pathData));
@@ -1946,16 +1945,6 @@ import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
       link.append(sparkle);
     }
     return link;
-  }
-
-  function createSvgIcon(pathData) {
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("aria-hidden", "true");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", pathData);
-    svg.append(path);
-    return svg;
   }
 
   function setTrashCount(value) {
