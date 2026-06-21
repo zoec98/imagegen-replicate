@@ -5,6 +5,7 @@ import {
   readJsonScript,
   setBooleanAttribute,
 } from "./dom.js";
+import { setupTrash } from "./trash.js";
 
 (() => {
   const form = document.querySelector(".prompt-form");
@@ -35,13 +36,6 @@ import {
   const sourceSelectionStatus = form.querySelector(".source-selection-status");
   const messages = form.querySelector(".messages");
   const gallery = document.querySelector(".gallery");
-  const trashcanToggle = form.querySelector(".trashcan-toggle");
-  const trashcanCount = form.querySelector(".trashcan-count");
-  const trashOverlay = document.querySelector(".trash-overlay");
-  const trashClose = trashOverlay?.querySelector(".trash-close");
-  const trashEmptyButton = trashOverlay?.querySelector(".trash-empty");
-  const trashGallery = trashOverlay?.querySelector(".trash-gallery");
-  const trashEmptyState = trashOverlay?.querySelector(".trash-empty-state");
   const uploadToggle = form.querySelector(".upload-toggle");
   const uploadOverlay = document.querySelector(".upload-overlay");
   const uploadClose = uploadOverlay?.querySelector(".upload-close");
@@ -1947,135 +1941,6 @@ import {
     return link;
   }
 
-  function setTrashCount(value) {
-    if (!trashcanCount) {
-      return;
-    }
-    const count = Number.parseInt(value, 10);
-    trashcanCount.textContent = String(Number.isFinite(count) ? Math.max(count, 0) : 0);
-  }
-
-  function trashFigure(image) {
-    const figure = createImageCard("gallery-item image-card trash-item");
-    figure.dataset.filename = image.filename || "";
-    if (image.restore_url) {
-      figure.dataset.restoreUrl = image.restore_url;
-    }
-
-    const link = createImageMedia({
-      alt: image.filename || "Trash image",
-      href: image.url || "#",
-      src: image.url || "",
-    });
-    const caption = createImageCardRibbon();
-    const actions = createActionRibbon("Trash image actions");
-    const infoWrap = createInfoAction({
-      label: `Trash image information for ${image.filename || "image"}`,
-      tooltipText: image.filename || "Image",
-    });
-    const restoreButton = document.createElement("button");
-    restoreButton.className = "trash-restore";
-    restoreButton.type = "button";
-    restoreButton.textContent = "Restore";
-    restoreButton.disabled = !image.restore_url;
-    restoreButton.setAttribute("aria-label", `Restore ${image.filename || "image"}`);
-    actions.append(infoWrap, restoreButton);
-    caption.append(actions);
-    figure.append(link, caption);
-    return figure;
-  }
-
-  function renderTrashImages(images) {
-    if (!trashGallery || !trashEmptyState) {
-      return;
-    }
-    trashGallery.replaceChildren();
-    if (!Array.isArray(images) || images.length === 0) {
-      trashEmptyState.hidden = false;
-      return;
-    }
-    trashEmptyState.hidden = true;
-    images.forEach((image) => trashGallery.append(trashFigure(image)));
-  }
-
-  async function refreshTrash() {
-    const url = trashcanToggle?.dataset.apiTrashUrl;
-    if (!url) {
-      return;
-    }
-    const data = await requestJson(url, {
-      fallbackMessage: "Trash refresh failed.",
-    });
-    setTrashCount(data.trash_count);
-    renderTrashImages(data.images);
-  }
-
-  function openTrashOverlay() {
-    if (!trashOverlay) {
-      return;
-    }
-    trashOverlay.hidden = false;
-    trashClose?.focus();
-    refreshTrash().catch((error) => {
-      showMessage(error.message || "Trash refresh failed.", "error");
-    });
-  }
-
-  function closeTrashOverlay() {
-    if (!trashOverlay) {
-      return;
-    }
-    trashOverlay.hidden = true;
-  }
-
-  async function restoreTrashImage(figure) {
-    const restoreUrl = figure?.dataset.restoreUrl;
-    const filename = figure?.dataset.filename || "image";
-    if (!restoreUrl) {
-      showMessage("This trash image cannot be restored.", "error");
-      return;
-    }
-    const data = await csrfJsonRequest(
-      restoreUrl,
-      {},
-      {
-        csrfToken,
-        fallbackMessage: `Could not restore ${filename}.`,
-      },
-    );
-    if (Object.prototype.hasOwnProperty.call(data, "trash_count")) {
-      setTrashCount(data.trash_count);
-    }
-    await refreshGallery();
-    await refreshTrash();
-    showMessage(`${data.filename || filename} restored.`, "success");
-  }
-
-  async function emptyTrash() {
-    const url = trashcanToggle?.dataset.apiEmptyTrashUrl;
-    if (!url) {
-      showMessage("Empty trash URL is unavailable.", "error");
-      return;
-    }
-    const data = await csrfJsonRequest(
-      url,
-      {},
-      {
-        csrfToken,
-        fallbackMessage: "Trash could not be emptied.",
-      },
-    );
-    if (Object.prototype.hasOwnProperty.call(data, "trash_count")) {
-      setTrashCount(data.trash_count);
-    }
-    await refreshTrash();
-    const deleted = Array.isArray(data.deleted) ? data.deleted.length : 0;
-    showMessage(
-      deleted === 1 ? "1 trash image deleted." : `${deleted} trash images deleted.`,
-      "success",
-    );
-  }
-
   async function refreshGallery() {
     if (!gallery || !form.dataset.apiImagesUrl) {
       return;
@@ -2085,7 +1950,7 @@ import {
       fallbackMessage: "Gallery refresh failed.",
     });
     if (Object.prototype.hasOwnProperty.call(data, "trash_count")) {
-      setTrashCount(data.trash_count);
+      trashWorkflow.setCount(data.trash_count);
     }
     gallery.replaceChildren();
     if (!Array.isArray(data.images) || data.images.length === 0) {
@@ -2186,6 +2051,12 @@ import {
     }
   }
 
+  const trashWorkflow = setupTrash(document, {
+    csrfToken,
+    refreshGallery,
+    showMessage,
+  });
+
   checkAppFreshness().catch((error) => {
     showMessage(error.message || "App version check failed.", "error");
   });
@@ -2265,38 +2136,6 @@ import {
   paletteEditorDelete?.addEventListener("click", () => {
     deletePaletteFragment().catch((error) => {
       showMessage(error.message || "Palette fragment could not be deleted.", "error");
-    });
-  });
-  trashcanToggle?.addEventListener("click", () => {
-    openTrashOverlay();
-  });
-  trashClose?.addEventListener("click", () => {
-    closeTrashOverlay();
-  });
-  trashEmptyButton?.addEventListener("click", () => {
-    trashEmptyButton.disabled = true;
-    emptyTrash()
-      .catch((error) => {
-        showMessage(error.message || "Trash could not be emptied.", "error");
-      })
-      .finally(() => {
-        trashEmptyButton.disabled = false;
-      });
-  });
-  trashOverlay?.addEventListener("click", (event) => {
-    if (event.target === trashOverlay) {
-      closeTrashOverlay();
-    }
-  });
-  trashGallery?.addEventListener("click", (event) => {
-    const restoreButton = event.target.closest(".trash-restore");
-    if (!restoreButton) {
-      return;
-    }
-    restoreButton.disabled = true;
-    restoreTrashImage(restoreButton.closest(".trash-item")).catch((error) => {
-      restoreButton.disabled = false;
-      showMessage(error.message || "Trash image could not be restored.", "error");
     });
   });
   uploadToggle?.addEventListener("click", () => {
@@ -2502,8 +2341,8 @@ import {
       closeMaskEditor();
       return;
     }
-    if (event.key === "Escape" && trashOverlay && !trashOverlay.hidden) {
-      closeTrashOverlay();
+    if (event.key === "Escape" && trashWorkflow.isOpen()) {
+      trashWorkflow.close();
       return;
     }
     if (event.key === "Escape" && uploadOverlay && !uploadOverlay.hidden) {

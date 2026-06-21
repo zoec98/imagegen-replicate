@@ -17,6 +17,7 @@ export default [
         FormData: "readonly",
         Image: "readonly",
         KeyboardEvent: "readonly",
+        MouseEvent: "readonly",
         URL: "readonly",
         clearTimeout: "readonly",
         console: "readonly",
