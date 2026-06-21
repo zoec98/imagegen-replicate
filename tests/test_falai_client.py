@@ -144,6 +144,41 @@ def test_falai_text_submission_uses_resolved_endpoint_and_persists_outputs(tmp_p
     assert persisted[0]["prediction_input"]["prompt"] == "a red house"
 
 
+def test_falai_seedream5_lite_text_submission_omits_byteplus_urls(tmp_path):
+    model = resolve_model("falai", "seedream5")
+    target = resolve_generation_target("falai", "seedream5", edit_mode=False)
+    handle = FakeHandle(
+        request_id="fal-request-456",
+        statuses=[Completed(logs=[], metrics={})],
+        result={"images": [{"url": "https://example.test/out.png"}]},
+    )
+    client = FakeFalClient(handle=handle)
+
+    generate_image_urls(
+        "a red house",
+        app_config(tmp_path),
+        model=model,
+        target=target,
+        parameters={"image_size": "auto_2K"},
+        client=client,
+        sleep=lambda _: None,
+        clock=lambda: 0.0,
+        persist_images=lambda urls, **kwargs: [
+            StoredImage(
+                path=tmp_path / "seedream5-fal-request-456-01.png",
+                source_url=urls[0],
+                content_type="image/png",
+                size_bytes=123,
+                created_at="2026-06-03T10:00:00+00:00",
+            )
+        ],
+    )
+
+    arguments = client.submit_calls[0]["arguments"]
+    assert arguments["enable_safety_checker"] is False
+    assert "return_byteplus_urls" not in arguments
+
+
 def test_falai_edit_submission_uploads_source_images_and_keeps_local_names_in_metadata(
     tmp_path,
 ):

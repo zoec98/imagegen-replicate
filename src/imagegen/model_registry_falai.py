@@ -271,7 +271,6 @@ def _seedream_parameters(
     image_size_choices: tuple[object, ...],
     include_seed: bool,
     include_enhance_prompt_mode: bool = False,
-    include_return_byteplus_urls: bool = False,
 ) -> tuple[ModelParameter, ...]:
     parameters = [
         _param(
@@ -316,16 +315,6 @@ def _seedream_parameters(
                 "",
                 order=5,
                 semantic_type="seed",
-            )
-        )
-    if include_return_byteplus_urls:
-        parameters.append(
-            _param(
-                "return_byteplus_urls",
-                "Return temporary BytePlus URLs that expire after 24 hours.",
-                "boolean",
-                False,
-                order=7,
             )
         )
     if include_enhance_prompt_mode:
@@ -1468,7 +1457,6 @@ SEEDREAM5 = ProviderModel(
             image_size_default="auto_2K",
             image_size_choices=SEEDREAM5_IMAGE_SIZE_CHOICES,
             include_seed=False,
-            include_return_byteplus_urls=True,
         ),
         fixed_inputs=FALAI_FIXED_SAFE_IMAGE_INPUTS,
         pricing=(

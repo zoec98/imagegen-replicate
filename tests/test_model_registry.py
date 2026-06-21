@@ -235,6 +235,16 @@ def test_falai_models_keep_safety_checker_fixed_when_supported():
         assert target.fixed_inputs["enable_safety_checker"] is False
 
 
+def test_falai_models_do_not_expose_byteplus_url_outputs():
+    for model in list_models_for_provider("falai"):
+        targets = [model.text_target]
+        if model.edit_target is not None:
+            targets.append(model.edit_target)
+        for target in targets:
+            parameter_names = {parameter.name for parameter in target.parameters}
+            assert "return_byteplus_urls" not in parameter_names
+
+
 def test_falai_text_mode_resolves_selectable_endpoint():
     target = resolve_generation_target("falai", "seedream45", edit_mode=False)
 

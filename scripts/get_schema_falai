@@ -499,17 +499,31 @@ def suggested_alias(endpoint: str) -> str:
 def registry_type(name: str, prop: dict[str, Any]) -> str:
     if name in {"prompt"}:
         return "textarea"
-    if name.endswith("_url") or name.endswith("_urls"):
-        return "image upload"
     if enum_choices(prop):
         return "select"
     if prop.get("type") in {"boolean", "integer", "number", "string", "array"}:
+        if is_image_url_input(name, prop):
+            return "image upload"
         return str(prop["type"])
     if isinstance(prop.get("anyOf"), list):
         nested_types = [nested.get("type") for nested in prop["anyOf"] if isinstance(nested, dict)]
         if "integer" in nested_types:
             return "seed" if name == "seed" else "integer"
     return "string"
+
+
+def is_image_url_input(name: str, prop: dict[str, Any]) -> bool:
+    if not (name.endswith("_url") or name.endswith("_urls")):
+        return False
+    if name.startswith("return_"):
+        return False
+    prop_type = prop.get("type")
+    if prop_type == "string":
+        return True
+    if prop_type == "array":
+        items = prop.get("items", {})
+        return isinstance(items, dict) and items.get("type") == "string"
+    return False
 
 
 def markdown_value(value: Any) -> str:
