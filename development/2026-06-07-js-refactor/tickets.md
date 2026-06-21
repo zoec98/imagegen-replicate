@@ -344,6 +344,8 @@ Completed verification:
 
 ## Ticket 10: Extract Mask Editor Module
 
+Status: completed on 2026-06-21.
+
 ### Goal
 
 Move mask editor behavior into a dedicated module while keeping canvas-heavy
@@ -375,6 +377,18 @@ coverage pragmatic.
 - `npm run js:check`
 - `uv run pytest`
 - `uv run ruff check src tests`
+
+Completed verification:
+
+- Added Vitest coverage in `tests/js/mask-editor.test.js`.
+- `npm run js:check`
+- `uv run pytest`
+- `uv run ruff check src tests`
+
+Canvas validation note:
+
+- Manual browser validation of freehand drawing, brush feel, invert visual
+  fidelity, and saved mask appearance was not run in this pass.
 
 ## Ticket 11: Add Image Upload Module
 

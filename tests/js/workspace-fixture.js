@@ -66,7 +66,7 @@ export function renderWorkspace({ modelRegistry = [], selectedProvider = "" } = 
     <div class="mask-editor-overlay" hidden>
       <div class="mask-editor-stage"></div>
       <div class="mask-editor-canvas-wrap"></div>
-      <img class="mask-editor-source" alt="">
+      <canvas class="mask-editor-source"></canvas>
       <canvas class="mask-editor-mask"></canvas>
       <input class="mask-editor-brush-size" type="range" value="48">
       <input class="mask-editor-brush-falloff" type="range" value="0.65">

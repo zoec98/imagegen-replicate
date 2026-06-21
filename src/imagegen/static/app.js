@@ -489,6 +489,260 @@
 		};
 	}
 	//#endregion
+	//#region src/imagegen/frontend/mask-editor.js
+	function setupMaskEditor(root = document, services = {}) {
+		const { csrfToken = "", imageFactory = () => new Image(), refreshGallery = async () => {}, showMessage = () => {} } = services;
+		const overlay = root.querySelector(".mask-editor-overlay");
+		const stage = overlay?.querySelector(".mask-editor-stage");
+		const wrap = overlay?.querySelector(".mask-editor-canvas-wrap");
+		const sourceCanvas = overlay?.querySelector(".mask-editor-source");
+		const maskCanvas = overlay?.querySelector(".mask-editor-mask");
+		const brushSizeInput = overlay?.querySelector(".mask-editor-brush-size");
+		const brushFalloffInput = overlay?.querySelector(".mask-editor-brush-falloff");
+		const brushSizeValue = overlay?.querySelector(".mask-editor-brush-size-value");
+		const brushFalloffValue = overlay?.querySelector(".mask-editor-brush-falloff-value");
+		const invertButton = overlay?.querySelector(".mask-editor-invert");
+		const saveButton = overlay?.querySelector(".mask-editor-save");
+		const title = overlay?.querySelector("#mask-editor-title");
+		const closeButton = overlay?.querySelector(".mask-editor-close");
+		let sourceImage = null;
+		let maskData = null;
+		let isPainting = false;
+		let brushSize = 48;
+		let brushFalloff = .65;
+		function numberFromInput(input, fallback) {
+			const value = Number.parseFloat(input?.value || "");
+			return Number.isFinite(value) ? value : fallback;
+		}
+		function updateBrushControls() {
+			brushSize = Math.max(numberFromInput(brushSizeInput, brushSize), 1);
+			brushFalloff = Math.min(Math.max(numberFromInput(brushFalloffInput, brushFalloff * 100), 0), 100) / 100;
+			if (brushSizeValue) brushSizeValue.textContent = `${Math.round(brushSize)} px`;
+			if (brushFalloffValue) brushFalloffValue.textContent = `${Math.round(brushFalloff * 100)}%`;
+		}
+		function open(figure) {
+			const filename = figure?.dataset.filename;
+			const imageUrl = figure?.querySelector("img")?.src;
+			const maskUrl = figure?.dataset.maskUrl;
+			const maskSaveUrl = figure?.dataset.maskSaveUrl;
+			if (!overlay || !sourceCanvas || !maskCanvas || !filename || !imageUrl || !maskUrl || !maskSaveUrl) return;
+			overlay.dataset.filename = filename;
+			overlay.dataset.imageUrl = imageUrl;
+			overlay.dataset.maskUrl = maskUrl;
+			overlay.dataset.maskSaveUrl = maskSaveUrl;
+			if (title) title.textContent = filename;
+			updateBrushControls();
+			overlay.hidden = false;
+			loadImage(imageUrl);
+			closeButton?.focus();
+		}
+		function close() {
+			if (!overlay) return;
+			overlay.hidden = true;
+			delete overlay.dataset.filename;
+			delete overlay.dataset.imageUrl;
+			delete overlay.dataset.maskUrl;
+			delete overlay.dataset.maskSaveUrl;
+			sourceImage = null;
+			maskData = null;
+			isPainting = false;
+			resetCanvases();
+			if (title) title.textContent = "Mask";
+		}
+		function loadImage(imageUrl) {
+			const image = imageFactory();
+			image.onload = () => {
+				if (overlay?.dataset.imageUrl !== imageUrl) return;
+				sourceImage = image;
+				maskData = new Float32Array(image.naturalWidth * image.naturalHeight);
+				resetCanvases(image.naturalWidth, image.naturalHeight);
+				redraw();
+			};
+			image.onerror = () => {
+				if (overlay?.dataset.imageUrl === imageUrl) {
+					showMessage("Mask source image could not be loaded.", "error");
+					close();
+				}
+			};
+			image.src = imageUrl;
+		}
+		function resetCanvases(width = 0, height = 0) {
+			[sourceCanvas, maskCanvas].forEach((canvas) => {
+				if (!canvas) return;
+				canvas.width = width;
+				canvas.height = height;
+				canvas.style.width = "";
+				canvas.style.height = "";
+				canvas.getContext("2d")?.clearRect(0, 0, Math.max(width, 1), Math.max(height, 1));
+			});
+			if (wrap) {
+				wrap.style.width = "";
+				wrap.style.height = "";
+			}
+		}
+		function resizeCanvases() {
+			if (!stage || !wrap || !sourceImage || !sourceCanvas || !maskCanvas) return;
+			const maxWidth = Math.max(stage.clientWidth, 1);
+			const maxHeight = Math.max(window.innerHeight - 176, 192);
+			const scale = Math.min(maxWidth / sourceImage.naturalWidth, maxHeight / sourceImage.naturalHeight, 1);
+			const displayWidth = Math.max(Math.round(sourceImage.naturalWidth * scale), 1);
+			const displayHeight = Math.max(Math.round(sourceImage.naturalHeight * scale), 1);
+			wrap.style.width = `${displayWidth}px`;
+			wrap.style.height = `${displayHeight}px`;
+			[sourceCanvas, maskCanvas].forEach((canvas) => {
+				canvas.style.width = `${displayWidth}px`;
+				canvas.style.height = `${displayHeight}px`;
+			});
+		}
+		function redraw() {
+			if (!sourceImage || !sourceCanvas || !maskCanvas) return;
+			resizeCanvases();
+			const sourceContext = sourceCanvas.getContext("2d");
+			sourceContext?.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+			sourceContext?.drawImage(sourceImage, 0, 0, sourceCanvas.width, sourceCanvas.height);
+			redrawOverlay();
+		}
+		function redrawOverlay() {
+			if (!maskCanvas || !maskData) return;
+			const context = maskCanvas.getContext("2d");
+			if (!context) return;
+			const imageData = context.createImageData(maskCanvas.width, maskCanvas.height);
+			for (let index = 0; index < maskData.length; index += 1) {
+				const alpha = Math.round(Math.min(maskData[index], 1) * 150);
+				const offset = index * 4;
+				imageData.data[offset] = 255;
+				imageData.data[offset + 1] = 42;
+				imageData.data[offset + 2] = 42;
+				imageData.data[offset + 3] = alpha;
+			}
+			context.putImageData(imageData, 0, 0);
+		}
+		function pointerPosition(event) {
+			if (!maskCanvas) return null;
+			const rect = maskCanvas.getBoundingClientRect();
+			if (rect.width <= 0 || rect.height <= 0) return null;
+			return {
+				x: (event.clientX - rect.left) / rect.width * maskCanvas.width,
+				y: (event.clientY - rect.top) / rect.height * maskCanvas.height,
+				scale: maskCanvas.width / rect.width
+			};
+		}
+		function paintAt(position) {
+			if (!position || !maskCanvas || !maskData) return;
+			const radius = Math.max(brushSize * position.scale / 2, 1);
+			const innerRadius = radius * (1 - brushFalloff);
+			const minX = Math.max(Math.floor(position.x - radius), 0);
+			const maxX = Math.min(Math.ceil(position.x + radius), maskCanvas.width - 1);
+			const minY = Math.max(Math.floor(position.y - radius), 0);
+			const maxY = Math.min(Math.ceil(position.y + radius), maskCanvas.height - 1);
+			for (let y = minY; y <= maxY; y += 1) for (let x = minX; x <= maxX; x += 1) {
+				const distance = Math.hypot(x - position.x, y - position.y);
+				if (distance > radius) continue;
+				const intensity = distance <= innerRadius ? 1 : 1 - (distance - innerRadius) / Math.max(radius - innerRadius, 1);
+				const index = y * maskCanvas.width + x;
+				maskData[index] = Math.max(maskData[index], intensity);
+			}
+			redrawOverlay();
+		}
+		function invert() {
+			if (!maskData) return;
+			for (let index = 0; index < maskData.length; index += 1) maskData[index] = 1 - Math.min(Math.max(maskData[index], 0), 1);
+			redrawOverlay();
+		}
+		function pngDataUrl() {
+			if (!maskCanvas || !maskData) throw new Error("Mask data is unavailable.");
+			const canvas = document.createElement("canvas");
+			canvas.width = maskCanvas.width;
+			canvas.height = maskCanvas.height;
+			const context = canvas.getContext("2d");
+			if (!context) throw new Error("Mask export is unavailable.");
+			const imageData = context.createImageData(canvas.width, canvas.height);
+			for (let index = 0; index < maskData.length; index += 1) {
+				const value = Math.round(Math.min(Math.max(maskData[index], 0), 1) * 255);
+				const offset = index * 4;
+				imageData.data[offset] = value;
+				imageData.data[offset + 1] = value;
+				imageData.data[offset + 2] = value;
+				imageData.data[offset + 3] = 255;
+			}
+			context.putImageData(imageData, 0, 0);
+			return canvas.toDataURL("image/png");
+		}
+		async function save() {
+			if (!overlay?.dataset.maskSaveUrl) {
+				showMessage("Mask save URL is unavailable.", "error");
+				return;
+			}
+			if (!csrfToken) {
+				showMessage("Missing CSRF token.", "error");
+				return;
+			}
+			if (saveButton) saveButton.disabled = true;
+			showMessage("Saving mask.", "info");
+			try {
+				const data = await csrfJsonRequest(overlay.dataset.maskSaveUrl, { mask_png: pngDataUrl() }, {
+					csrfToken,
+					fallbackMessage: "Mask could not be saved."
+				});
+				close();
+				await refreshGallery();
+				showMessage(`${data.filename || "Mask"} saved.`, "success");
+			} catch (error) {
+				showMessage(error.message || "Mask could not be saved.", "error");
+			} finally {
+				if (saveButton) saveButton.disabled = false;
+			}
+		}
+		function startPainting(event) {
+			if (!maskData || !maskCanvas) return;
+			event.preventDefault();
+			isPainting = true;
+			maskCanvas.setPointerCapture?.(event.pointerId);
+			paintAt(pointerPosition(event));
+		}
+		function continuePainting(event) {
+			if (!isPainting) return;
+			event.preventDefault();
+			paintAt(pointerPosition(event));
+		}
+		function stopPainting(event) {
+			if (!isPainting) return;
+			isPainting = false;
+			maskCanvas?.releasePointerCapture?.(event.pointerId);
+		}
+		closeButton?.addEventListener("click", () => {
+			close();
+		});
+		overlay?.addEventListener("click", (event) => {
+			if (event.target === overlay) close();
+		});
+		maskCanvas?.addEventListener("pointerdown", startPainting);
+		maskCanvas?.addEventListener("pointermove", continuePainting);
+		maskCanvas?.addEventListener("pointerup", stopPainting);
+		maskCanvas?.addEventListener("pointercancel", stopPainting);
+		maskCanvas?.addEventListener("pointerleave", stopPainting);
+		brushSizeInput?.addEventListener("input", updateBrushControls);
+		brushFalloffInput?.addEventListener("input", updateBrushControls);
+		invertButton?.addEventListener("click", invert);
+		saveButton?.addEventListener("click", () => {
+			save().catch((error) => {
+				showMessage(error.message || "Mask could not be saved.", "error");
+			});
+		});
+		window.addEventListener("resize", () => {
+			if (overlay && !overlay.hidden) redraw();
+		});
+		updateBrushControls();
+		return {
+			close,
+			isOpen: () => Boolean(overlay && !overlay.hidden),
+			open,
+			redraw,
+			save,
+			updateBrushControls
+		};
+	}
+	//#endregion
 	//#region src/imagegen/frontend/metadata.js
 	function setupMetadata(root = document, services = {}) {
 		const { applyMetadata = () => {}, modelRegistry = [], showMessage = () => {} } = services;
@@ -1153,19 +1407,6 @@
 		const uploadImmichPage = uploadOverlay?.querySelector(".upload-immich-page");
 		const uploadImmichEmpty = uploadOverlay?.querySelector(".upload-immich-empty");
 		const uploadImmichGallery = uploadOverlay?.querySelector(".upload-immich-gallery");
-		const maskEditorOverlay = document.querySelector(".mask-editor-overlay");
-		const maskEditorStage = maskEditorOverlay?.querySelector(".mask-editor-stage");
-		const maskEditorWrap = maskEditorOverlay?.querySelector(".mask-editor-canvas-wrap");
-		const maskEditorSource = maskEditorOverlay?.querySelector(".mask-editor-source");
-		const maskEditorMask = maskEditorOverlay?.querySelector(".mask-editor-mask");
-		const maskEditorBrushSizeInput = maskEditorOverlay?.querySelector(".mask-editor-brush-size");
-		const maskEditorBrushFalloffInput = maskEditorOverlay?.querySelector(".mask-editor-brush-falloff");
-		const maskEditorBrushSizeValue = maskEditorOverlay?.querySelector(".mask-editor-brush-size-value");
-		const maskEditorBrushFalloffValue = maskEditorOverlay?.querySelector(".mask-editor-brush-falloff-value");
-		const maskEditorInvert = maskEditorOverlay?.querySelector(".mask-editor-invert");
-		const maskEditorSave = maskEditorOverlay?.querySelector(".mask-editor-save");
-		const maskEditorTitle = maskEditorOverlay?.querySelector("#mask-editor-title");
-		const maskEditorClose = maskEditorOverlay?.querySelector(".mask-editor-close");
 		const csrfToken = document.querySelector("meta[name=\"csrf-token\"]")?.getAttribute("content");
 		const pageChecksum = document.querySelector("meta[name=\"app-build\"]")?.getAttribute("content");
 		const pollSeconds = Number.parseFloat(form.dataset.pollSeconds || "1");
@@ -1180,11 +1421,7 @@
 		let sourceWorkflow = null;
 		let galleryWorkflow = null;
 		let generationWorkflow = null;
-		let maskEditorSourceImage = null;
-		let maskEditorMaskData = null;
-		let maskEditorPainting = false;
-		let maskEditorBrushSize = 48;
-		let maskEditorBrushFalloff = .65;
+		let maskEditorWorkflow = null;
 		let immichCurrentPage = 1;
 		let immichNextPage = null;
 		let immichPreviousPage = null;
@@ -1446,206 +1683,6 @@
 				setUploadStatus(error.message || "Image file could not be uploaded.", "error");
 			});
 		}
-		function numberFromInput(input, fallback) {
-			const value = Number.parseFloat(input?.value || "");
-			return Number.isFinite(value) ? value : fallback;
-		}
-		function updateMaskBrushControls() {
-			maskEditorBrushSize = Math.max(numberFromInput(maskEditorBrushSizeInput, maskEditorBrushSize), 1);
-			maskEditorBrushFalloff = Math.min(Math.max(numberFromInput(maskEditorBrushFalloffInput, maskEditorBrushFalloff * 100), 0), 100) / 100;
-			if (maskEditorBrushSizeValue) maskEditorBrushSizeValue.textContent = `${Math.round(maskEditorBrushSize)} px`;
-			if (maskEditorBrushFalloffValue) maskEditorBrushFalloffValue.textContent = `${Math.round(maskEditorBrushFalloff * 100)}%`;
-		}
-		function openMaskEditor(figure) {
-			const filename = figure?.dataset.filename;
-			const imageUrl = figure?.querySelector("img")?.src;
-			const maskUrl = figure?.dataset.maskUrl;
-			const maskSaveUrl = figure?.dataset.maskSaveUrl;
-			if (!maskEditorOverlay || !maskEditorSource || !maskEditorMask || !filename || !imageUrl || !maskUrl || !maskSaveUrl) return;
-			maskEditorOverlay.dataset.filename = filename;
-			maskEditorOverlay.dataset.imageUrl = imageUrl;
-			maskEditorOverlay.dataset.maskUrl = maskUrl;
-			maskEditorOverlay.dataset.maskSaveUrl = maskSaveUrl;
-			if (maskEditorTitle) maskEditorTitle.textContent = filename;
-			updateMaskBrushControls();
-			maskEditorOverlay.hidden = false;
-			loadMaskEditorImage(imageUrl);
-			maskEditorClose?.focus();
-		}
-		function closeMaskEditor() {
-			if (!maskEditorOverlay) return;
-			maskEditorOverlay.hidden = true;
-			delete maskEditorOverlay.dataset.filename;
-			delete maskEditorOverlay.dataset.imageUrl;
-			delete maskEditorOverlay.dataset.maskUrl;
-			delete maskEditorOverlay.dataset.maskSaveUrl;
-			maskEditorSourceImage = null;
-			maskEditorMaskData = null;
-			maskEditorPainting = false;
-			resetMaskEditorCanvases();
-			if (maskEditorTitle) maskEditorTitle.textContent = "Mask";
-		}
-		function loadMaskEditorImage(imageUrl) {
-			const image = new Image();
-			image.onload = () => {
-				if (maskEditorOverlay?.dataset.imageUrl !== imageUrl) return;
-				maskEditorSourceImage = image;
-				maskEditorMaskData = new Float32Array(image.naturalWidth * image.naturalHeight);
-				resetMaskEditorCanvases(image.naturalWidth, image.naturalHeight);
-				redrawMaskEditor();
-			};
-			image.onerror = () => {
-				if (maskEditorOverlay?.dataset.imageUrl === imageUrl) {
-					showMessage("Mask source image could not be loaded.", "error");
-					closeMaskEditor();
-				}
-			};
-			image.src = imageUrl;
-		}
-		function resetMaskEditorCanvases(width = 0, height = 0) {
-			[maskEditorSource, maskEditorMask].forEach((canvas) => {
-				if (!canvas) return;
-				canvas.width = width;
-				canvas.height = height;
-				canvas.style.width = "";
-				canvas.style.height = "";
-				canvas.getContext("2d")?.clearRect(0, 0, Math.max(width, 1), Math.max(height, 1));
-			});
-			if (maskEditorWrap) {
-				maskEditorWrap.style.width = "";
-				maskEditorWrap.style.height = "";
-			}
-		}
-		function resizeMaskEditorCanvases() {
-			if (!maskEditorStage || !maskEditorWrap || !maskEditorSourceImage || !maskEditorSource || !maskEditorMask) return;
-			const maxWidth = Math.max(maskEditorStage.clientWidth, 1);
-			const maxHeight = Math.max(window.innerHeight - 176, 192);
-			const scale = Math.min(maxWidth / maskEditorSourceImage.naturalWidth, maxHeight / maskEditorSourceImage.naturalHeight, 1);
-			const displayWidth = Math.max(Math.round(maskEditorSourceImage.naturalWidth * scale), 1);
-			const displayHeight = Math.max(Math.round(maskEditorSourceImage.naturalHeight * scale), 1);
-			maskEditorWrap.style.width = `${displayWidth}px`;
-			maskEditorWrap.style.height = `${displayHeight}px`;
-			[maskEditorSource, maskEditorMask].forEach((canvas) => {
-				canvas.style.width = `${displayWidth}px`;
-				canvas.style.height = `${displayHeight}px`;
-			});
-		}
-		function redrawMaskEditor() {
-			if (!maskEditorSourceImage || !maskEditorSource || !maskEditorMask) return;
-			resizeMaskEditorCanvases();
-			const sourceContext = maskEditorSource.getContext("2d");
-			sourceContext?.clearRect(0, 0, maskEditorSource.width, maskEditorSource.height);
-			sourceContext?.drawImage(maskEditorSourceImage, 0, 0, maskEditorSource.width, maskEditorSource.height);
-			redrawMaskOverlay();
-		}
-		function redrawMaskOverlay() {
-			if (!maskEditorMask || !maskEditorMaskData) return;
-			const context = maskEditorMask.getContext("2d");
-			if (!context) return;
-			const imageData = context.createImageData(maskEditorMask.width, maskEditorMask.height);
-			for (let index = 0; index < maskEditorMaskData.length; index += 1) {
-				const alpha = Math.round(Math.min(maskEditorMaskData[index], 1) * 150);
-				const offset = index * 4;
-				imageData.data[offset] = 255;
-				imageData.data[offset + 1] = 42;
-				imageData.data[offset + 2] = 42;
-				imageData.data[offset + 3] = alpha;
-			}
-			context.putImageData(imageData, 0, 0);
-		}
-		function maskPointerPosition(event) {
-			if (!maskEditorMask) return null;
-			const rect = maskEditorMask.getBoundingClientRect();
-			if (rect.width <= 0 || rect.height <= 0) return null;
-			return {
-				x: (event.clientX - rect.left) / rect.width * maskEditorMask.width,
-				y: (event.clientY - rect.top) / rect.height * maskEditorMask.height,
-				scale: maskEditorMask.width / rect.width
-			};
-		}
-		function paintMaskAt(position) {
-			if (!position || !maskEditorMask || !maskEditorMaskData) return;
-			const radius = Math.max(maskEditorBrushSize * position.scale / 2, 1);
-			const innerRadius = radius * (1 - maskEditorBrushFalloff);
-			const minX = Math.max(Math.floor(position.x - radius), 0);
-			const maxX = Math.min(Math.ceil(position.x + radius), maskEditorMask.width - 1);
-			const minY = Math.max(Math.floor(position.y - radius), 0);
-			const maxY = Math.min(Math.ceil(position.y + radius), maskEditorMask.height - 1);
-			for (let y = minY; y <= maxY; y += 1) for (let x = minX; x <= maxX; x += 1) {
-				const distance = Math.hypot(x - position.x, y - position.y);
-				if (distance > radius) continue;
-				const intensity = distance <= innerRadius ? 1 : 1 - (distance - innerRadius) / Math.max(radius - innerRadius, 1);
-				const index = y * maskEditorMask.width + x;
-				maskEditorMaskData[index] = Math.max(maskEditorMaskData[index], intensity);
-			}
-			redrawMaskOverlay();
-		}
-		function invertMaskEditorData() {
-			if (!maskEditorMaskData) return;
-			for (let index = 0; index < maskEditorMaskData.length; index += 1) maskEditorMaskData[index] = 1 - Math.min(Math.max(maskEditorMaskData[index], 0), 1);
-			redrawMaskOverlay();
-		}
-		function maskEditorPngDataUrl() {
-			if (!maskEditorMask || !maskEditorMaskData) throw new Error("Mask data is unavailable.");
-			const canvas = document.createElement("canvas");
-			canvas.width = maskEditorMask.width;
-			canvas.height = maskEditorMask.height;
-			const context = canvas.getContext("2d");
-			if (!context) throw new Error("Mask export is unavailable.");
-			const imageData = context.createImageData(canvas.width, canvas.height);
-			for (let index = 0; index < maskEditorMaskData.length; index += 1) {
-				const value = Math.round(Math.min(Math.max(maskEditorMaskData[index], 0), 1) * 255);
-				const offset = index * 4;
-				imageData.data[offset] = value;
-				imageData.data[offset + 1] = value;
-				imageData.data[offset + 2] = value;
-				imageData.data[offset + 3] = 255;
-			}
-			context.putImageData(imageData, 0, 0);
-			return canvas.toDataURL("image/png");
-		}
-		async function saveMaskEditorData() {
-			if (!maskEditorOverlay?.dataset.maskSaveUrl) {
-				showMessage("Mask save URL is unavailable.", "error");
-				return;
-			}
-			if (!csrfToken) {
-				showMessage("Missing CSRF token.", "error");
-				return;
-			}
-			if (maskEditorSave) maskEditorSave.disabled = true;
-			showMessage("Saving mask.", "info");
-			try {
-				const data = await csrfJsonRequest(maskEditorOverlay.dataset.maskSaveUrl, { mask_png: maskEditorPngDataUrl() }, {
-					csrfToken,
-					fallbackMessage: "Mask could not be saved."
-				});
-				closeMaskEditor();
-				await refreshGallery();
-				showMessage(`${data.filename || "Mask"} saved.`, "success");
-			} catch (error) {
-				showMessage(error.message || "Mask could not be saved.", "error");
-			} finally {
-				if (maskEditorSave) maskEditorSave.disabled = false;
-			}
-		}
-		function startMaskPainting(event) {
-			if (!maskEditorMaskData || !maskEditorMask) return;
-			event.preventDefault();
-			maskEditorPainting = true;
-			maskEditorMask.setPointerCapture?.(event.pointerId);
-			paintMaskAt(maskPointerPosition(event));
-		}
-		function continueMaskPainting(event) {
-			if (!maskEditorPainting) return;
-			event.preventDefault();
-			paintMaskAt(maskPointerPosition(event));
-		}
-		function stopMaskPainting(event) {
-			if (!maskEditorPainting) return;
-			maskEditorPainting = false;
-			maskEditorMask?.releasePointerCapture?.(event.pointerId);
-		}
 		function updateSourceSelectionUi() {
 			sourceWorkflow?.update();
 		}
@@ -1862,10 +1899,15 @@
 			modelRegistry,
 			showMessage
 		});
+		maskEditorWorkflow = setupMaskEditor(document, {
+			csrfToken,
+			refreshGallery,
+			showMessage
+		});
 		galleryWorkflow = setupGallery(document, {
 			csrfToken,
 			metadata: metadataWorkflow,
-			openMaskEditor,
+			openMaskEditor: (figure) => maskEditorWorkflow.open(figure),
 			removeSourceImage: (filename) => sourceWorkflow.remove(filename),
 			setTrashCount: (value) => trashWorkflow.setCount(value),
 			showMessage,
@@ -2000,31 +2042,9 @@
 				setUploadStatus(error.message || "Immich image could not be imported.", "error");
 			});
 		});
-		maskEditorClose?.addEventListener("click", () => {
-			closeMaskEditor();
-		});
-		maskEditorOverlay?.addEventListener("click", (event) => {
-			if (event.target === maskEditorOverlay) closeMaskEditor();
-		});
-		maskEditorMask?.addEventListener("pointerdown", startMaskPainting);
-		maskEditorMask?.addEventListener("pointermove", continueMaskPainting);
-		maskEditorMask?.addEventListener("pointerup", stopMaskPainting);
-		maskEditorMask?.addEventListener("pointercancel", stopMaskPainting);
-		maskEditorMask?.addEventListener("pointerleave", stopMaskPainting);
-		maskEditorBrushSizeInput?.addEventListener("input", updateMaskBrushControls);
-		maskEditorBrushFalloffInput?.addEventListener("input", updateMaskBrushControls);
-		maskEditorInvert?.addEventListener("click", invertMaskEditorData);
-		maskEditorSave?.addEventListener("click", () => {
-			saveMaskEditorData().catch((error) => {
-				showMessage(error.message || "Mask could not be saved.", "error");
-			});
-		});
-		window.addEventListener("resize", () => {
-			if (maskEditorOverlay && !maskEditorOverlay.hidden) redrawMaskEditor();
-		});
 		document.addEventListener("keydown", (event) => {
-			if (event.key === "Escape" && maskEditorOverlay && !maskEditorOverlay.hidden) {
-				closeMaskEditor();
+			if (event.key === "Escape" && maskEditorWorkflow.isOpen()) {
+				maskEditorWorkflow.close();
 				return;
 			}
 			if (event.key === "Escape" && trashWorkflow.isOpen()) {
@@ -2047,7 +2067,6 @@
 		renderModelOptions(selectedProvider());
 		renderPricing(selectedModel());
 		renderParameters(selectedModel());
-		updateMaskBrushControls();
 		updateSourceSelectionUi();
 	})();
 	//#endregion
