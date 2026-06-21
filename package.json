@@ -1,0 +1,19 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "js:build": "vite build",
+    "js:test": "vitest run",
+    "js:lint": "eslint \"src/imagegen/frontend/**/*.js\" \"tests/js/**/*.js\" --no-error-on-unmatched-pattern",
+    "js:format": "prettier --write src/imagegen/frontend tests/js",
+    "js:check": "npm run js:lint && npm run js:test && npm run js:build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.5.0",
+    "jsdom": "^29.1.1",
+    "prettier": "^3.8.4",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9"
+  }
+}

@@ -19,6 +19,9 @@ ENV/
 # uv
 .uv-cache/
 
+# JavaScript
+node_modules/
+
 # Tests, coverage, and type checkers
 .pytest_cache/
 .coverage
