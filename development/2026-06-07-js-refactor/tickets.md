@@ -296,6 +296,8 @@ Completed verification:
 
 ## Ticket 9: Extract Source Image And Generation Modules
 
+Status: completed on 2026-06-21.
+
 ### Goal
 
 Move source image selection and generation form behavior into dedicated modules.
@@ -331,6 +333,14 @@ Move source image selection and generation form behavior into dedicated modules.
 - `uv run ruff check src tests`
 - Manual browser validation of model switching, edit mode, source image
   selection, generation submit, polling, and gallery refresh.
+
+Completed verification:
+
+- Added Vitest coverage in `tests/js/source-images.test.js` and
+  `tests/js/generation.test.js`.
+- `npm run js:check`
+- `uv run pytest`
+- `uv run ruff check src tests`
 
 ## Ticket 10: Extract Mask Editor Module
 

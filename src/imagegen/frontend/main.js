@@ -6,8 +6,10 @@ import {
   setBooleanAttribute,
 } from "./dom.js";
 import { setupGallery } from "./gallery.js";
+import { setupGeneration } from "./generation.js";
 import { setupMetadata } from "./metadata.js";
 import { setupPalettes } from "./palettes.js";
+import { setupSourceImages } from "./source-images.js";
 import { setupTrash } from "./trash.js";
 
 (() => {
@@ -22,13 +24,7 @@ import { setupTrash } from "./trash.js";
   const pricingInfo = form.querySelector(".pricing-info");
   const pricingTooltip = form.querySelector(".pricing-tooltip");
   const parameterGrid = form.querySelector(".parameter-grid");
-  const generateButton = form.querySelector(".generate-button");
-  const editToggle = form.querySelector(".edit-toggle");
-  const sourceCounter = form.querySelector(".source-counter");
-  const sourceClear = form.querySelector(".source-clear");
-  const sourceSelectionStatus = form.querySelector(".source-selection-status");
   const messages = form.querySelector(".messages");
-  const gallery = document.querySelector(".gallery");
   const uploadToggle = form.querySelector(".upload-toggle");
   const uploadOverlay = document.querySelector(".upload-overlay");
   const uploadClose = uploadOverlay?.querySelector(".upload-close");
@@ -71,7 +67,6 @@ import { setupTrash } from "./trash.js";
   const pageChecksum = document
     .querySelector('meta[name="app-build"]')
     ?.getAttribute("content");
-  const terminalStatuses = new Set(["succeeded", "failed", "timeout"]);
   const pollSeconds = Number.parseFloat(form.dataset.pollSeconds || "1");
   const pollMilliseconds = Math.max(
     250,
@@ -86,9 +81,9 @@ import { setupTrash } from "./trash.js";
 
   const modelRegistry = loadJsonArray("#model-registry-data");
   const parameterState = {};
-  const selectedSourceImages = new Set();
+  let sourceWorkflow = null;
   let galleryWorkflow = null;
-  let editModeEnabled = false;
+  let generationWorkflow = null;
   let maskEditorSourceImage = null;
   let maskEditorMaskData = null;
   let maskEditorPainting = false;
@@ -481,24 +476,6 @@ import { setupTrash } from "./trash.js";
     });
   }
 
-  function sourceImageLimit(model) {
-    const limit = Number.parseInt(model?.source_image_max, 10);
-    return Number.isFinite(limit) && limit > 0 ? limit : 0;
-  }
-
-  function sourceStatus(text, isError = false) {
-    if (!sourceSelectionStatus) {
-      return;
-    }
-    sourceSelectionStatus.textContent = text || "";
-    sourceSelectionStatus.classList.toggle("source-selection-status-error", isError);
-  }
-
-  function clearSelectedSources() {
-    selectedSourceImages.clear();
-    updateSourceSelectionUi();
-  }
-
   function numberFromInput(input, fallback) {
     const value = Number.parseFloat(input?.value || "");
     return Number.isFinite(value) ? value : fallback;
@@ -821,72 +798,8 @@ import { setupTrash } from "./trash.js";
     maskEditorMask?.releasePointerCapture?.(event.pointerId);
   }
 
-  function setEditMode(enabled) {
-    const model = selectedModel();
-    editModeEnabled = Boolean(enabled && model?.edit_capable);
-    if (!editModeEnabled) {
-      selectedSourceImages.clear();
-      sourceStatus("");
-    }
-    updateSourceSelectionUi();
-  }
-
   function updateSourceSelectionUi() {
-    const model = selectedModel();
-    const editCapable = Boolean(model?.edit_capable);
-    const count = selectedSourceImages.size;
-
-    if (editToggle) {
-      editToggle.disabled = !editCapable;
-      setBooleanAttribute(editToggle, "aria-pressed", editModeEnabled);
-      editToggle.classList.toggle("edit-toggle-active", editModeEnabled);
-    }
-    if (sourceCounter) {
-      sourceCounter.textContent = `${count} selected`;
-    }
-    if (sourceClear) {
-      sourceClear.hidden = count === 0;
-      sourceClear.disabled = count === 0;
-    }
-    gallery?.classList.toggle("gallery-edit-active", editModeEnabled);
-    gallery?.querySelectorAll(".gallery-item").forEach((figure) => {
-      const filename = figure.dataset.filename;
-      const selected = Boolean(filename && selectedSourceImages.has(filename));
-      figure.classList.toggle("gallery-item-selected", selected);
-      const button = figure.querySelector(".source-select");
-      if (!button) {
-        return;
-      }
-      button.disabled = !editModeEnabled;
-      setBooleanAttribute(button, "aria-pressed", selected);
-      button.setAttribute(
-        "aria-label",
-        `${selected ? "Deselect" : "Select"} ${filename || "image"} as source image`,
-      );
-    });
-  }
-
-  function toggleSourceImage(filename) {
-    if (!editModeEnabled || !filename) {
-      return;
-    }
-    if (selectedSourceImages.has(filename)) {
-      selectedSourceImages.delete(filename);
-      sourceStatus("");
-      updateSourceSelectionUi();
-      return;
-    }
-    const limit = sourceImageLimit(selectedModel());
-    if (limit > 0 && selectedSourceImages.size >= limit) {
-      sourceStatus(
-        `Select up to ${limit} source image${limit === 1 ? "" : "s"}.`,
-        true,
-      );
-      return;
-    }
-    selectedSourceImages.add(filename);
-    sourceStatus("");
-    updateSourceSelectionUi();
+    sourceWorkflow?.update();
   }
 
   function readControlValue(control) {
@@ -932,15 +845,7 @@ import { setupTrash } from "./trash.js";
   }
 
   function setGenerating(isGenerating) {
-    if (!generateButton) {
-      return;
-    }
-    const hasProviderModel = Boolean(selectedModel());
-    generateButton.disabled = isGenerating || isPageStale || !hasProviderModel;
-    setBooleanAttribute(generateButton, "aria-busy", isGenerating);
-    generateButton.textContent = isGenerating
-      ? "Generating"
-      : generateButton.dataset.defaultLabel || "Generate";
+    generationWorkflow?.setGenerating(isGenerating);
   }
 
   function markPageStale() {
@@ -1001,22 +906,6 @@ import { setupTrash } from "./trash.js";
       parameters[parameter.name] = value;
     });
     return parameters;
-  }
-
-  function collectGenerationPayload(prompt) {
-    const payload = {
-      provider: providerSelector?.value || undefined,
-      model: modelSelector?.value || undefined,
-      prompt,
-      parameters: collectParameters(),
-    };
-    if (editModeEnabled) {
-      payload.edit_mode = true;
-    }
-    if (editModeEnabled && selectedSourceImages.size > 0) {
-      payload.source_images = Array.from(selectedSourceImages);
-    }
-    return payload;
   }
 
   function parameterLabel(name) {
@@ -1230,9 +1119,7 @@ import { setupTrash } from "./trash.js";
       renderModelOptions(model.provider);
     }
     modelSelector.value = model.alias;
-    selectedSourceImages.clear();
-    sourceImages.forEach((filename) => selectedSourceImages.add(filename));
-    editModeEnabled = Boolean(metadata.edit_mode || sourceImages.length > 0);
+    sourceWorkflow.setFromMetadata(sourceImages, metadata.edit_mode);
     Object.keys(parameterState).forEach((name) => {
       delete parameterState[name];
     });
@@ -1240,20 +1127,6 @@ import { setupTrash } from "./trash.js";
     renderPricing(model);
     renderParameters(model);
     updateSourceSelectionUi();
-  }
-
-  function statusMessage(data) {
-    if (data.status === "failed" || data.status === "timeout") {
-      return data.error || `Generation ${data.status}.`;
-    }
-    if (data.status === "succeeded") {
-      return "Generation succeeded.";
-    }
-    const latestLog = Array.isArray(data.logs) ? data.logs.at(-1) : "";
-    if (latestLog) {
-      return latestLog;
-    }
-    return `Generation status: ${data.status}.`;
   }
 
   function createImageCard(className) {
@@ -1297,97 +1170,13 @@ import { setupTrash } from "./trash.js";
     await galleryWorkflow?.refresh();
   }
 
-  function finishGeneration(data) {
-    delete form.dataset.activeRequestId;
-    setGenerating(false);
-    if (data.status === "succeeded") {
-      showMessage(statusMessage(data), "success");
-      refreshGallery().catch((error) => showMessage(error.message, "error"));
-      checkAppFreshness().catch(() => {});
-      return;
-    }
-    showMessage(statusMessage(data), "error");
-    checkAppFreshness().catch(() => {});
-  }
-
-  async function pollGeneration(statusUrl) {
-    if (!statusUrl || !form.dataset.activeRequestId) {
-      return;
-    }
-    try {
-      const data = await requestJson(statusUrl, {
-        fallbackMessage: "Generation status request failed.",
-      });
-
-      if (data.request_id !== form.dataset.activeRequestId) {
-        return;
-      }
-
-      if (terminalStatuses.has(data.status)) {
-        finishGeneration(data);
-        return;
-      }
-
-      showMessage(statusMessage(data), "info");
-      window.setTimeout(() => pollGeneration(statusUrl), pollMilliseconds);
-    } catch (error) {
-      delete form.dataset.activeRequestId;
-      setGenerating(false);
-      showMessage(error.message || "Generation status request failed.", "error");
-    }
-  }
-
-  async function submitGeneration(event) {
-    event.preventDefault();
-
-    const prompt = promptInput?.value.trim() || "";
-    if (!prompt) {
-      showMessage("Prompt is required.", "error");
-      promptInput?.focus();
-      return;
-    }
-
-    if (!csrfToken) {
-      showMessage("Missing CSRF token.", "error");
-      return;
-    }
-
-    try {
-      if (!(await checkAppFreshness())) {
-        return;
-      }
-    } catch (error) {
-      showMessage(error.message || "App version check failed.", "error");
-      return;
-    }
-
-    setGenerating(true);
-    showMessage("Generation request queued.", "info");
-
-    try {
-      const data = await csrfJsonRequest(
-        form.dataset.apiGenerateUrl,
-        collectGenerationPayload(prompt),
-        { csrfToken, fallbackMessage: "Generation request failed." },
-      );
-      showMessage("Generation is running.", "info");
-      form.dataset.activeRequestId = data.request_id;
-      window.setTimeout(
-        () => pollGeneration(data.status_url),
-        Number.isFinite(data.poll_seconds)
-          ? Math.max(250, data.poll_seconds * 1000)
-          : pollMilliseconds,
-      );
-    } catch (error) {
-      setGenerating(false);
-      showMessage(error.message || "Generation request failed.", "error");
-    }
-  }
-
   const trashWorkflow = setupTrash(document, {
     csrfToken,
     refreshGallery,
     showMessage,
+  });
+  sourceWorkflow = setupSourceImages(document, {
+    getModel: selectedModel,
   });
   const metadataWorkflow = setupMetadata(document, {
     applyMetadata: applyImageMetadata,
@@ -1398,11 +1187,24 @@ import { setupTrash } from "./trash.js";
     csrfToken,
     metadata: metadataWorkflow,
     openMaskEditor,
-    removeSourceImage: (filename) => selectedSourceImages.delete(filename),
+    removeSourceImage: (filename) => sourceWorkflow.remove(filename),
     setTrashCount: (value) => trashWorkflow.setCount(value),
     showMessage,
-    toggleSourceImage,
+    toggleSourceImage: (filename) => sourceWorkflow.toggle(filename),
     updateSourceSelectionUi,
+  });
+  generationWorkflow = setupGeneration(document, {
+    checkAppFreshness,
+    collectParameters,
+    csrfToken,
+    getModel: selectedModel,
+    getModelAlias: () => modelSelector?.value || undefined,
+    getProvider: () => providerSelector?.value || undefined,
+    isPageStale: () => isPageStale,
+    pollMilliseconds,
+    refreshGallery,
+    showMessage,
+    sourceState: () => sourceWorkflow.payload(),
   });
   setupPalettes(document, {
     csrfToken,
@@ -1414,9 +1216,7 @@ import { setupTrash } from "./trash.js";
   });
   providerSelector?.addEventListener("change", () => {
     const model = renderModelOptions(selectedProvider());
-    selectedSourceImages.clear();
-    editModeEnabled = false;
-    sourceStatus("");
+    sourceWorkflow.resetForProviderChange();
     renderPricing(model);
     renderParameters(model);
     updateSourceSelectionUi();
@@ -1424,21 +1224,10 @@ import { setupTrash } from "./trash.js";
   });
   modelSelector?.addEventListener("change", () => {
     const model = selectedModel();
-    selectedSourceImages.clear();
-    if (!model?.edit_capable) {
-      editModeEnabled = false;
-    }
-    sourceStatus("");
+    sourceWorkflow.resetForModelChange();
     renderPricing(model);
     renderParameters(model);
     updateSourceSelectionUi();
-  });
-  editToggle?.addEventListener("click", () => {
-    setEditMode(!editModeEnabled);
-  });
-  sourceClear?.addEventListener("click", () => {
-    clearSelectedSources();
-    sourceStatus("");
   });
   uploadToggle?.addEventListener("click", () => {
     openUploadOverlay();
@@ -1614,5 +1403,4 @@ import { setupTrash } from "./trash.js";
   renderParameters(selectedModel());
   updateMaskBrushControls();
   updateSourceSelectionUi();
-  form.addEventListener("submit", submitGeneration);
 })();
