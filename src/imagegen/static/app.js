@@ -92,6 +92,351 @@
 		element.append(...children);
 	}
 	//#endregion
+	//#region src/imagegen/frontend/gallery.js
+	function setupGallery(root = document, services = {}) {
+		const { csrfToken, metadata = {}, openMaskEditor = () => {}, removeSourceImage = () => {}, setTrashCount = () => {}, showMessage = () => {}, toggleSourceImage = () => {}, updateSourceSelectionUi = () => {} } = services;
+		const form = root.querySelector(".prompt-form");
+		const gallery = root.querySelector(".gallery");
+		let armedDeleteButton = null;
+		function disarmDelete() {
+			if (!armedDeleteButton) return;
+			armedDeleteButton.classList.remove("gallery-delete-armed");
+			const filename = armedDeleteButton.closest(".gallery-item")?.dataset.filename;
+			armedDeleteButton.setAttribute("aria-label", `Delete ${filename || "image"}`);
+			armedDeleteButton.setAttribute("title", "Delete image");
+			armedDeleteButton = null;
+		}
+		function armDelete(button) {
+			if (!button) return;
+			if (armedDeleteButton && armedDeleteButton !== button) disarmDelete();
+			armedDeleteButton = button;
+			const filename = button.closest(".gallery-item")?.dataset.filename || "image";
+			button.classList.add("gallery-delete-armed");
+			button.setAttribute("aria-label", `Confirm delete ${filename}`);
+			button.setAttribute("title", "Confirm delete image");
+			showMessage(`Click delete again to remove ${filename}.`, "info");
+		}
+		async function deleteImage(figure) {
+			const deleteUrl = figure?.dataset.deleteUrl;
+			const filename = figure?.dataset.filename || "image";
+			if (!deleteUrl) {
+				showMessage("This image cannot be deleted.", "error");
+				return;
+			}
+			await csrfJsonRequest(deleteUrl, {}, {
+				csrfToken,
+				fallbackMessage: `Could not delete ${filename}.`
+			});
+			removeSourceImage(filename);
+			showMessage(`${filename} deleted.`, "success");
+			await refresh();
+		}
+		async function uploadToImmich(figure) {
+			const uploadUrl = figure?.dataset.immichUploadUrl;
+			const filename = figure?.dataset.filename || "image";
+			const button = figure?.querySelector(".gallery-immich");
+			if (!uploadUrl) {
+				showMessage("Immich upload is not configured for this image.", "error");
+				return;
+			}
+			if (button) {
+				button.disabled = true;
+				button.classList.remove("gallery-immich-failed");
+				button.classList.add("gallery-immich-uploading");
+				button.setAttribute("aria-label", `Uploading ${filename} to Immich`);
+				button.setAttribute("title", "Uploading to Immich");
+			}
+			let data;
+			try {
+				data = await csrfJsonRequest(uploadUrl, {}, {
+					csrfToken,
+					fallbackMessage: `Could not upload ${filename} to Immich.`
+				});
+			} catch (error) {
+				if (button) {
+					button.disabled = false;
+					button.classList.remove("gallery-immich-uploading");
+					button.classList.add("gallery-immich-failed");
+					button.setAttribute("aria-label", `Immich upload failed for ${filename}`);
+					button.setAttribute("title", "Upload to Immich");
+				}
+				throw error;
+			}
+			if (button) {
+				button.disabled = false;
+				button.classList.remove("gallery-immich-uploading", "gallery-immich-failed");
+				button.classList.add("gallery-immich-uploaded");
+				button.setAttribute("aria-label", `${filename} uploaded to Immich`);
+				button.setAttribute("title", "Uploaded to Immich");
+			}
+			showMessage(`${filename} ${data.status === "already_present" ? "already present" : "uploaded"} in Immich.`, "success");
+		}
+		async function refresh() {
+			if (!gallery || !form?.dataset.apiImagesUrl) return;
+			disarmDelete();
+			const data = await requestJson(form.dataset.apiImagesUrl, { fallbackMessage: "Gallery refresh failed." });
+			if (Object.prototype.hasOwnProperty.call(data, "trash_count")) setTrashCount(data.trash_count);
+			render(data.images);
+			updateSourceSelectionUi();
+		}
+		function render(images) {
+			if (!gallery) return;
+			gallery.replaceChildren();
+			if (!Array.isArray(images) || images.length === 0) {
+				gallery.append(createElement("p", {
+					className: "empty",
+					textContent: "No generated images yet."
+				}));
+				return;
+			}
+			images.forEach((image) => gallery.append(imageFigure(image)));
+		}
+		gallery?.addEventListener("click", (event) => {
+			const infoButton = event.target.closest(".gallery-info");
+			if (infoButton) {
+				disarmDelete();
+				metadata.refreshTooltip?.(infoButton.closest(".gallery-item"));
+				return;
+			}
+			const loadButton = event.target.closest(".gallery-load");
+			if (loadButton) {
+				disarmDelete();
+				metadata.load?.(loadButton.closest(".gallery-item")).catch((error) => {
+					showMessage(error.message || "Image metadata could not be loaded.", "error");
+				});
+				return;
+			}
+			if (event.target.closest(".gallery-download, .gallery-download-clean")) {
+				disarmDelete();
+				return;
+			}
+			const maskButton = event.target.closest(".gallery-mask");
+			if (maskButton) {
+				disarmDelete();
+				openMaskEditor(maskButton.closest(".gallery-item"));
+				return;
+			}
+			const deleteButton = event.target.closest(".gallery-delete");
+			if (deleteButton) {
+				const figure = deleteButton.closest(".gallery-item");
+				if (armedDeleteButton !== deleteButton) {
+					armDelete(deleteButton);
+					return;
+				}
+				deleteImage(figure).catch((error) => {
+					disarmDelete();
+					showMessage(error.message || "Image could not be deleted.", "error");
+				});
+				return;
+			}
+			const immichButton = event.target.closest(".gallery-immich");
+			if (immichButton) {
+				disarmDelete();
+				uploadToImmich(immichButton.closest(".gallery-item")).catch((error) => {
+					showMessage(error.message || "Image could not be uploaded to Immich.", "error");
+				});
+				return;
+			}
+			const button = event.target.closest(".source-select");
+			if (!button) return;
+			disarmDelete();
+			toggleSourceImage(button.closest(".gallery-item")?.dataset.filename || "");
+		});
+		gallery?.addEventListener("mouseover", (event) => {
+			const infoButton = event.target.closest(".gallery-info");
+			if (!infoButton) return;
+			metadata.refreshTooltip?.(infoButton.closest(".gallery-item"));
+		});
+		gallery?.addEventListener("focusin", (event) => {
+			const infoButton = event.target.closest(".gallery-info");
+			if (!infoButton) return;
+			metadata.refreshTooltip?.(infoButton.closest(".gallery-item"));
+		});
+		return {
+			disarmDelete,
+			refresh,
+			render
+		};
+	}
+	function imageFigure(image) {
+		const figure = createElement("figure", { className: "gallery-item image-card" });
+		figure.dataset.filename = image.filename;
+		setDatasetValue(figure, "cleanDownloadUrl", image.clean_download_url);
+		setDatasetValue(figure, "contentType", image.content_type);
+		setDatasetValue(figure, "createdAt", image.created_at);
+		setDatasetValue(figure, "deleteUrl", image.delete_url);
+		setDatasetValue(figure, "downloadUrl", image.download_url);
+		setDatasetValue(figure, "immichUploadUrl", image.immich_upload_url);
+		setDatasetValue(figure, "maskSaveUrl", image.mask_save_url);
+		setDatasetValue(figure, "maskUrl", image.mask_url);
+		setDatasetValue(figure, "metadataUrl", image.metadata_url);
+		const link = createImageMedia$1({
+			alt: image.filename,
+			href: image.url,
+			src: image.url
+		});
+		const caption = createImageCardRibbon();
+		const actions = createActionRibbon("Image actions");
+		const infoWrap = createInfoAction$1({
+			label: `Image information for ${image.filename}`,
+			tooltipText: image.filename
+		});
+		let immichButton = null;
+		if (image.immich_upload_url) immichButton = iconButton("gallery-immich", `Upload ${image.filename} to Immich`, "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 17h-4v-4H7l5-5 5 5h-3z", "Upload to Immich");
+		const downloadLink = iconLink("gallery-download", `Download ${image.filename}`, image.download_url, "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 12h3l-5 5-5-5h3V8h4z", null, "Download with metadata");
+		const cleanDownloadLink = iconLink("gallery-download-clean", `Download clean ${image.filename}`, image.clean_download_url, "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 12h3l-5 5-5-5h3V8h4z", "M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z", "Download without metadata");
+		const maskButton = iconButton("gallery-mask", `Create mask for ${image.filename}`, "M7 20c-1.7 0-3-1.3-3-3 0-1.1.6-2.1 1.5-2.6L15 4.9c.9-.9 2.3-.9 3.2 0l.9.9c.9.9.9 2.3 0 3.2l-9.5 9.5C9.1 19.4 8.1 20 7 20zm1.2-3.1 8.8-8.8-1.1-1.1-8.8 8.8c-.4.4-.4.9 0 1.2.3.3.8.3 1.1-.1z", "Create mask");
+		const loadButton = iconButton("gallery-load", `Load metadata from ${image.filename}`, "M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2h6.5A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z", "Load metadata");
+		loadButton.disabled = !image.metadata_url;
+		const deleteButton = iconButton("gallery-delete", `Delete ${image.filename}`, "M9 3h6l1 2h4v2H4V5h4zm-3 6h12l-.7 11H6.7z", "Delete image");
+		actions.append(infoWrap, loadButton, downloadLink, cleanDownloadLink, maskButton);
+		if (immichButton) actions.append(immichButton);
+		actions.append(deleteButton);
+		const sourceButton = createElement("button", {
+			attributes: { "aria-label": `Select ${image.filename} as source image` },
+			className: "source-select",
+			type: "button"
+		});
+		caption.append(actions);
+		figure.append(link, sourceButton, caption);
+		return figure;
+	}
+	function setDatasetValue(element, name, value) {
+		if (value) element.dataset[name] = value;
+	}
+	function createImageMedia$1({ alt, className = "", href = null, loading = null, onError = null, src }) {
+		const media = createElement(href ? "a" : "span", { className: ["image-card-media", className].filter(Boolean).join(" ") });
+		if (href) {
+			media.href = href;
+			media.target = "_blank";
+			media.rel = "noopener";
+		}
+		const img = createElement("img", {
+			alt,
+			src
+		});
+		if (loading) img.loading = loading;
+		if (onError) img.addEventListener("error", onError);
+		media.append(img);
+		return media;
+	}
+	function createImageCardRibbon() {
+		return createElement("figcaption", { className: "image-card-ribbon" });
+	}
+	function createActionRibbon(label) {
+		return createElement("div", {
+			attributes: { "aria-label": label },
+			className: "gallery-actions"
+		});
+	}
+	function createInfoAction$1({ label, tooltipText }) {
+		const infoWrap = createElement("span", { className: "image-info-wrap" });
+		const infoButton = iconButton("gallery-info", label, "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 8h2v7h-2zm0-3h2v2h-2z");
+		const tooltip = createElement("span", {
+			attributes: { role: "tooltip" },
+			children: [createElement("span", {
+				className: "tooltip-line",
+				textContent: tooltipText
+			})],
+			className: "image-info-tooltip"
+		});
+		infoWrap.append(infoButton, tooltip);
+		return infoWrap;
+	}
+	function iconButton(className, label, pathData, title = label) {
+		return createElement("button", {
+			attributes: {
+				"aria-label": label,
+				title
+			},
+			children: [createSvgIcon(pathData)],
+			className: `gallery-action ${className}`,
+			type: "button"
+		});
+	}
+	function iconLink(className, label, href, pathData, sparklePathData = null, title = label) {
+		const link = createElement("a", {
+			attributes: {
+				"aria-label": label,
+				title
+			},
+			className: `gallery-action ${className}`,
+			href: href || "#"
+		});
+		if (!href) setBooleanAttribute(link, "aria-disabled", true);
+		link.append(createSvgIcon(pathData));
+		if (sparklePathData) {
+			const sparkle = createSvgIcon(sparklePathData);
+			sparkle.classList.add("sparkle");
+			link.append(sparkle);
+		}
+		return link;
+	}
+	//#endregion
+	//#region src/imagegen/frontend/metadata.js
+	function setupMetadata(root = document, services = {}) {
+		const { applyMetadata = () => {}, modelRegistry = [], showMessage = () => {} } = services;
+		async function load(figure) {
+			const metadataUrl = figure?.dataset.metadataUrl;
+			if (!metadataUrl) {
+				showMessage("This image has no embedded metadata to load.", "error");
+				return;
+			}
+			const data = await requestJson(metadataUrl, { fallbackMessage: "Image metadata could not be loaded." });
+			applyMetadata(data);
+			const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+			showMessage(warnings.length ? `Image metadata loaded. ${warnings.join(" ")}` : "Image metadata loaded.", warnings.length ? "warning" : "success");
+		}
+		async function metadataForInfo(figure) {
+			if (!figure?.dataset.metadataUrl) return null;
+			if (figure.dataset.infoMetadata) return JSON.parse(figure.dataset.infoMetadata);
+			let metadata;
+			try {
+				metadata = await requestJson(figure.dataset.metadataUrl);
+			} catch {
+				return null;
+			}
+			figure.dataset.infoMetadata = JSON.stringify(metadata);
+			return metadata;
+		}
+		function refreshTooltip(figure) {
+			updateInfoTooltip(figure, null);
+			metadataForInfo(figure).then((metadata) => updateInfoTooltip(figure, metadata)).catch(() => updateInfoTooltip(figure, null));
+		}
+		function modelForMetadata(metadata) {
+			if (metadata.model_alias) {
+				if (metadata.provider) return modelRegistry.find((model) => model.provider === metadata.provider && model.alias === metadata.model_alias) || null;
+				return modelRegistry.find((model) => model.alias === metadata.model_alias) || null;
+			}
+			if (metadata.model) return modelRegistry.find((model) => model.replicate_model === metadata.model) || null;
+			return null;
+		}
+		function updateInfoTooltip(figure, metadata) {
+			const tooltip = figure?.querySelector(".image-info-tooltip");
+			if (!figure || !tooltip) return;
+			const model = metadata ? modelForMetadata(metadata) : null;
+			const lines = [
+				figure.dataset.filename || "Image",
+				model?.display_name || metadata?.model_alias || metadata?.model || "Model unavailable",
+				imageDimensions(figure),
+				metadata?.prompt || "Prompt unavailable"
+			];
+			tooltip.replaceChildren(...lines.map((line) => createElement("span", {
+				className: "tooltip-line",
+				textContent: line
+			})));
+		}
+		return {
+			load,
+			refreshTooltip
+		};
+	}
+	function imageDimensions(figure) {
+		const image = figure?.querySelector("img");
+		if (!image?.naturalWidth || !image?.naturalHeight) return "Dimensions unavailable";
+		return `${image.naturalWidth} x ${image.naturalHeight}`;
+	}
+	//#endregion
 	//#region src/imagegen/frontend/palettes.js
 	function setupPalettes(root = document, services = {}) {
 		const { csrfToken, showMessage = () => {} } = services;
@@ -599,7 +944,7 @@
 		const modelRegistry = loadJsonArray("#model-registry-data");
 		const parameterState = {};
 		const selectedSourceImages = /* @__PURE__ */ new Set();
-		let armedDeleteButton = null;
+		let galleryWorkflow = null;
 		let editModeEnabled = false;
 		let maskEditorSourceImage = null;
 		let maskEditorMaskData = null;
@@ -1326,128 +1671,6 @@
 			renderParameters(model);
 			updateSourceSelectionUi();
 		}
-		async function loadGalleryMetadata(figure) {
-			const metadataUrl = figure?.dataset.metadataUrl;
-			if (!metadataUrl) {
-				showMessage("This image has no embedded metadata to load.", "error");
-				return;
-			}
-			const data = await requestJson(metadataUrl, { fallbackMessage: "Image metadata could not be loaded." });
-			applyImageMetadata(data);
-			const warnings = Array.isArray(data.warnings) ? data.warnings : [];
-			showMessage(warnings.length ? `Image metadata loaded. ${warnings.join(" ")}` : "Image metadata loaded.", warnings.length ? "warning" : "success");
-		}
-		async function deleteGalleryImage(figure) {
-			const deleteUrl = figure?.dataset.deleteUrl;
-			const filename = figure?.dataset.filename || "image";
-			if (!deleteUrl) {
-				showMessage("This image cannot be deleted.", "error");
-				return;
-			}
-			await csrfJsonRequest(deleteUrl, {}, {
-				csrfToken,
-				fallbackMessage: `Could not delete ${filename}.`
-			});
-			selectedSourceImages.delete(filename);
-			showMessage(`${filename} deleted.`, "success");
-			await refreshGallery();
-		}
-		function disarmGalleryDelete() {
-			if (!armedDeleteButton) return;
-			armedDeleteButton.classList.remove("gallery-delete-armed");
-			const filename = armedDeleteButton.closest(".gallery-item")?.dataset.filename;
-			armedDeleteButton.setAttribute("aria-label", `Delete ${filename || "image"}`);
-			armedDeleteButton.setAttribute("title", "Delete image");
-			armedDeleteButton = null;
-		}
-		function armGalleryDelete(button) {
-			if (!button) return;
-			if (armedDeleteButton && armedDeleteButton !== button) disarmGalleryDelete();
-			armedDeleteButton = button;
-			const filename = button.closest(".gallery-item")?.dataset.filename || "image";
-			button.classList.add("gallery-delete-armed");
-			button.setAttribute("aria-label", `Confirm delete ${filename}`);
-			button.setAttribute("title", "Confirm delete image");
-			showMessage(`Click delete again to remove ${filename}.`, "info");
-		}
-		async function uploadGalleryImageToImmich(figure) {
-			const uploadUrl = figure?.dataset.immichUploadUrl;
-			const filename = figure?.dataset.filename || "image";
-			const button = figure?.querySelector(".gallery-immich");
-			if (!uploadUrl) {
-				showMessage("Immich upload is not configured for this image.", "error");
-				return;
-			}
-			if (button) {
-				button.disabled = true;
-				button.classList.remove("gallery-immich-failed");
-				button.classList.add("gallery-immich-uploading");
-				button.setAttribute("aria-label", `Uploading ${filename} to Immich`);
-				button.setAttribute("title", "Uploading to Immich");
-			}
-			let data;
-			try {
-				data = await csrfJsonRequest(uploadUrl, {}, {
-					csrfToken,
-					fallbackMessage: `Could not upload ${filename} to Immich.`
-				});
-			} catch (error) {
-				if (button) {
-					button.disabled = false;
-					button.classList.remove("gallery-immich-uploading");
-					button.classList.add("gallery-immich-failed");
-					button.setAttribute("aria-label", `Immich upload failed for ${filename}`);
-					button.setAttribute("title", "Upload to Immich");
-				}
-				throw error;
-			}
-			if (button) {
-				button.disabled = false;
-				button.classList.remove("gallery-immich-uploading", "gallery-immich-failed");
-				button.classList.add("gallery-immich-uploaded");
-				button.setAttribute("aria-label", `${filename} uploaded to Immich`);
-				button.setAttribute("title", "Uploaded to Immich");
-			}
-			showMessage(`${filename} ${data.status === "already_present" ? "already present" : "uploaded"} in Immich.`, "success");
-		}
-		async function metadataForInfo(figure) {
-			if (!figure?.dataset.metadataUrl) return null;
-			if (figure.dataset.infoMetadata) return JSON.parse(figure.dataset.infoMetadata);
-			let metadata;
-			try {
-				metadata = await requestJson(figure.dataset.metadataUrl);
-			} catch {
-				return null;
-			}
-			figure.dataset.infoMetadata = JSON.stringify(metadata);
-			return metadata;
-		}
-		function imageDimensions(figure) {
-			const image = figure?.querySelector("img");
-			if (!image?.naturalWidth || !image?.naturalHeight) return "Dimensions unavailable";
-			return `${image.naturalWidth} x ${image.naturalHeight}`;
-		}
-		function updateInfoTooltip(figure, metadata) {
-			const tooltip = figure?.querySelector(".image-info-tooltip");
-			if (!figure || !tooltip) return;
-			const model = metadata ? modelForMetadata(metadata) : null;
-			const lines = [
-				figure.dataset.filename || "Image",
-				model?.display_name || metadata?.model_alias || metadata?.model || "Model unavailable",
-				imageDimensions(figure),
-				metadata?.prompt || "Prompt unavailable"
-			];
-			tooltip.replaceChildren(...lines.map((line) => {
-				const item = document.createElement("span");
-				item.className = "tooltip-line";
-				item.textContent = line;
-				return item;
-			}));
-		}
-		function refreshInfoTooltip(figure) {
-			updateInfoTooltip(figure, null);
-			metadataForInfo(figure).then((metadata) => updateInfoTooltip(figure, metadata)).catch(() => updateInfoTooltip(figure, null));
-		}
 		function statusMessage(data) {
 			if (data.status === "failed" || data.status === "timeout") return data.error || `Generation ${data.status}.`;
 			if (data.status === "succeeded") return "Generation succeeded.";
@@ -1477,112 +1700,8 @@
 		function createImageCardRibbon() {
 			return createElement("figcaption", { className: "image-card-ribbon" });
 		}
-		function createActionRibbon(label) {
-			return createElement("div", {
-				attributes: { "aria-label": label },
-				className: "gallery-actions"
-			});
-		}
-		function createInfoAction({ label, tooltipText }) {
-			const infoWrap = createElement("span", { className: "image-info-wrap" });
-			const infoButton = iconButton("gallery-info", label, "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 8h2v7h-2zm0-3h2v2h-2z");
-			const tooltip = createElement("span", {
-				attributes: { role: "tooltip" },
-				children: [createElement("span", {
-					className: "tooltip-line",
-					textContent: tooltipText
-				})],
-				className: "image-info-tooltip"
-			});
-			infoWrap.append(infoButton, tooltip);
-			return infoWrap;
-		}
-		function imageFigure(image) {
-			const figure = createImageCard("gallery-item image-card");
-			figure.dataset.filename = image.filename;
-			if (image.delete_url) figure.dataset.deleteUrl = image.delete_url;
-			if (image.immich_upload_url) figure.dataset.immichUploadUrl = image.immich_upload_url;
-			if (image.download_url) figure.dataset.downloadUrl = image.download_url;
-			if (image.clean_download_url) figure.dataset.cleanDownloadUrl = image.clean_download_url;
-			if (image.mask_url) figure.dataset.maskUrl = image.mask_url;
-			if (image.mask_save_url) figure.dataset.maskSaveUrl = image.mask_save_url;
-			if (image.metadata_url) figure.dataset.metadataUrl = image.metadata_url;
-			if (image.content_type) figure.dataset.contentType = image.content_type;
-			if (image.created_at) figure.dataset.createdAt = image.created_at;
-			const link = createImageMedia({
-				alt: image.filename,
-				href: image.url,
-				src: image.url
-			});
-			const caption = createImageCardRibbon();
-			const actions = createActionRibbon("Image actions");
-			const infoWrap = createInfoAction({
-				label: `Image information for ${image.filename}`,
-				tooltipText: image.filename
-			});
-			let immichButton = null;
-			if (image.immich_upload_url) immichButton = iconButton("gallery-immich", `Upload ${image.filename} to Immich`, "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 17h-4v-4H7l5-5 5 5h-3z", "Upload to Immich");
-			const downloadLink = iconLink("gallery-download", `Download ${image.filename}`, image.download_url, "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 12h3l-5 5-5-5h3V8h4z", null, "Download with metadata");
-			const cleanDownloadLink = iconLink("gallery-download-clean", `Download clean ${image.filename}`, image.clean_download_url, "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 12h3l-5 5-5-5h3V8h4z", "M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z", "Download without metadata");
-			const maskButton = iconButton("gallery-mask", `Create mask for ${image.filename}`, "M7 20c-1.7 0-3-1.3-3-3 0-1.1.6-2.1 1.5-2.6L15 4.9c.9-.9 2.3-.9 3.2 0l.9.9c.9.9.9 2.3 0 3.2l-9.5 9.5C9.1 19.4 8.1 20 7 20zm1.2-3.1 8.8-8.8-1.1-1.1-8.8 8.8c-.4.4-.4.9 0 1.2.3.3.8.3 1.1-.1z", "Create mask");
-			const loadButton = iconButton("gallery-load", `Load metadata from ${image.filename}`, "M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2h6.5A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z", "Load metadata");
-			loadButton.disabled = !image.metadata_url;
-			const deleteButton = iconButton("gallery-delete", `Delete ${image.filename}`, "M9 3h6l1 2h4v2H4V5h4zm-3 6h12l-.7 11H6.7z", "Delete image");
-			actions.append(infoWrap, loadButton, downloadLink, cleanDownloadLink, maskButton);
-			if (immichButton) actions.append(immichButton);
-			actions.append(deleteButton);
-			const sourceButton = document.createElement("button");
-			sourceButton.className = "source-select";
-			sourceButton.type = "button";
-			sourceButton.setAttribute("aria-label", `Select ${image.filename} as source image`);
-			caption.append(actions);
-			figure.append(link, sourceButton, caption);
-			return figure;
-		}
-		function iconButton(className, label, pathData, title = label) {
-			return createElement("button", {
-				attributes: {
-					"aria-label": label,
-					title
-				},
-				children: [createSvgIcon(pathData)],
-				className: `gallery-action ${className}`,
-				type: "button"
-			});
-		}
-		function iconLink(className, label, href, pathData, sparklePathData = null, title = label) {
-			const link = createElement("a", {
-				attributes: {
-					"aria-label": label,
-					title
-				},
-				className: `gallery-action ${className}`,
-				href: href || "#"
-			});
-			if (!href) setBooleanAttribute(link, "aria-disabled", true);
-			link.append(createSvgIcon(pathData));
-			if (sparklePathData) {
-				const sparkle = createSvgIcon(sparklePathData);
-				sparkle.classList.add("sparkle");
-				link.append(sparkle);
-			}
-			return link;
-		}
 		async function refreshGallery() {
-			if (!gallery || !form.dataset.apiImagesUrl) return;
-			disarmGalleryDelete();
-			const data = await requestJson(form.dataset.apiImagesUrl, { fallbackMessage: "Gallery refresh failed." });
-			if (Object.prototype.hasOwnProperty.call(data, "trash_count")) trashWorkflow.setCount(data.trash_count);
-			gallery.replaceChildren();
-			if (!Array.isArray(data.images) || data.images.length === 0) {
-				const empty = document.createElement("p");
-				empty.className = "empty";
-				empty.textContent = "No generated images yet.";
-				gallery.append(empty);
-				return;
-			}
-			data.images.forEach((image) => gallery.append(imageFigure(image)));
-			updateSourceSelectionUi();
+			await galleryWorkflow?.refresh();
 		}
 		function finishGeneration(data) {
 			delete form.dataset.activeRequestId;
@@ -1650,6 +1769,21 @@
 			csrfToken,
 			refreshGallery,
 			showMessage
+		});
+		const metadataWorkflow = setupMetadata(document, {
+			applyMetadata: applyImageMetadata,
+			modelRegistry,
+			showMessage
+		});
+		galleryWorkflow = setupGallery(document, {
+			csrfToken,
+			metadata: metadataWorkflow,
+			openMaskEditor,
+			removeSourceImage: (filename) => selectedSourceImages.delete(filename),
+			setTrashCount: (value) => trashWorkflow.setCount(value),
+			showMessage,
+			toggleSourceImage,
+			updateSourceSelectionUi
 		});
 		setupPalettes(document, {
 			csrfToken,
@@ -1777,57 +1911,6 @@
 				setUploadStatus(error.message || "Immich image could not be imported.", "error");
 			});
 		});
-		gallery?.addEventListener("click", (event) => {
-			const infoButton = event.target.closest(".gallery-info");
-			if (infoButton) {
-				disarmGalleryDelete();
-				refreshInfoTooltip(infoButton.closest(".gallery-item"));
-				return;
-			}
-			const loadButton = event.target.closest(".gallery-load");
-			if (loadButton) {
-				disarmGalleryDelete();
-				loadGalleryMetadata(loadButton.closest(".gallery-item")).catch((error) => {
-					showMessage(error.message || "Image metadata could not be loaded.", "error");
-				});
-				return;
-			}
-			if (event.target.closest(".gallery-download, .gallery-download-clean")) {
-				disarmGalleryDelete();
-				return;
-			}
-			const maskButton = event.target.closest(".gallery-mask");
-			if (maskButton) {
-				disarmGalleryDelete();
-				openMaskEditor(maskButton.closest(".gallery-item"));
-				return;
-			}
-			const deleteButton = event.target.closest(".gallery-delete");
-			if (deleteButton) {
-				const figure = deleteButton.closest(".gallery-item");
-				if (armedDeleteButton !== deleteButton) {
-					armGalleryDelete(deleteButton);
-					return;
-				}
-				deleteGalleryImage(figure).catch((error) => {
-					disarmGalleryDelete();
-					showMessage(error.message || "Image could not be deleted.", "error");
-				});
-				return;
-			}
-			const immichButton = event.target.closest(".gallery-immich");
-			if (immichButton) {
-				disarmGalleryDelete();
-				uploadGalleryImageToImmich(immichButton.closest(".gallery-item")).catch((error) => {
-					showMessage(error.message || "Image could not be uploaded to Immich.", "error");
-				});
-				return;
-			}
-			const button = event.target.closest(".source-select");
-			if (!button) return;
-			disarmGalleryDelete();
-			toggleSourceImage(button.closest(".gallery-item")?.dataset.filename || "");
-		});
 		maskEditorClose?.addEventListener("click", () => {
 			closeMaskEditor();
 		});
@@ -1860,16 +1943,6 @@
 				return;
 			}
 			if (event.key === "Escape" && uploadOverlay && !uploadOverlay.hidden) closeUploadOverlay();
-		});
-		gallery?.addEventListener("mouseover", (event) => {
-			const infoButton = event.target.closest(".gallery-info");
-			if (!infoButton) return;
-			refreshInfoTooltip(infoButton.closest(".gallery-item"));
-		});
-		gallery?.addEventListener("focusin", (event) => {
-			const infoButton = event.target.closest(".gallery-info");
-			if (!infoButton) return;
-			refreshInfoTooltip(infoButton.closest(".gallery-item"));
 		});
 		parameterGrid?.addEventListener("input", (event) => {
 			const control = event.target;

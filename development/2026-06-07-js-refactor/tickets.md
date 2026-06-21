@@ -248,6 +248,8 @@ Move prompt palette UI behavior into a dedicated workflow module.
 
 ## Ticket 8: Extract Gallery And Metadata Modules
 
+Status: completed on 2026-06-21.
+
 ### Goal
 
 Move local gallery rendering, gallery actions, and metadata loading into
@@ -283,6 +285,14 @@ dedicated modules.
 - `uv run ruff check src tests`
 - Manual browser validation of gallery refresh, metadata load, delete, mask
   trigger, and Immich upload when configured.
+
+Completed verification:
+
+- Added Vitest coverage in `tests/js/gallery.test.js` and
+  `tests/js/metadata.test.js`.
+- `npm run js:check`
+- `uv run pytest`
+- `uv run ruff check src tests`
 
 ## Ticket 9: Extract Source Image And Generation Modules
 
@@ -451,4 +461,3 @@ Playwright or another real-browser test layer.
 - `npm run js:check`
 - `uv run pytest`
 - `uv run ruff check src tests`
-
