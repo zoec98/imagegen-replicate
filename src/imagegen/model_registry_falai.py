@@ -406,7 +406,9 @@ def _nano_banana_2_parameters() -> tuple[ModelParameter, ...]:
         _param(
             "thinking_level",
             "Optional model thinking level.",
-            "string",
+            "select",
+            "",
+            choices=("", "minimal", "high"),
             order=12,
         ),
     )
