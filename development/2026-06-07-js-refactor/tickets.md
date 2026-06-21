@@ -433,6 +433,8 @@ Completed verification:
 
 ## Ticket 12: Update Developer Documentation
 
+Status: completed on 2026-06-21.
+
 ### Goal
 
 Document the new JavaScript source, build, test, and generated-file workflow so
@@ -459,6 +461,14 @@ future contributors edit the right files.
 ### Verification
 
 - Documentation review.
+- `npm run js:check`
+- `uv run pytest`
+- `uv run ruff check src tests`
+
+Completed verification:
+
+- Reviewed `AGENTS.md`, `development/README.md`, and
+  `development/ui-guidance.md`.
 - `npm run js:check`
 - `uv run pytest`
 - `uv run ruff check src tests`

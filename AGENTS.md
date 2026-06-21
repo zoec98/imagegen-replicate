@@ -20,10 +20,16 @@ uv sync
 uv run pytest
 uv run ruff format src tests
 uv run ruff check --fix src tests
+npm run js:format
+npm run js:check
 ```
 
 When adding runtime dependencies, use `uv add <package>`. When adding test or
 tooling dependencies, use `uv add --dev <package>`.
+
+Node dependencies are only needed when changing browser JavaScript. Running the
+Flask app does not require Node. Use `npm install` after checkout if
+`node_modules/` is absent and JavaScript work is needed.
 
 Project scripts live in `scripts/`:
 
@@ -46,16 +52,30 @@ Before work, load only the focused detail file needed for the task:
 - Generated image storage and metadata: [development/generated-images.md](development/generated-images.md)
 - Prompt palette work: [development/prompt-palettes.md](development/prompt-palettes.md)
 - UI work: [development/ui-guidance.md](development/ui-guidance.md)
-- Testing rules: [development/testing.md](development/testing.md)
 - Refactoring reviews: [development/refactoring.md](development/refactoring.md)
 - Security-sensitive work: [development/security-boundary.md](development/security-boundary.md)
-- New feature planning, audits, and decisions: [development/index.md](development/index.md)
+- Development folder structure: [development/README.md](development/README.md)
+- Current JavaScript refactor decisions and tickets:
+  [development/2026-06-07-js-refactor/tickets.md](development/2026-06-07-js-refactor/tickets.md)
+- Image upload planning:
+  [development/2026-06-07-image-upload/tickets.md](development/2026-06-07-image-upload/tickets.md)
+  and [development/2026-06-07-image-upload/user-story.md](development/2026-06-07-image-upload/user-story.md)
+- Gallery cleanup findings and follow-up work:
+  [development/2026-06-08-gallery-cleanup/analysis.md](development/2026-06-08-gallery-cleanup/analysis.md),
+  [development/2026-06-08-gallery-cleanup/audit.md](development/2026-06-08-gallery-cleanup/audit.md),
+  [development/2026-06-08-gallery-cleanup/test-notes.md](development/2026-06-08-gallery-cleanup/test-notes.md),
+  and [development/2026-06-08-gallery-cleanup/tickets.md](development/2026-06-08-gallery-cleanup/tickets.md)
+- Historical route/UI boundary and refactoring audits:
+  [development/2026-06-05-refactor-route-and-ui-boundaries/tickets.md](development/2026-06-05-refactor-route-and-ui-boundaries/tickets.md),
+  [development/2026-06-05-refactoring-audit/2026-06-05-refactoring-audit.md](development/2026-06-05-refactoring-audit/2026-06-05-refactoring-audit.md),
+  and [development/2026-06-05-test-audit/audit.md](development/2026-06-05-test-audit/audit.md)
 
 For new non-trivial work, create or update a focused workstream under
-`development/epics/` with user stories, tickets, notes, and audit output. Root
-planning files such as `PLAN.md`, `USER-STORY.md`, `AUDIT.md`, and
-`SCENARIO.md` are legacy or temporary artifacts; prefer `development/` for
-future work unless the user explicitly asks otherwise.
+`development/` with a date-prefixed directory such as
+`development/YYYY-MM-DD-short-name/`. Store user stories, tickets, notes, and
+audit output there. Root planning files such as `PLAN.md`, `USER-STORY.md`,
+`AUDIT.md`, and `SCENARIO.md` are legacy or temporary artifacts; prefer
+`development/` for future work unless the user explicitly asks otherwise.
 
 ## Expected Application Shape
 
@@ -74,11 +94,38 @@ Preferred structure as the app grows:
 - `src/imagegen/palettes.py`: filesystem palette repository and validation.
 - `src/imagegen/prompt_annotations.py`: prompt annotation validation/stripping.
 - `src/imagegen/templates/`: Jinja templates.
-- `src/imagegen/static/`: CSS, JavaScript, and local UI assets.
+- `src/imagegen/frontend/`: editable browser JavaScript source modules.
+- `src/imagegen/static/`: CSS, generated JavaScript, generated sourcemaps, and
+  local UI assets.
 - `tests/`: focused tests for behavior and route/provider boundaries.
+- `tests/js/`: Vitest + jsdom tests for browser JavaScript behavior.
 
 Use the Flask application factory `create_app(config: dict | None = None)` so
 tests can create isolated apps.
+
+Browser JavaScript source of truth lives under `src/imagegen/frontend/`.
+`src/imagegen/static/app.js` and `src/imagegen/static/app.js.map` are generated
+by `npm run js:build`; do not edit them directly. Keep generated `app.js`
+committed so end users can run the Flask app without Node.
+
+Current frontend modules:
+
+- `main.js`: workspace bootstrap and workflow wiring.
+- `api.js`: shared JSON, `fetch`, and CSRF request helpers.
+- `dom.js`: small DOM creation and attribute helpers.
+- `gallery.js`: gallery refresh, card rendering, gallery actions, delete, mask
+  trigger, Immich upload trigger, and source-select dispatch.
+- `metadata.js`: embedded metadata loading and image information tooltip data.
+- `trash.js`: trash overlay listing, restore, empty, count, and close behavior.
+- `palettes.js`: prompt palette insertion and palette editor behavior.
+- `source-images.js`: edit mode, selected source image state, limits, and
+  source-image UI state.
+- `generation.js`: generation payload assembly, submit, polling, and completion
+  status handling.
+- `mask-editor.js`: mask overlay, brush controls, drawing state, invert, and
+  save behavior.
+- `image-upload.js`: upload overlay, URL import, file/drop import, and Immich
+  import browser behavior.
 
 ## Hard Guardrails
 
@@ -110,12 +157,17 @@ tests can create isolated apps.
   actionable details while avoiding credential leakage.
 - Do not trust browser-submitted parameters, filenames, MIME types, metadata, or
   output URLs.
+- Do not bypass the JavaScript workflow modules in `src/imagegen/frontend/`
+  from unrelated browser code. Wire behavior through the existing setup
+  functions and service callbacks unless a focused refactor changes ownership.
 - Keep gallery deletion inside the configured output directory; validate
   filenames, require CSRF protection, and move deleted images to the configured
   trash directory instead of unlinking them from routes.
 - Do not use destructive git commands or revert unrelated user changes.
 - Do not skip `uv run pytest` and `uv run ruff check src tests` after code
   changes unless the reason is documented in the final response.
+- Do not skip `npm run js:check` after browser JavaScript changes unless the
+  reason is documented in the final response.
 - Assume tests are quick and cheap; run `uv run pytest` in full, not only
   individual tests, before finishing code changes.
 
