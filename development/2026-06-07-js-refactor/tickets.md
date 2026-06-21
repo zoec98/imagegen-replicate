@@ -392,6 +392,8 @@ Canvas validation note:
 
 ## Ticket 11: Add Image Upload Module
 
+Status: completed on 2026-06-21.
+
 ### Goal
 
 Prepare the JavaScript structure for the future image upload epic without
@@ -418,6 +420,13 @@ mixing upload behavior into unrelated modules.
 
 - Add Vitest tests for absent markup no-op behavior and overlay open/close once
   markup exists.
+- `npm run js:check`
+- `uv run pytest`
+- `uv run ruff check src tests`
+
+Completed verification:
+
+- Added Vitest coverage in `tests/js/image-upload.test.js`.
 - `npm run js:check`
 - `uv run pytest`
 - `uv run ruff check src tests`
