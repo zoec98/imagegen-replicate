@@ -1,7 +1,7 @@
 # Refactoring Policy
 
 When asked to refactor, do not change code immediately. First create or update
-a focused refactoring note under `development/refactors/`.
+a focused refactoring note under `development/<todays_date>-refactoring-audit/refactor.md`.
 
 For each module under review:
 
