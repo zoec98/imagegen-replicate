@@ -1,3 +1,5 @@
+import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
+
 (() => {
   const form = document.querySelector(".prompt-form");
   if (!form) {
@@ -387,13 +389,9 @@
     if (!form.dataset.apiPalettesUrl) {
       return;
     }
-    const response = await fetch(form.dataset.apiPalettesUrl, {
-      credentials: "same-origin",
+    const data = await requestJson(form.dataset.apiPalettesUrl, {
+      fallbackMessage: "Palette refresh failed.",
     });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Palette refresh failed.");
-    }
     paletteData = Array.isArray(data.palettes) ? data.palettes : [];
     renderPromptPaletteControls();
     populatePaletteEditor(selectedPalette, selectedFragment);
@@ -406,18 +404,14 @@
       }
       return;
     }
-    const response = await fetch(
+    const data = await requestJson(
       paletteUrl(
         `/${encoded(paletteEditorPalette.value)}/fragments/${encoded(
           paletteEditorFragment.value,
         )}`,
       ),
-      { credentials: "same-origin" },
+      { fallbackMessage: "Palette fragment could not be loaded." },
     );
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Palette fragment could not be loaded.");
-    }
     if (paletteEditorName) {
       paletteEditorName.value = "";
     }
@@ -427,23 +421,11 @@
   }
 
   async function writePaletteFragment(method, url, body) {
-    if (!csrfToken) {
-      throw new Error("Missing CSRF token.");
-    }
-    const response = await fetch(url, {
+    return csrfJsonRequest(url, body, {
+      csrfToken,
       method,
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
-      },
-      body: JSON.stringify(body),
+      fallbackMessage: "Palette edit failed.",
     });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Palette edit failed.");
-    }
-    return data;
   }
 
   async function createPaletteFragment() {
@@ -554,54 +536,24 @@
     uploadDropTarget?.classList.remove("upload-drop-target-active");
   }
 
-  async function readApiJson(response, fallbackMessage) {
-    let data;
-    try {
-      data = await response.json();
-    } catch {
-      data = {};
-    }
-    if (!response.ok) {
-      throw new Error(data.error || fallbackMessage);
-    }
-    return data;
-  }
-
   async function postUploadJson(url, body, fallbackMessage) {
     if (!url) {
       throw new Error("Upload URL is unavailable.");
     }
-    if (!csrfToken) {
-      throw new Error("Missing CSRF token.");
-    }
-    const response = await fetch(url, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
-      },
-      body: JSON.stringify(body),
+    return csrfJsonRequest(url, body, {
+      csrfToken,
+      fallbackMessage,
     });
-    return readApiJson(response, fallbackMessage);
   }
 
   async function postUploadForm(url, formData, fallbackMessage) {
     if (!url) {
       throw new Error("Upload URL is unavailable.");
     }
-    if (!csrfToken) {
-      throw new Error("Missing CSRF token.");
-    }
-    const response = await fetch(url, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "X-CSRF-Token": csrfToken,
-      },
-      body: formData,
+    return csrfFormRequest(url, formData, {
+      csrfToken,
+      fallbackMessage,
     });
-    return readApiJson(response, fallbackMessage);
   }
 
   async function finishUploadImport(data, message) {
@@ -682,14 +634,9 @@
       return;
     }
     try {
-      const response = await fetch(thumbnailUrl, {
-        credentials: "same-origin",
+      await requestJson(thumbnailUrl, {
+        fallbackMessage: "Immich thumbnail could not be loaded.",
       });
-      if (response.ok) {
-        return;
-      }
-      const data = await readApiJson(response, "Immich thumbnail could not be loaded.");
-      setUploadStatus(data.error || "Immich thumbnail could not be loaded.", "error");
     } catch (error) {
       setUploadStatus(
         error.message || "Immich thumbnail could not be loaded.",
@@ -733,10 +680,9 @@
     const url = new URL(baseUrl, window.location.href);
     url.searchParams.set("page", String(page));
     try {
-      const response = await fetch(url.toString(), {
-        credentials: "same-origin",
+      const data = await requestJson(url.toString(), {
+        fallbackMessage: "Immich gallery could not be loaded.",
       });
-      const data = await readApiJson(response, "Immich gallery could not be loaded.");
       renderImmichAssets(data);
     } catch (error) {
       setImmichPageLabel(`Page ${immichCurrentPage}`);
@@ -1147,19 +1093,11 @@
     }
     showMessage("Saving mask.", "info");
     try {
-      const response = await fetch(maskEditorOverlay.dataset.maskSaveUrl, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken,
-        },
-        body: JSON.stringify({ mask_png: maskEditorPngDataUrl() }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Mask could not be saved.");
-      }
+      const data = await csrfJsonRequest(
+        maskEditorOverlay.dataset.maskSaveUrl,
+        { mask_png: maskEditorPngDataUrl() },
+        { csrfToken, fallbackMessage: "Mask could not be saved." },
+      );
       closeMaskEditor();
       await refreshGallery();
       showMessage(`${data.filename || "Mask"} saved.`, "success");
@@ -1333,13 +1271,9 @@
     if (!pageChecksum || !form.dataset.apiAppVersionUrl) {
       return true;
     }
-    const response = await fetch(form.dataset.apiAppVersionUrl, {
-      credentials: "same-origin",
+    const data = await requestJson(form.dataset.apiAppVersionUrl, {
+      fallbackMessage: "App version check failed.",
     });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "App version check failed.");
-    }
     if (data.app_checksum !== pageChecksum) {
       markPageStale();
       return false;
@@ -1629,13 +1563,9 @@
       showMessage("This image has no embedded metadata to load.", "error");
       return;
     }
-    const response = await fetch(metadataUrl, {
-      credentials: "same-origin",
+    const data = await requestJson(metadataUrl, {
+      fallbackMessage: "Image metadata could not be loaded.",
     });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Image metadata could not be loaded.");
-    }
     applyImageMetadata(data);
     const warnings = Array.isArray(data.warnings) ? data.warnings : [];
     showMessage(
@@ -1653,23 +1583,14 @@
       showMessage("This image cannot be deleted.", "error");
       return;
     }
-    if (!csrfToken) {
-      showMessage("Missing CSRF token.", "error");
-      return;
-    }
-    const response = await fetch(deleteUrl, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
+    await csrfJsonRequest(
+      deleteUrl,
+      {},
+      {
+        csrfToken,
+        fallbackMessage: `Could not delete ${filename}.`,
       },
-      body: JSON.stringify({}),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || `Could not delete ${filename}.`);
-    }
+    );
     selectedSourceImages.delete(filename);
     showMessage(`${filename} deleted.`, "success");
     await refreshGallery();
@@ -1709,10 +1630,6 @@
       showMessage("Immich upload is not configured for this image.", "error");
       return;
     }
-    if (!csrfToken) {
-      showMessage("Missing CSRF token.", "error");
-      return;
-    }
     if (button) {
       button.disabled = true;
       button.classList.remove("gallery-immich-failed");
@@ -1720,17 +1637,17 @@
       button.setAttribute("aria-label", `Uploading ${filename} to Immich`);
       button.setAttribute("title", "Uploading to Immich");
     }
-    const response = await fetch(uploadUrl, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
-      },
-      body: JSON.stringify({}),
-    });
-    const data = await response.json();
-    if (!response.ok) {
+    let data;
+    try {
+      data = await csrfJsonRequest(
+        uploadUrl,
+        {},
+        {
+          csrfToken,
+          fallbackMessage: `Could not upload ${filename} to Immich.`,
+        },
+      );
+    } catch (error) {
       if (button) {
         button.disabled = false;
         button.classList.remove("gallery-immich-uploading");
@@ -1738,7 +1655,7 @@
         button.setAttribute("aria-label", `Immich upload failed for ${filename}`);
         button.setAttribute("title", "Upload to Immich");
       }
-      throw new Error(data.error || `Could not upload ${filename} to Immich.`);
+      throw error;
     }
     if (button) {
       button.disabled = false;
@@ -1758,13 +1675,12 @@
     if (figure.dataset.infoMetadata) {
       return JSON.parse(figure.dataset.infoMetadata);
     }
-    const response = await fetch(figure.dataset.metadataUrl, {
-      credentials: "same-origin",
-    });
-    if (!response.ok) {
+    let metadata;
+    try {
+      metadata = await requestJson(figure.dataset.metadataUrl);
+    } catch {
       return null;
     }
-    const metadata = await response.json();
     figure.dataset.infoMetadata = JSON.stringify(metadata);
     return metadata;
   }
@@ -2098,13 +2014,9 @@
     if (!url) {
       return;
     }
-    const response = await fetch(url, {
-      credentials: "same-origin",
+    const data = await requestJson(url, {
+      fallbackMessage: "Trash refresh failed.",
     });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Trash refresh failed.");
-    }
     setTrashCount(data.trash_count);
     renderTrashImages(data.images);
   }
@@ -2134,23 +2046,14 @@
       showMessage("This trash image cannot be restored.", "error");
       return;
     }
-    if (!csrfToken) {
-      showMessage("Missing CSRF token.", "error");
-      return;
-    }
-    const response = await fetch(restoreUrl, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
+    const data = await csrfJsonRequest(
+      restoreUrl,
+      {},
+      {
+        csrfToken,
+        fallbackMessage: `Could not restore ${filename}.`,
       },
-      body: JSON.stringify({}),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || `Could not restore ${filename}.`);
-    }
+    );
     if (Object.prototype.hasOwnProperty.call(data, "trash_count")) {
       setTrashCount(data.trash_count);
     }
@@ -2165,23 +2068,14 @@
       showMessage("Empty trash URL is unavailable.", "error");
       return;
     }
-    if (!csrfToken) {
-      showMessage("Missing CSRF token.", "error");
-      return;
-    }
-    const response = await fetch(url, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
+    const data = await csrfJsonRequest(
+      url,
+      {},
+      {
+        csrfToken,
+        fallbackMessage: "Trash could not be emptied.",
       },
-      body: JSON.stringify({}),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Trash could not be emptied.");
-    }
+    );
     if (Object.prototype.hasOwnProperty.call(data, "trash_count")) {
       setTrashCount(data.trash_count);
     }
@@ -2198,13 +2092,9 @@
       return;
     }
     disarmGalleryDelete();
-    const response = await fetch(form.dataset.apiImagesUrl, {
-      credentials: "same-origin",
+    const data = await requestJson(form.dataset.apiImagesUrl, {
+      fallbackMessage: "Gallery refresh failed.",
     });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Gallery refresh failed.");
-    }
     if (Object.prototype.hasOwnProperty.call(data, "trash_count")) {
       setTrashCount(data.trash_count);
     }
@@ -2238,13 +2128,9 @@
       return;
     }
     try {
-      const response = await fetch(statusUrl, {
-        credentials: "same-origin",
+      const data = await requestJson(statusUrl, {
+        fallbackMessage: "Generation status request failed.",
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Generation status request failed.");
-      }
 
       if (data.request_id !== form.dataset.activeRequestId) {
         return;
@@ -2292,21 +2178,11 @@
     showMessage("Generation request queued.", "info");
 
     try {
-      const response = await fetch(form.dataset.apiGenerateUrl, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken,
-        },
-        body: JSON.stringify(collectGenerationPayload(prompt)),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setGenerating(false);
-        showMessage(data.error || "Generation request failed.", "error");
-        return;
-      }
+      const data = await csrfJsonRequest(
+        form.dataset.apiGenerateUrl,
+        collectGenerationPayload(prompt),
+        { csrfToken, fallbackMessage: "Generation request failed." },
+      );
       showMessage("Generation is running.", "info");
       form.dataset.activeRequestId = data.request_id;
       window.setTimeout(
