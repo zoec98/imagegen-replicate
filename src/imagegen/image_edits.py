@@ -6,13 +6,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageFilter, UnidentifiedImageError
 
+from imagegen.mask_store import MaskPayloadError, decode_mask_payload
 from imagegen.metadata_embed import read_embedded_metadata, write_embedded_metadata
 from imagegen.source_images import validate_source_image_filename
 
 
 MIN_CROP_SIZE = 10
+MAX_BLUR_RADIUS = 20
 
 
 class ImageEditError(ValueError):
@@ -68,6 +70,47 @@ def crop_image(
     return EditedImage(path=output_path)
 
 
+def blur_image(
+    payload: object,
+    *,
+    source_filename: str,
+    output_dir: Path,
+    content_length: int | None = None,
+) -> EditedImage:
+    safe_name = validate_source_image_filename(source_filename, output_dir=output_dir)
+    source_path = output_dir / safe_name
+    blur_radius = _blur_radius(payload)
+
+    try:
+        with Image.open(source_path) as source:
+            source.load()
+            mask_image = decode_mask_payload(
+                payload,
+                source_size=source.size,
+                content_length=content_length,
+            )
+            _validate_non_empty_mask(mask_image)
+            blurred = source.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+            edited_image = Image.composite(blurred, source, mask_image)
+            output_path = _edited_output_path(
+                safe_name,
+                operation="blur",
+                output_dir=output_dir,
+            )
+            _save_image(
+                edited_image, output_path=output_path, image_format=source.format
+            )
+    except ImageEditError:
+        raise
+    except MaskPayloadError as error:
+        raise ImageEditError(str(error)) from error
+    except (OSError, UnidentifiedImageError) as error:
+        raise ImageEditError("Source image is invalid.") from error
+
+    _copy_embedded_metadata(source_path, output_path)
+    return EditedImage(path=output_path)
+
+
 def _crop_rectangle(payload: object, *, source_size: tuple[int, int]) -> CropRectangle:
     if not isinstance(payload, dict):
         raise ImageEditError("Crop rectangle is required.")
@@ -87,6 +130,29 @@ def _crop_rectangle(payload: object, *, source_size: tuple[int, int]) -> CropRec
 
     _validate_crop_rectangle(rectangle, source_size=source_size)
     return rectangle
+
+
+def _blur_radius(payload: object) -> float:
+    if not isinstance(payload, dict):
+        raise ImageEditError("Blur radius is required.")
+    if "brush_size" in payload:
+        raise ImageEditError("brush_size is not accepted for blur operations.")
+    value = payload.get("blur_radius")
+    if value is None:
+        raise ImageEditError("Blur radius is required.")
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ImageEditError("Blur radius must be a number.")
+    radius = float(value)
+    if radius < 0 or radius > MAX_BLUR_RADIUS:
+        raise ImageEditError(
+            f"Blur radius must be between 0 and {MAX_BLUR_RADIUS} pixels."
+        )
+    return radius
+
+
+def _validate_non_empty_mask(mask_image: Image.Image) -> None:
+    if mask_image.getbbox() is None:
+        raise ImageEditError("Mask must mark at least one pixel.")
 
 
 def _integer_coordinate(value: object, *, name: str) -> int:

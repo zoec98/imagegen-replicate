@@ -44,15 +44,29 @@ def save_mask_payload(
     except OSError as error:
         raise MaskPayloadError("Source image is invalid.") from error
 
+    mask_image = decode_mask_payload(
+        payload,
+        source_size=source_size,
+        content_length=content_length,
+    )
+
+    saved_name = mask_filename(source_filename)
+    mask_image.save(output_dir / saved_name, "PNG")
+    return saved_name
+
+
+def decode_mask_payload(
+    payload: object,
+    *,
+    source_size: tuple[int, int],
+    content_length: int | None,
+) -> Image.Image:
     limits = mask_payload_limits(source_size)
     _validate_mask_request_size(content_length, limits)
     mask_image = _decode_mask_png(_mask_png_payload(payload, limits))
     if mask_image.size != source_size:
         raise MaskPayloadError("Mask dimensions must match the source image.")
-
-    saved_name = mask_filename(source_filename)
-    mask_image.convert("L").save(output_dir / saved_name, "PNG")
-    return saved_name
+    return mask_image.convert("L")
 
 
 def mask_payload_limits(source_size: tuple[int, int]) -> MaskPayloadLimits:

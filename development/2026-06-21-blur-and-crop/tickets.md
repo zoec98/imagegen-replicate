@@ -244,6 +244,8 @@ to the crop endpoint.
 
 ## Ticket 5: Add Backend Blur Operation
 
+Status: Complete.
+
 ### Goal
 
 Add a server-side blur endpoint that applies Gaussian blur only to painted mask
@@ -283,6 +285,27 @@ regions and writes a new gallery image.
 - Add failing tests before implementation.
 - `uv run pytest`
 - `uv run ruff check src tests`
+
+### Implementation Notes
+
+- Used the existing Pillow dependency and `PIL.ImageFilter.GaussianBlur`; no
+  new dependency and no hand-rolled blur implementation were added.
+- Added `imagegen.image_edits.blur_image()` as the backend blur operation.
+- Added `POST /api/images/<path:filename>/blur` as a CSRF-protected JSON API.
+- Refactored `mask_store.py` to expose reusable mask payload decoding while
+  preserving existing mask-save behavior.
+- Blur outputs use server-generated `source-blur-<uuid>` filenames and preserve
+  the source file extension.
+- Blur accepts floating-point radius values from 0 to 20.
+- Blur rejects `brush_size`; brush size remains a frontend mask creation
+  detail, not a server operation parameter.
+- Blur rejects missing, malformed, wrong-sized, and empty masks.
+- Blur reads existing embedded application metadata and writes the exact same
+  metadata dictionary to the edited output when present.
+- Sources without embedded application metadata produce blurred outputs without
+  added operation metadata.
+- Added operation-level tests in `tests/test_image_edits.py`.
+- Added route-level tests in `tests/test_image_routes.py`.
 
 ## Ticket 6: Add Frontend Blur Interaction
 

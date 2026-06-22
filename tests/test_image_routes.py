@@ -1401,6 +1401,240 @@ def test_api_crop_image_requires_csrf(app_config, app_factory):
     assert len(list(app_config.output_dir.glob("sample-crop-*.png"))) == 0
 
 
+def test_api_blur_image_writes_new_gallery_image(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source = Image.new("RGB", (8, 8), (255, 0, 0))
+    for x in range(4, 8):
+        for y in range(8):
+            source.putpixel((x, y), (0, 0, 255))
+    source.save(source_path, "PNG")
+    original_bytes = source_path.read_bytes()
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/blur",
+        json={
+            "blur_radius": 4.5,
+            "mask_png": grayscale_png_payload(
+                [255 if x >= 4 else 0 for _y in range(8) for x in range(8)],
+                (8, 8),
+            ),
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 201
+    image = response.json["image"]
+    assert image == {
+        "clean_download_url": f"/images/{image['filename']}/download-clean",
+        "crop_save_url": f"/api/images/{image['filename']}/crop",
+        "delete_url": f"/api/images/{image['filename']}/delete",
+        "download_url": f"/images/{image['filename']}/download",
+        "filename": image["filename"],
+        "mask_save_url": f"/api/images/{image['filename']}/mask",
+        "mask_url": f"/images/{image['filename'].removesuffix('.png')}-mask.png",
+        "url": f"/images/{image['filename']}",
+        "metadata_url": None,
+        "content_type": None,
+        "created_at": None,
+    }
+    assert image["filename"].startswith("sample-blur-")
+    assert image["filename"].endswith(".png")
+    assert source_path.read_bytes() == original_bytes
+    with Image.open(app_config.output_dir / image["filename"]) as blurred:
+        assert blurred.getpixel((0, 0)) == (255, 0, 0)
+        assert blurred.getpixel((7, 0)) != (0, 0, 255)
+
+
+def test_api_blur_image_preserves_embedded_metadata(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8), (255, 0, 0)).save(source_path, "PNG")
+    metadata = {
+        "content_type": "image/png",
+        "created_at": "2026-06-22T12:00:00+00:00",
+        "provider": "manual",
+        "prompt": "existing metadata",
+    }
+    write_embedded_metadata(source_path, metadata)
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/blur",
+        json={
+            "blur_radius": 2,
+            "mask_png": grayscale_png_payload([255] + [0] * 63, (8, 8)),
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 201
+    blurred_path = app_config.output_dir / response.json["image"]["filename"]
+    assert read_embedded_metadata(blurred_path) == metadata
+    assert read_embedded_metadata(source_path) == metadata
+
+
+def test_api_blur_image_does_not_add_metadata_when_source_has_none(
+    app_config,
+    app_factory,
+):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8), (255, 0, 0)).save(source_path, "PNG")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/blur",
+        json={
+            "blur_radius": 2,
+            "mask_png": grayscale_png_payload([255] + [0] * 63, (8, 8)),
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 201
+    blurred_path = app_config.output_dir / response.json["image"]["filename"]
+    assert read_embedded_metadata(blurred_path) is None
+
+
+def test_api_blur_image_rejects_unsafe_source_filename(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8), (255, 0, 0)).save(source_path, "PNG")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/../sample.png/blur",
+        json={
+            "blur_radius": 2,
+            "mask_png": grayscale_png_payload([255] + [0] * 63, (8, 8)),
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 404
+    assert response.json == {"error": "Image not found."}
+    assert len(list(app_config.output_dir.glob("sample-blur-*.png"))) == 0
+
+
+def test_api_blur_image_rejects_missing_source_image(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/missing.png/blur",
+        json={
+            "blur_radius": 2,
+            "mask_png": grayscale_png_payload([255] + [0] * 63, (8, 8)),
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 404
+    assert response.json == {"error": "Image not found."}
+
+
+@pytest.mark.parametrize(
+    ("payload", "error"),
+    [
+        (
+            {"mask_png": grayscale_png_payload([255] + [0] * 63, (8, 8))},
+            "Blur radius is required.",
+        ),
+        (
+            {
+                "blur_radius": "2",
+                "mask_png": grayscale_png_payload([255] + [0] * 63, (8, 8)),
+            },
+            "Blur radius must be a number.",
+        ),
+        (
+            {
+                "blur_radius": 20.1,
+                "mask_png": grayscale_png_payload([255] + [0] * 63, (8, 8)),
+            },
+            "Blur radius must be between 0 and 20 pixels.",
+        ),
+        ({"blur_radius": 2}, "Mask PNG is required."),
+        (
+            {"blur_radius": 2, "mask_png": grayscale_png_payload([0] * 64, (8, 8))},
+            "Mask must mark at least one pixel.",
+        ),
+        (
+            {"blur_radius": 2, "mask_png": grayscale_png_payload([255], (1, 1))},
+            "Mask dimensions must match the source image.",
+        ),
+        (
+            {
+                "blur_radius": 2,
+                "brush_size": 48,
+                "mask_png": grayscale_png_payload([255] + [0] * 63, (8, 8)),
+            },
+            "brush_size is not accepted for blur operations.",
+        ),
+    ],
+)
+def test_api_blur_image_rejects_invalid_payload(
+    app_config,
+    app_factory,
+    payload,
+    error,
+):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8), (255, 0, 0)).save(source_path, "PNG")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/blur",
+        json=payload,
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": error}
+    assert len(list(app_config.output_dir.glob("sample-blur-*.png"))) == 0
+
+
+def test_api_blur_image_requires_csrf(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8), (255, 0, 0)).save(source_path, "PNG")
+    client = app_factory().test_client()
+    client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+
+    response = client.post(
+        "/api/images/sample.png/blur",
+        json={
+            "blur_radius": 2,
+            "mask_png": grayscale_png_payload([255] + [0] * 63, (8, 8)),
+        },
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 403
+    assert response.json == {"error": "Invalid CSRF token."}
+    assert len(list(app_config.output_dir.glob("sample-blur-*.png"))) == 0
+
+
 def test_api_save_mask_preserves_black_white_and_gray_pixels(
     app_config,
     app_factory,
