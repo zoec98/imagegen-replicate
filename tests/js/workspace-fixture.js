@@ -74,9 +74,9 @@ export function renderWorkspace({ modelRegistry = [], selectedProvider = "" } = 
         <option value="mask">Mask</option>
       </select>
       <div class="mask-editor-control-group mask-editor-brush-controls">
-        <input class="mask-editor-brush-size" type="range" value="48">
+        <input class="mask-editor-brush-size" type="range" value="50">
         <label class="mask-editor-falloff-tool">
-          <input class="mask-editor-brush-falloff" type="range" value="0.65">
+          <input class="mask-editor-brush-falloff" type="range" value="0">
         </label>
         <span class="mask-editor-brush-size-value"></span>
         <span class="mask-editor-brush-falloff-value"></span>
@@ -85,7 +85,7 @@ export function renderWorkspace({ modelRegistry = [], selectedProvider = "" } = 
         <button class="mask-editor-crop" type="button"></button>
       </div>
       <div class="mask-editor-control-group mask-editor-blur-controls" hidden>
-        <input class="mask-editor-blur-radius" type="range" min="0" max="20" step="0.1" value="0">
+        <input class="mask-editor-blur-radius" type="range" min="0" max="50" step="0.1" value="20">
         <span class="mask-editor-blur-radius-value"></span>
         <button class="mask-editor-blur" type="button"></button>
       </div>

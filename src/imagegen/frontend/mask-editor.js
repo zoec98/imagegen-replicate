@@ -1,5 +1,10 @@
 import { csrfJsonRequest } from "./api.js";
 
+const DEFAULT_BRUSH_SIZE = 50;
+const DEFAULT_BRUSH_FALLOFF = 0;
+const DEFAULT_BLUR_RADIUS = 20;
+const MAX_BLUR_RADIUS = 50;
+
 export function setupMaskEditor(root = document, services = {}) {
   const {
     csrfToken = "",
@@ -32,9 +37,9 @@ export function setupMaskEditor(root = document, services = {}) {
   let sourceImage = null;
   let maskData = null;
   let isPainting = false;
-  let brushSize = 48;
-  let brushFalloff = 0.65;
-  let blurRadius = 0;
+  let brushSize = DEFAULT_BRUSH_SIZE;
+  let brushFalloff = DEFAULT_BRUSH_FALLOFF;
+  let blurRadius = DEFAULT_BLUR_RADIUS;
   let operation = "crop";
   let cropStart = null;
   let cropSelection = null;
@@ -63,7 +68,7 @@ export function setupMaskEditor(root = document, services = {}) {
   function updateBlurControls() {
     blurRadius = Math.min(
       Math.max(numberFromInput(blurRadiusInput, blurRadius), 0),
-      20,
+      MAX_BLUR_RADIUS,
     );
     if (blurRadiusValue) {
       blurRadiusValue.textContent = `${blurRadius.toFixed(1).replace(/\.0$/, "")} px`;

@@ -426,6 +426,8 @@ existing gallery workflows.
 
 ## Ticket 8: Manual Browser Validation And Epic Closeout
 
+Status: Complete.
+
 ### Goal
 
 Manually validate the in-browser behavior that jsdom tests cannot prove well
@@ -461,3 +463,21 @@ without adding Playwright.
 - `npm run js:check`
 - `uv run pytest`
 - `uv run ruff check src tests`
+
+### Validation Notes
+
+- Manual browser validation was completed by the user for the crop, blur, and
+  mask editor workflows.
+- The blur output appeared weaker than expected compared with other image
+  programs. The current implementation does not intentionally mix source pixels
+  into fully painted blur areas: the frontend exports fully painted blur mask
+  pixels as grayscale `255`, and the backend composites the fully blurred image
+  over the source image with that mask. The red editor overlay uses a lower
+  alpha only for visual markup.
+- Default editor values were adjusted after validation:
+  - Brush radius defaults to `50 px`.
+  - Falloff defaults to `0%`.
+  - Gaussian blur radius defaults to `20 px`.
+  - Gaussian blur radius accepts values from `0` to `50 px`.
+- Crop and Blur action buttons were aligned as mode actions and styled like the
+  primary Save Mask button when active.

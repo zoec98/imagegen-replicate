@@ -144,6 +144,19 @@ def test_blur_image_does_not_add_metadata_when_source_has_none(tmp_path):
     assert read_embedded_metadata(edited.path) is None
 
 
+def test_blur_image_accepts_maximum_radius(tmp_path):
+    source_path = tmp_path / "sample.png"
+    Image.new("RGB", (1, 1), (255, 0, 0)).save(source_path, "PNG")
+
+    edited = blur_image(
+        {"blur_radius": 50, "mask_png": mask_payload([255], (1, 1))},
+        source_filename="sample.png",
+        output_dir=tmp_path,
+    )
+
+    assert edited.path.is_file()
+
+
 @pytest.mark.parametrize(
     ("payload", "error"),
     [
@@ -154,11 +167,11 @@ def test_blur_image_does_not_add_metadata_when_source_has_none(tmp_path):
         ),
         (
             {"blur_radius": -0.1, "mask_png": mask_payload([255], (1, 1))},
-            "Blur radius must be between 0 and 20 pixels.",
+            "Blur radius must be between 0 and 50 pixels.",
         ),
         (
-            {"blur_radius": 20.1, "mask_png": mask_payload([255], (1, 1))},
-            "Blur radius must be between 0 and 20 pixels.",
+            {"blur_radius": 50.1, "mask_png": mask_payload([255], (1, 1))},
+            "Blur radius must be between 0 and 50 pixels.",
         ),
     ],
 )

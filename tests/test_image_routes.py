@@ -1762,10 +1762,10 @@ def test_api_blur_image_rejects_missing_source_image(app_factory):
         ),
         (
             {
-                "blur_radius": 20.1,
+                "blur_radius": 50.1,
                 "mask_png": grayscale_png_payload([255] + [0] * 63, (8, 8)),
             },
-            "Blur radius must be between 0 and 20 pixels.",
+            "Blur radius must be between 0 and 50 pixels.",
         ),
         ({"blur_radius": 2}, "Mask PNG is required."),
         (

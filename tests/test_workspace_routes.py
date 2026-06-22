@@ -71,7 +71,19 @@ def test_index_renders_prompt_form(app_factory):
     assert b'class="mask-editor-source"' in response.data
     assert b'class="mask-editor-mask"' in response.data
     assert b'class="mask-editor-brush-size"' in response.data
+    assert (
+        b'class="mask-editor-brush-size" type="range" min="8" max="160" step="1" value="50"'
+        in response.data
+    )
     assert b'class="mask-editor-brush-falloff"' in response.data
+    assert (
+        b'class="mask-editor-brush-falloff" type="range" min="0" max="100" step="1" value="0"'
+        in response.data
+    )
+    assert (
+        b'class="mask-editor-blur-radius" type="range" min="0" max="50" step="0.1" value="20"'
+        in response.data
+    )
     assert b'class="mask-editor-invert"' in response.data
     assert b'class="mask-editor-save"' in response.data
     assert b'class="mask-editor-close"' in response.data

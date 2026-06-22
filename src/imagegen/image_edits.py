@@ -14,7 +14,7 @@ from imagegen.source_images import validate_source_image_filename
 
 
 MIN_CROP_SIZE = 10
-MAX_BLUR_RADIUS = 20
+MAX_BLUR_RADIUS = 50
 
 
 class ImageEditError(ValueError):

@@ -534,7 +534,9 @@ select {
 
 .mask-editor-control-group {
   align-items: center;
-  display: contents;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
 }
 
 .mask-editor-control-group[hidden] {
@@ -552,6 +554,15 @@ select {
 .mask-editor-operation-tool {
   flex: 0 0 11rem;
   grid-template-columns: auto minmax(6rem, 1fr);
+}
+
+.mask-editor-brush-controls {
+  flex: 1 1 auto;
+}
+
+.mask-editor-crop-controls,
+.mask-editor-blur-controls {
+  margin-left: auto;
 }
 
 .mask-editor-tool span,
@@ -592,16 +603,14 @@ select {
 }
 
 .mask-editor-invert:hover,
-.mask-editor-crop:hover,
-.mask-editor-blur:hover,
-.mask-editor-invert:focus-visible,
-.mask-editor-crop:focus-visible,
-.mask-editor-blur:focus-visible {
+.mask-editor-invert:focus-visible {
   background: #eff6ff;
   border-color: #1d4ed8;
   color: #1d4ed8;
 }
 
+.mask-editor-crop,
+.mask-editor-blur,
 .mask-editor-save {
   background: #1d4ed8;
   border-color: #1d4ed8;
@@ -609,19 +618,19 @@ select {
   font-weight: 650;
 }
 
+.mask-editor-crop:hover,
+.mask-editor-blur:hover,
 .mask-editor-save:hover,
+.mask-editor-crop:focus-visible,
+.mask-editor-blur:focus-visible,
 .mask-editor-save:focus-visible {
   background: #1e40af;
   border-color: #1e40af;
 }
 
-.mask-editor-save:disabled {
-  cursor: default;
-  opacity: 0.65;
-}
-
 .mask-editor-crop:disabled,
-.mask-editor-blur:disabled {
+.mask-editor-blur:disabled,
+.mask-editor-save:disabled {
   cursor: default;
   opacity: 0.65;
 }

@@ -857,6 +857,10 @@
 	}
 	//#endregion
 	//#region src/imagegen/frontend/mask-editor.js
+	var DEFAULT_BRUSH_SIZE = 50;
+	var DEFAULT_BRUSH_FALLOFF = 0;
+	var DEFAULT_BLUR_RADIUS = 20;
+	var MAX_BLUR_RADIUS = 50;
 	function setupMaskEditor(root = document, services = {}) {
 		const { csrfToken = "", imageFactory = () => new Image(), refreshGallery = async () => {}, showMessage = () => {} } = services;
 		const overlay = root.querySelector(".mask-editor-overlay");
@@ -884,9 +888,9 @@
 		let sourceImage = null;
 		let maskData = null;
 		let isPainting = false;
-		let brushSize = 48;
-		let brushFalloff = .65;
-		let blurRadius = 0;
+		let brushSize = DEFAULT_BRUSH_SIZE;
+		let brushFalloff = DEFAULT_BRUSH_FALLOFF;
+		let blurRadius = DEFAULT_BLUR_RADIUS;
 		let operation = "crop";
 		let cropStart = null;
 		let cropSelection = null;
@@ -902,7 +906,7 @@
 			if (brushFalloffValue) brushFalloffValue.textContent = `${Math.round(brushFalloff * 100)}%`;
 		}
 		function updateBlurControls() {
-			blurRadius = Math.min(Math.max(numberFromInput(blurRadiusInput, blurRadius), 0), 20);
+			blurRadius = Math.min(Math.max(numberFromInput(blurRadiusInput, blurRadius), 0), MAX_BLUR_RADIUS);
 			if (blurRadiusValue) blurRadiusValue.textContent = `${blurRadius.toFixed(1).replace(/\.0$/, "")} px`;
 			updateBlurButton();
 		}
