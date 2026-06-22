@@ -543,6 +543,12 @@ select {
   display: none;
 }
 
+.mask-editor-control-group > [hidden],
+.mask-editor-tool[hidden],
+.mask-editor-tool [hidden] {
+  display: none;
+}
+
 .mask-editor-tool {
   align-items: center;
   display: grid;
@@ -563,6 +569,22 @@ select {
 .mask-editor-crop-controls,
 .mask-editor-blur-controls {
   margin-left: auto;
+}
+
+.mask-editor-blur-controls {
+  flex: 1 1 24rem;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+
+.mask-editor-blur-controls .mask-editor-tool {
+  flex: 1 1 24rem;
+  max-width: 34rem;
+}
+
+.mask-editor-crop,
+.mask-editor-blur {
+  flex: 0 0 auto;
 }
 
 .mask-editor-tool span,

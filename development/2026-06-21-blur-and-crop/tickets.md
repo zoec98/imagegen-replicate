@@ -481,3 +481,7 @@ without adding Playwright.
   - Gaussian blur radius accepts values from `0` to `50 px`.
 - Crop and Blur action buttons were aligned as mode actions and styled like the
   primary Save Mask button when active.
+- Follow-up browser validation found that CSS component display rules overrode
+  the `hidden` attribute for the Falloff controls in Blur mode. Added explicit
+  hidden-state CSS for editor controls and kept the Blur slider/action group on
+  one aligned row at desktop widths.
