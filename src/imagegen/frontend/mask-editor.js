@@ -27,7 +27,6 @@ export function setupMaskEditor(root = document, services = {}) {
   const blurRadiusValue = overlay?.querySelector(".mask-editor-blur-radius-value");
   const brushSizeInput = overlay?.querySelector(".mask-editor-brush-size");
   const brushFalloffInput = overlay?.querySelector(".mask-editor-brush-falloff");
-  const brushFalloffTool = overlay?.querySelector(".mask-editor-falloff-tool");
   const brushSizeValue = overlay?.querySelector(".mask-editor-brush-size-value");
   const brushFalloffValue = overlay?.querySelector(".mask-editor-brush-falloff-value");
   const invertButton = overlay?.querySelector(".mask-editor-invert");
@@ -92,12 +91,6 @@ export function setupMaskEditor(root = document, services = {}) {
     }
     if (blurControls) {
       blurControls.hidden = operation !== "blur";
-    }
-    if (brushFalloffTool) {
-      brushFalloffTool.hidden = operation === "blur";
-    }
-    if (brushFalloffValue) {
-      brushFalloffValue.hidden = operation === "blur";
     }
     if (invertButton) {
       invertButton.hidden = operation !== "mask";
@@ -327,8 +320,7 @@ export function setupMaskEditor(root = document, services = {}) {
       return;
     }
     const radius = Math.max((brushSize * position.scale) / 2, 1);
-    const effectiveFalloff = operation === "blur" ? 0 : brushFalloff;
-    const innerRadius = radius * (1 - effectiveFalloff);
+    const innerRadius = radius * (1 - brushFalloff);
     const minX = Math.max(Math.floor(position.x - radius), 0);
     const maxX = Math.min(Math.ceil(position.x + radius), maskCanvas.width - 1);
     const minY = Math.max(Math.floor(position.y - radius), 0);

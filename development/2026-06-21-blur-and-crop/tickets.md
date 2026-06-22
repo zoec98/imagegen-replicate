@@ -15,11 +15,11 @@ Source stories: `development/2026-06-21-blur-and-crop/user-stories.md`.
 - Require crop rectangles to map to at least 10 by 10 natural-image pixels.
 - Use existing red painted markup for blur selection. Do not implement true
   blur preview in the first version.
-- Use a blur radius slider from 0 to 20 px, accepting floating-point values.
+- Use a blur radius slider from 0 to 50 px, accepting floating-point values.
 - Keep blur brush size as a mask creation detail only; do not send it as a
   server operation parameter.
-- Keep blur falloff fixed at 0 percent and hide the falloff slider in blur
-  mode.
+- Keep blur falloff defaulted to 0 percent in blur mode, but allow users to
+  raise falloff for soft blur edges.
 - Add two new backend endpoints for crop and blur. Keep the existing mask
   endpoint for mask mode.
 - Reuse existing filename, path, output-directory, and gallery boundaries where
@@ -320,10 +320,10 @@ mask to the blur endpoint.
 
 - Add blur mode using the existing painted red markup behavior.
 - Keep brush size controls available in blur mode.
-- Hide falloff controls in blur mode.
-- Fix blur falloff at 0 percent.
+- Show falloff controls in blur mode.
+- Keep blur falloff defaulted to 0 percent.
 - Add a blur radius slider labeled with `px`.
-- Configure the blur radius range as 0 to 20 with floating-point values.
+- Configure the blur radius range as 0 to 50 with floating-point values.
 - Send mask payload plus blur radius through the existing API helper.
 - Do not send brush size as a blur operation parameter.
 - Do not implement true blur preview.
@@ -336,8 +336,8 @@ mask to the blur endpoint.
 
 - Blur mode uses brush painting.
 - Brush size can be adjusted for mask creation.
-- Falloff controls are hidden.
-- Blur radius is visible, uses a `px` metric, and accepts values from 0 to 20.
+- Falloff controls are available for soft blur edges.
+- Blur radius is visible, uses a `px` metric, and accepts values from 0 to 50.
 - The browser sends the painted mask or alpha mask plus blur radius.
 - The browser does not send brush size as a blur operation parameter.
 - The visible preview remains the existing red painted markup.
@@ -356,9 +356,10 @@ mask to the blur endpoint.
 ### Implementation Notes
 
 - Added blur save URLs to server-rendered and API-rendered gallery image data.
-- Blur mode uses the existing red painted overlay and brush-size control.
-- Blur mode hides the falloff control and paints with fixed 0 percent falloff.
-- Added a blur radius slider from 0 to 20 px with floating-point step support.
+- Blur mode uses the existing red painted overlay, brush-size control, and
+  falloff control.
+- Blur mode falloff defaults to 0 percent and can be raised for soft blur edges.
+- Added a blur radius slider from 0 to 50 px with floating-point step support.
 - Blur submissions send only `mask_png` and `blur_radius` to
   `POST /api/images/<filename>/blur`; brush size is not sent.
 - Successful blur closes the editor, refreshes the gallery, and reports the
@@ -485,3 +486,6 @@ without adding Playwright.
   the `hidden` attribute for the Falloff controls in Blur mode. Added explicit
   hidden-state CSS for editor controls and kept the Blur slider/action group on
   one aligned row at desktop widths.
+- Follow-up decision: Falloff is now intentionally enabled in Blur mode. Existing
+  grayscale mask export and backend compositing already support soft blur edges;
+  the default remains `0%`.

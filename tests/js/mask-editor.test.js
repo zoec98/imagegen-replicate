@@ -179,7 +179,10 @@ describe("setupMaskEditor", () => {
     operation.dispatchEvent(new Event("change", { bubbles: true }));
 
     expect(document.querySelector(".mask-editor-brush-controls").hidden).toBe(false);
-    expect(document.querySelector(".mask-editor-falloff-tool").hidden).toBe(true);
+    expect(document.querySelector(".mask-editor-falloff-tool").hidden).toBe(false);
+    expect(document.querySelector(".mask-editor-brush-falloff-value").hidden).toBe(
+      false,
+    );
     expect(document.querySelector(".mask-editor-crop-controls").hidden).toBe(true);
     expect(document.querySelector(".mask-editor-blur-controls").hidden).toBe(false);
     expect(document.querySelector(".mask-editor-blur-radius").min).toBe("0");

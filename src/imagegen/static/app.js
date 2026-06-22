@@ -878,7 +878,6 @@
 		const blurRadiusValue = overlay?.querySelector(".mask-editor-blur-radius-value");
 		const brushSizeInput = overlay?.querySelector(".mask-editor-brush-size");
 		const brushFalloffInput = overlay?.querySelector(".mask-editor-brush-falloff");
-		const brushFalloffTool = overlay?.querySelector(".mask-editor-falloff-tool");
 		const brushSizeValue = overlay?.querySelector(".mask-editor-brush-size-value");
 		const brushFalloffValue = overlay?.querySelector(".mask-editor-brush-falloff-value");
 		const invertButton = overlay?.querySelector(".mask-editor-invert");
@@ -921,8 +920,6 @@
 			if (brushControls) brushControls.hidden = operation === "crop";
 			if (cropControls) cropControls.hidden = operation !== "crop";
 			if (blurControls) blurControls.hidden = operation !== "blur";
-			if (brushFalloffTool) brushFalloffTool.hidden = operation === "blur";
-			if (brushFalloffValue) brushFalloffValue.hidden = operation === "blur";
 			if (invertButton) invertButton.hidden = operation !== "mask";
 			if (saveButton) saveButton.hidden = operation !== "mask";
 			updateBlurButton();
@@ -1074,7 +1071,7 @@
 		function paintAt(position) {
 			if (!position || !maskCanvas || !maskData) return;
 			const radius = Math.max(brushSize * position.scale / 2, 1);
-			const innerRadius = radius * (1 - (operation === "blur" ? 0 : brushFalloff));
+			const innerRadius = radius * (1 - brushFalloff);
 			const minX = Math.max(Math.floor(position.x - radius), 0);
 			const maxX = Math.min(Math.ceil(position.x + radius), maskCanvas.width - 1);
 			const minY = Math.max(Math.floor(position.y - radius), 0);
