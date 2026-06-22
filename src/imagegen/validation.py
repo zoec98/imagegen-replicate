@@ -197,7 +197,13 @@ def _has_default(parameter: ModelParameter) -> bool:
 
 
 def _omit_blank_parameter(parameter: ModelParameter, value: Any) -> bool:
-    return parameter.semantic_type == "seed" and value == ""
+    if parameter.semantic_type == "seed" and value == "":
+        return True
+    # An optional select (one whose choices include "") should not be forwarded
+    # to the provider when the user leaves it blank.
+    if parameter.type == "select" and value == "" and "" in parameter.choices:
+        return True
+    return False
 
 
 def _normalize_model_parameters(
