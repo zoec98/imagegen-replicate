@@ -557,6 +557,7 @@ def test_index_exposes_gallery_filenames_for_source_selection(app_config, app_fa
     assert b'class="image-card-ribbon"' in response.data
     assert b'data-filename="source.png"' in response.data
     assert b'data-delete-url="/api/images/source.png/delete"' in response.data
+    assert b'data-blur-save-url="/api/images/source.png/blur"' in response.data
     assert b'data-crop-save-url="/api/images/source.png/crop"' in response.data
     assert b'data-mask-url="/images/source-mask.png"' in response.data
     assert b'data-mask-save-url="/api/images/source.png/mask"' in response.data

@@ -15,6 +15,7 @@ function renderMaskWorkspace() {
       <figure
         class="gallery-item"
         data-filename="source.png"
+        data-blur-save-url="/api/images/source.png/blur"
         data-crop-save-url="/api/images/source.png/crop"
         data-mask-url="/images/source-mask.png"
         data-mask-save-url="/api/images/source-mask.png"
@@ -34,7 +35,9 @@ function renderMaskWorkspace() {
       </select>
       <div class="mask-editor-control-group mask-editor-brush-controls">
         <input class="mask-editor-brush-size" type="range" value="48">
-        <input class="mask-editor-brush-falloff" type="range" value="0.65">
+        <label class="mask-editor-falloff-tool">
+          <input class="mask-editor-brush-falloff" type="range" value="0.65">
+        </label>
         <span class="mask-editor-brush-size-value"></span>
         <span class="mask-editor-brush-falloff-value"></span>
       </div>
@@ -42,7 +45,9 @@ function renderMaskWorkspace() {
         <button class="mask-editor-crop" type="button" disabled></button>
       </div>
       <div class="mask-editor-control-group mask-editor-blur-controls" hidden>
-        <input class="mask-editor-blur-radius" type="range" value="0">
+        <input class="mask-editor-blur-radius" type="range" min="0" max="20" step="0.1" value="0">
+        <span class="mask-editor-blur-radius-value"></span>
+        <button class="mask-editor-blur" type="button" disabled></button>
       </div>
       <button class="mask-editor-invert" type="button"></button>
       <button class="mask-editor-save" type="button"></button>
@@ -130,6 +135,7 @@ describe("setupMaskEditor", () => {
 
     expect(overlay.hidden).toBe(false);
     expect(overlay.dataset.filename).toBe("source.png");
+    expect(overlay.dataset.blurSaveUrl).toBe("/api/images/source.png/blur");
     expect(overlay.dataset.cropSaveUrl).toBe("/api/images/source.png/crop");
     expect(overlay.dataset.maskSaveUrl).toBe("/api/images/source-mask.png");
     expect(document.querySelector("#mask-editor-title").textContent).toBe("source.png");
@@ -173,13 +179,18 @@ describe("setupMaskEditor", () => {
     operation.dispatchEvent(new Event("change", { bubbles: true }));
 
     expect(document.querySelector(".mask-editor-brush-controls").hidden).toBe(false);
+    expect(document.querySelector(".mask-editor-falloff-tool").hidden).toBe(true);
     expect(document.querySelector(".mask-editor-crop-controls").hidden).toBe(true);
     expect(document.querySelector(".mask-editor-blur-controls").hidden).toBe(false);
+    expect(document.querySelector(".mask-editor-blur-radius").min).toBe("0");
+    expect(document.querySelector(".mask-editor-blur-radius").max).toBe("20");
+    expect(document.querySelector(".mask-editor-blur-radius").step).toBe("0.1");
 
     operation.value = "mask";
     operation.dispatchEvent(new Event("change", { bubbles: true }));
 
     expect(document.querySelector(".mask-editor-brush-controls").hidden).toBe(false);
+    expect(document.querySelector(".mask-editor-falloff-tool").hidden).toBe(false);
     expect(document.querySelector(".mask-editor-crop-controls").hidden).toBe(true);
     expect(document.querySelector(".mask-editor-blur-controls").hidden).toBe(true);
   });
@@ -359,6 +370,127 @@ describe("setupMaskEditor", () => {
     expect(document.querySelector(".mask-editor-brush-falloff-value").textContent).toBe(
       "25%",
     );
+  });
+
+  it("updates blur radius labels", () => {
+    renderMaskWorkspace();
+    stubCanvas();
+    setupMaskEditor(document, { imageFactory: fakeImageFactory });
+
+    const radius = document.querySelector(".mask-editor-blur-radius");
+    radius.value = "7.5";
+    radius.dispatchEvent(new Event("input", { bubbles: true }));
+
+    expect(document.querySelector(".mask-editor-blur-radius-value").textContent).toBe(
+      "7.5 px",
+    );
+  });
+
+  it("submits painted blur mask and radius without brush size", async () => {
+    renderMaskWorkspace();
+    stubCanvas();
+    const refreshGallery = vi.fn().mockResolvedValue(undefined);
+    const showMessage = vi.fn();
+    const fetcher = vi.fn().mockResolvedValue(
+      jsonResponse({
+        image: { filename: "source-blur-123.png" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetcher);
+    const editor = setupMaskEditor(document, {
+      csrfToken: "csrf-token",
+      imageFactory: largeFakeImageFactory,
+      refreshGallery,
+      showMessage,
+    });
+    editor.open(document.querySelector(".gallery-item"));
+    await new Promise((resolve) => queueMicrotask(resolve));
+    const operation = document.querySelector(".mask-editor-operation");
+    operation.value = "blur";
+    operation.dispatchEvent(new Event("change", { bubbles: true }));
+    const radius = document.querySelector(".mask-editor-blur-radius");
+    radius.value = "7.5";
+    radius.dispatchEvent(new Event("input", { bubbles: true }));
+    const canvas = document.querySelector(".mask-editor-mask");
+    setCanvasRect(canvas, {
+      height: 100,
+      left: 0,
+      top: 0,
+      width: 200,
+    });
+
+    canvas.dispatchEvent(pointer("pointerdown", 20, 20));
+    canvas.dispatchEvent(pointer("pointermove", 80, 80));
+    canvas.dispatchEvent(pointer("pointerup", 80, 80));
+    expect(document.querySelector(".mask-editor-blur").disabled).toBe(false);
+    document.querySelector(".mask-editor-blur").click();
+
+    await vi.waitFor(() => {
+      expect(fetcher).toHaveBeenCalledWith(
+        "/api/images/source.png/blur",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+    expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({
+      blur_radius: 7.5,
+      mask_png: "data:image/png;base64,mask",
+    });
+    await vi.waitFor(() => {
+      expect(refreshGallery).toHaveBeenCalled();
+      expect(showMessage).toHaveBeenCalledWith(
+        "source-blur-123.png blurred.",
+        "success",
+      );
+      expect(document.querySelector(".mask-editor-overlay").hidden).toBe(true);
+    });
+  });
+
+  it("reports blur errors and leaves the editor open", async () => {
+    renderMaskWorkspace();
+    stubCanvas();
+    const showMessage = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse(
+            { error: "Mask must mark at least one pixel." },
+            { status: 400 },
+          ),
+        ),
+    );
+    const editor = setupMaskEditor(document, {
+      csrfToken: "csrf-token",
+      imageFactory: largeFakeImageFactory,
+      showMessage,
+    });
+    editor.open(document.querySelector(".gallery-item"));
+    await new Promise((resolve) => queueMicrotask(resolve));
+    const operation = document.querySelector(".mask-editor-operation");
+    operation.value = "blur";
+    operation.dispatchEvent(new Event("change", { bubbles: true }));
+    const canvas = document.querySelector(".mask-editor-mask");
+    setCanvasRect(canvas, {
+      height: 100,
+      left: 0,
+      top: 0,
+      width: 200,
+    });
+    canvas.dispatchEvent(pointer("pointerdown", 20, 20));
+    canvas.dispatchEvent(pointer("pointermove", 80, 80));
+    canvas.dispatchEvent(pointer("pointerup", 80, 80));
+
+    document.querySelector(".mask-editor-blur").click();
+
+    await vi.waitFor(() => {
+      expect(showMessage).toHaveBeenCalledWith(
+        "Mask must mark at least one pixel.",
+        "error",
+      );
+    });
+    expect(document.querySelector(".mask-editor-overlay").hidden).toBe(false);
+    expect(document.querySelector(".mask-editor-blur").disabled).toBe(false);
   });
 
   it("saves mask data and refreshes the gallery", async () => {

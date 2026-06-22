@@ -17,8 +17,12 @@ export function setupMaskEditor(root = document, services = {}) {
   const cropControls = overlay?.querySelector(".mask-editor-crop-controls");
   const blurControls = overlay?.querySelector(".mask-editor-blur-controls");
   const cropButton = overlay?.querySelector(".mask-editor-crop");
+  const blurButton = overlay?.querySelector(".mask-editor-blur");
+  const blurRadiusInput = overlay?.querySelector(".mask-editor-blur-radius");
+  const blurRadiusValue = overlay?.querySelector(".mask-editor-blur-radius-value");
   const brushSizeInput = overlay?.querySelector(".mask-editor-brush-size");
   const brushFalloffInput = overlay?.querySelector(".mask-editor-brush-falloff");
+  const brushFalloffTool = overlay?.querySelector(".mask-editor-falloff-tool");
   const brushSizeValue = overlay?.querySelector(".mask-editor-brush-size-value");
   const brushFalloffValue = overlay?.querySelector(".mask-editor-brush-falloff-value");
   const invertButton = overlay?.querySelector(".mask-editor-invert");
@@ -30,6 +34,7 @@ export function setupMaskEditor(root = document, services = {}) {
   let isPainting = false;
   let brushSize = 48;
   let brushFalloff = 0.65;
+  let blurRadius = 0;
   let operation = "crop";
   let cropStart = null;
   let cropSelection = null;
@@ -55,6 +60,17 @@ export function setupMaskEditor(root = document, services = {}) {
     }
   }
 
+  function updateBlurControls() {
+    blurRadius = Math.min(
+      Math.max(numberFromInput(blurRadiusInput, blurRadius), 0),
+      20,
+    );
+    if (blurRadiusValue) {
+      blurRadiusValue.textContent = `${blurRadius.toFixed(1).replace(/\.0$/, "")} px`;
+    }
+    updateBlurButton();
+  }
+
   function updateOperationControls() {
     operation = operationInput?.value || "mask";
     if (!["crop", "blur", "mask"].includes(operation)) {
@@ -72,12 +88,20 @@ export function setupMaskEditor(root = document, services = {}) {
     if (blurControls) {
       blurControls.hidden = operation !== "blur";
     }
+    if (brushFalloffTool) {
+      brushFalloffTool.hidden = operation === "blur";
+    }
+    if (brushFalloffValue) {
+      brushFalloffValue.hidden = operation === "blur";
+    }
     if (invertButton) {
       invertButton.hidden = operation !== "mask";
     }
     if (saveButton) {
       saveButton.hidden = operation !== "mask";
     }
+    updateBlurButton();
+    redrawOverlay();
   }
 
   function resetOperation() {
@@ -98,6 +122,7 @@ export function setupMaskEditor(root = document, services = {}) {
   function open(figure) {
     const filename = figure?.dataset.filename;
     const imageUrl = figure?.querySelector("img")?.src;
+    const blurSaveUrl = figure?.dataset.blurSaveUrl;
     const cropSaveUrl = figure?.dataset.cropSaveUrl;
     const maskUrl = figure?.dataset.maskUrl;
     const maskSaveUrl = figure?.dataset.maskSaveUrl;
@@ -107,6 +132,7 @@ export function setupMaskEditor(root = document, services = {}) {
       !maskCanvas ||
       !filename ||
       !imageUrl ||
+      !blurSaveUrl ||
       !cropSaveUrl ||
       !maskUrl ||
       !maskSaveUrl
@@ -115,6 +141,7 @@ export function setupMaskEditor(root = document, services = {}) {
     }
     overlay.dataset.filename = filename;
     overlay.dataset.imageUrl = imageUrl;
+    overlay.dataset.blurSaveUrl = blurSaveUrl;
     overlay.dataset.cropSaveUrl = cropSaveUrl;
     overlay.dataset.maskUrl = maskUrl;
     overlay.dataset.maskSaveUrl = maskSaveUrl;
@@ -124,6 +151,7 @@ export function setupMaskEditor(root = document, services = {}) {
     resetCropSelection();
     resetOperation();
     updateBrushControls();
+    updateBlurControls();
     overlay.hidden = false;
     loadImage(imageUrl);
     closeButton?.focus();
@@ -136,6 +164,7 @@ export function setupMaskEditor(root = document, services = {}) {
     overlay.hidden = true;
     delete overlay.dataset.filename;
     delete overlay.dataset.imageUrl;
+    delete overlay.dataset.blurSaveUrl;
     delete overlay.dataset.cropSaveUrl;
     delete overlay.dataset.maskUrl;
     delete overlay.dataset.maskSaveUrl;
@@ -293,7 +322,8 @@ export function setupMaskEditor(root = document, services = {}) {
       return;
     }
     const radius = Math.max((brushSize * position.scale) / 2, 1);
-    const innerRadius = radius * (1 - brushFalloff);
+    const effectiveFalloff = operation === "blur" ? 0 : brushFalloff;
+    const innerRadius = radius * (1 - effectiveFalloff);
     const minX = Math.max(Math.floor(position.x - radius), 0);
     const maxX = Math.min(Math.ceil(position.x + radius), maskCanvas.width - 1);
     const minY = Math.max(Math.floor(position.y - radius), 0);
@@ -313,6 +343,7 @@ export function setupMaskEditor(root = document, services = {}) {
       }
     }
     redrawOverlay();
+    updateBlurButton();
   }
 
   function cropRectangle(start, end) {
@@ -338,6 +369,16 @@ export function setupMaskEditor(root = document, services = {}) {
   function updateCropControls() {
     if (cropButton) {
       cropButton.disabled = !isValidCropSelection();
+    }
+  }
+
+  function hasPaintedMask() {
+    return Boolean(maskData?.some((value) => value > 0));
+  }
+
+  function updateBlurButton() {
+    if (blurButton) {
+      blurButton.disabled = operation !== "blur" || !hasPaintedMask();
     }
   }
 
@@ -409,6 +450,37 @@ export function setupMaskEditor(root = document, services = {}) {
     } catch (error) {
       showMessage(error.message || "Image could not be cropped.", "error");
       updateCropControls();
+    }
+  }
+
+  async function blur() {
+    if (!overlay?.dataset.blurSaveUrl) {
+      showMessage("Blur URL is unavailable.", "error");
+      return;
+    }
+    if (!csrfToken) {
+      showMessage("Missing CSRF token.", "error");
+      return;
+    }
+    if (!hasPaintedMask()) {
+      return;
+    }
+    if (blurButton) {
+      blurButton.disabled = true;
+    }
+    showMessage("Blurring image.", "info");
+    try {
+      const data = await csrfJsonRequest(
+        overlay.dataset.blurSaveUrl,
+        { blur_radius: blurRadius, mask_png: pngDataUrl() },
+        { csrfToken, fallbackMessage: "Image could not be blurred." },
+      );
+      close();
+      await refreshGallery();
+      showMessage(`${data.image?.filename || "Image"} blurred.`, "success");
+    } catch (error) {
+      showMessage(error.message || "Image could not be blurred.", "error");
+      updateBlurButton();
     }
   }
 
@@ -530,10 +602,16 @@ export function setupMaskEditor(root = document, services = {}) {
   maskCanvas?.addEventListener("pointerleave", stopPainting);
   brushSizeInput?.addEventListener("input", updateBrushControls);
   brushFalloffInput?.addEventListener("input", updateBrushControls);
+  blurRadiusInput?.addEventListener("input", updateBlurControls);
   operationInput?.addEventListener("change", updateOperationControls);
   cropButton?.addEventListener("click", () => {
     crop().catch((error) => {
       showMessage(error.message || "Image could not be cropped.", "error");
+    });
+  });
+  blurButton?.addEventListener("click", () => {
+    blur().catch((error) => {
+      showMessage(error.message || "Image could not be blurred.", "error");
     });
   });
   invertButton?.addEventListener("click", invert);
@@ -549,6 +627,7 @@ export function setupMaskEditor(root = document, services = {}) {
   });
 
   updateBrushControls();
+  updateBlurControls();
   updateOperationControls();
 
   return {

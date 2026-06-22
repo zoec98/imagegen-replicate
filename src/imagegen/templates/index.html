@@ -199,6 +199,7 @@
             class="gallery-item image-card"
             data-filename="{{ image.filename }}"
             data-delete-url="{{ url_for('api_delete_image', filename=image.filename) }}"
+            data-blur-save-url="{{ url_for('api_blur_image', filename=image.filename) }}"
             data-crop-save-url="{{ url_for('api_crop_image', filename=image.filename) }}"
             data-mask-url="{{ image.mask_url }}"
             data-mask-save-url="{{ url_for('api_save_mask', filename=image.filename) }}"
@@ -330,7 +331,7 @@
               <input class="mask-editor-brush-size" type="range" min="8" max="160" step="1" value="48">
               <output class="mask-editor-brush-size-value">48 px</output>
             </label>
-            <label class="mask-editor-tool">
+            <label class="mask-editor-tool mask-editor-falloff-tool">
               <span>Falloff</span>
               <input class="mask-editor-brush-falloff" type="range" min="0" max="100" step="1" value="65">
               <output class="mask-editor-brush-falloff-value">65%</output>
@@ -340,6 +341,11 @@
             <button class="mask-editor-crop" type="button" disabled>Crop</button>
           </div>
           <div class="mask-editor-control-group mask-editor-blur-controls" hidden>
+            <label class="mask-editor-tool mask-editor-blur-radius-tool">
+              <span>Blur</span>
+              <input class="mask-editor-blur-radius" type="range" min="0" max="20" step="0.1" value="0">
+              <output class="mask-editor-blur-radius-value">0 px</output>
+            </label>
             <button class="mask-editor-blur" type="button" disabled>Blur</button>
           </div>
           <button class="mask-editor-invert" type="button">Invert mask</button>

@@ -261,6 +261,7 @@
 	function imageFigure(image) {
 		const figure = createElement("figure", { className: "gallery-item image-card" });
 		figure.dataset.filename = image.filename;
+		setDatasetValue(figure, "blurSaveUrl", image.blur_save_url);
 		setDatasetValue(figure, "cleanDownloadUrl", image.clean_download_url);
 		setDatasetValue(figure, "contentType", image.content_type);
 		setDatasetValue(figure, "cropSaveUrl", image.crop_save_url);
@@ -868,8 +869,12 @@
 		const cropControls = overlay?.querySelector(".mask-editor-crop-controls");
 		const blurControls = overlay?.querySelector(".mask-editor-blur-controls");
 		const cropButton = overlay?.querySelector(".mask-editor-crop");
+		const blurButton = overlay?.querySelector(".mask-editor-blur");
+		const blurRadiusInput = overlay?.querySelector(".mask-editor-blur-radius");
+		const blurRadiusValue = overlay?.querySelector(".mask-editor-blur-radius-value");
 		const brushSizeInput = overlay?.querySelector(".mask-editor-brush-size");
 		const brushFalloffInput = overlay?.querySelector(".mask-editor-brush-falloff");
+		const brushFalloffTool = overlay?.querySelector(".mask-editor-falloff-tool");
 		const brushSizeValue = overlay?.querySelector(".mask-editor-brush-size-value");
 		const brushFalloffValue = overlay?.querySelector(".mask-editor-brush-falloff-value");
 		const invertButton = overlay?.querySelector(".mask-editor-invert");
@@ -881,6 +886,7 @@
 		let isPainting = false;
 		let brushSize = 48;
 		let brushFalloff = .65;
+		let blurRadius = 0;
 		let operation = "crop";
 		let cropStart = null;
 		let cropSelection = null;
@@ -895,6 +901,11 @@
 			if (brushSizeValue) brushSizeValue.textContent = `${Math.round(brushSize)} px`;
 			if (brushFalloffValue) brushFalloffValue.textContent = `${Math.round(brushFalloff * 100)}%`;
 		}
+		function updateBlurControls() {
+			blurRadius = Math.min(Math.max(numberFromInput(blurRadiusInput, blurRadius), 0), 20);
+			if (blurRadiusValue) blurRadiusValue.textContent = `${blurRadius.toFixed(1).replace(/\.0$/, "")} px`;
+			updateBlurButton();
+		}
 		function updateOperationControls() {
 			operation = operationInput?.value || "mask";
 			if (![
@@ -906,8 +917,12 @@
 			if (brushControls) brushControls.hidden = operation === "crop";
 			if (cropControls) cropControls.hidden = operation !== "crop";
 			if (blurControls) blurControls.hidden = operation !== "blur";
+			if (brushFalloffTool) brushFalloffTool.hidden = operation === "blur";
+			if (brushFalloffValue) brushFalloffValue.hidden = operation === "blur";
 			if (invertButton) invertButton.hidden = operation !== "mask";
 			if (saveButton) saveButton.hidden = operation !== "mask";
+			updateBlurButton();
+			redrawOverlay();
 		}
 		function resetOperation() {
 			operation = "crop";
@@ -923,12 +938,14 @@
 		function open(figure) {
 			const filename = figure?.dataset.filename;
 			const imageUrl = figure?.querySelector("img")?.src;
+			const blurSaveUrl = figure?.dataset.blurSaveUrl;
 			const cropSaveUrl = figure?.dataset.cropSaveUrl;
 			const maskUrl = figure?.dataset.maskUrl;
 			const maskSaveUrl = figure?.dataset.maskSaveUrl;
-			if (!overlay || !sourceCanvas || !maskCanvas || !filename || !imageUrl || !cropSaveUrl || !maskUrl || !maskSaveUrl) return;
+			if (!overlay || !sourceCanvas || !maskCanvas || !filename || !imageUrl || !blurSaveUrl || !cropSaveUrl || !maskUrl || !maskSaveUrl) return;
 			overlay.dataset.filename = filename;
 			overlay.dataset.imageUrl = imageUrl;
+			overlay.dataset.blurSaveUrl = blurSaveUrl;
 			overlay.dataset.cropSaveUrl = cropSaveUrl;
 			overlay.dataset.maskUrl = maskUrl;
 			overlay.dataset.maskSaveUrl = maskSaveUrl;
@@ -936,6 +953,7 @@
 			resetCropSelection();
 			resetOperation();
 			updateBrushControls();
+			updateBlurControls();
 			overlay.hidden = false;
 			loadImage(imageUrl);
 			closeButton?.focus();
@@ -945,6 +963,7 @@
 			overlay.hidden = true;
 			delete overlay.dataset.filename;
 			delete overlay.dataset.imageUrl;
+			delete overlay.dataset.blurSaveUrl;
 			delete overlay.dataset.cropSaveUrl;
 			delete overlay.dataset.maskUrl;
 			delete overlay.dataset.maskSaveUrl;
@@ -1051,7 +1070,7 @@
 		function paintAt(position) {
 			if (!position || !maskCanvas || !maskData) return;
 			const radius = Math.max(brushSize * position.scale / 2, 1);
-			const innerRadius = radius * (1 - brushFalloff);
+			const innerRadius = radius * (1 - (operation === "blur" ? 0 : brushFalloff));
 			const minX = Math.max(Math.floor(position.x - radius), 0);
 			const maxX = Math.min(Math.ceil(position.x + radius), maskCanvas.width - 1);
 			const minY = Math.max(Math.floor(position.y - radius), 0);
@@ -1064,6 +1083,7 @@
 				maskData[index] = Math.max(maskData[index], intensity);
 			}
 			redrawOverlay();
+			updateBlurButton();
 		}
 		function cropRectangle(start, end) {
 			if (!start || !end) return null;
@@ -1083,6 +1103,12 @@
 		}
 		function updateCropControls() {
 			if (cropButton) cropButton.disabled = !isValidCropSelection();
+		}
+		function hasPaintedMask() {
+			return Boolean(maskData?.some((value) => value > 0));
+		}
+		function updateBlurButton() {
+			if (blurButton) blurButton.disabled = operation !== "blur" || !hasPaintedMask();
 		}
 		function startCrop(event) {
 			if (!maskCanvas || !sourceImage) return;
@@ -1134,6 +1160,34 @@
 			} catch (error) {
 				showMessage(error.message || "Image could not be cropped.", "error");
 				updateCropControls();
+			}
+		}
+		async function blur() {
+			if (!overlay?.dataset.blurSaveUrl) {
+				showMessage("Blur URL is unavailable.", "error");
+				return;
+			}
+			if (!csrfToken) {
+				showMessage("Missing CSRF token.", "error");
+				return;
+			}
+			if (!hasPaintedMask()) return;
+			if (blurButton) blurButton.disabled = true;
+			showMessage("Blurring image.", "info");
+			try {
+				const data = await csrfJsonRequest(overlay.dataset.blurSaveUrl, {
+					blur_radius: blurRadius,
+					mask_png: pngDataUrl()
+				}, {
+					csrfToken,
+					fallbackMessage: "Image could not be blurred."
+				});
+				close();
+				await refreshGallery();
+				showMessage(`${data.image?.filename || "Image"} blurred.`, "success");
+			} catch (error) {
+				showMessage(error.message || "Image could not be blurred.", "error");
+				updateBlurButton();
 			}
 		}
 		function invert() {
@@ -1227,10 +1281,16 @@
 		maskCanvas?.addEventListener("pointerleave", stopPainting);
 		brushSizeInput?.addEventListener("input", updateBrushControls);
 		brushFalloffInput?.addEventListener("input", updateBrushControls);
+		blurRadiusInput?.addEventListener("input", updateBlurControls);
 		operationInput?.addEventListener("change", updateOperationControls);
 		cropButton?.addEventListener("click", () => {
 			crop().catch((error) => {
 				showMessage(error.message || "Image could not be cropped.", "error");
+			});
+		});
+		blurButton?.addEventListener("click", () => {
+			blur().catch((error) => {
+				showMessage(error.message || "Image could not be blurred.", "error");
 			});
 		});
 		invertButton?.addEventListener("click", invert);
@@ -1243,6 +1303,7 @@
 			if (overlay && !overlay.hidden) redraw();
 		});
 		updateBrushControls();
+		updateBlurControls();
 		updateOperationControls();
 		return {
 			close,

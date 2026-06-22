@@ -309,6 +309,8 @@ regions and writes a new gallery image.
 
 ## Ticket 6: Add Frontend Blur Interaction
 
+Status: Complete.
+
 ### Goal
 
 Allow users to paint blur regions, select a Gaussian blur radius, and submit the
@@ -350,6 +352,20 @@ mask to the blur endpoint.
 - `uv run ruff check src tests`
 - Manual browser validation of blur painting, radius selection, save, and
   gallery refresh.
+
+### Implementation Notes
+
+- Added blur save URLs to server-rendered and API-rendered gallery image data.
+- Blur mode uses the existing red painted overlay and brush-size control.
+- Blur mode hides the falloff control and paints with fixed 0 percent falloff.
+- Added a blur radius slider from 0 to 20 px with floating-point step support.
+- Blur submissions send only `mask_png` and `blur_radius` to
+  `POST /api/images/<filename>/blur`; brush size is not sent.
+- Successful blur closes the editor, refreshes the gallery, and reports the
+  new image filename.
+- Blur errors leave the editor open and show the backend error.
+- Added jsdom tests for blur control visibility, radius labels, payload
+  assembly, success handling, and error handling.
 
 ## Ticket 7: Preserve Gallery Integration For Edited Images
 

@@ -286,6 +286,7 @@ def test_api_images_returns_gallery_json_newest_first(app_config, app_factory):
         "images": [
             {
                 "clean_download_url": "/images/newer.jpg/download-clean",
+                "blur_save_url": "/api/images/newer.jpg/blur",
                 "crop_save_url": "/api/images/newer.jpg/crop",
                 "delete_url": "/api/images/newer.jpg/delete",
                 "download_url": "/images/newer.jpg/download",
@@ -299,6 +300,7 @@ def test_api_images_returns_gallery_json_newest_first(app_config, app_factory):
             },
             {
                 "clean_download_url": "/images/older.png/download-clean",
+                "blur_save_url": "/api/images/older.png/blur",
                 "crop_save_url": "/api/images/older.png/crop",
                 "delete_url": "/api/images/older.png/delete",
                 "download_url": "/images/older.png/download",
@@ -392,6 +394,7 @@ def test_api_images_includes_embedded_metadata(app_config, app_factory):
         "images": [
             {
                 "clean_download_url": "/images/sample.png/download-clean",
+                "blur_save_url": "/api/images/sample.png/blur",
                 "crop_save_url": "/api/images/sample.png/crop",
                 "delete_url": "/api/images/sample.png/delete",
                 "download_url": "/images/sample.png/download",
@@ -430,6 +433,7 @@ def test_api_import_image_url_stores_http_image(app_config, app_factory):
     image = response.json["image"]
     assert image == {
         "clean_download_url": f"/images/{image['filename']}/download-clean",
+        "blur_save_url": f"/api/images/{image['filename']}/blur",
         "crop_save_url": f"/api/images/{image['filename']}/crop",
         "delete_url": f"/api/images/{image['filename']}/delete",
         "download_url": f"/images/{image['filename']}/download",
@@ -1198,6 +1202,7 @@ def test_api_crop_image_writes_new_gallery_image(app_config, app_factory):
     image = response.json["image"]
     assert image == {
         "clean_download_url": f"/images/{image['filename']}/download-clean",
+        "blur_save_url": f"/api/images/{image['filename']}/blur",
         "crop_save_url": f"/api/images/{image['filename']}/crop",
         "delete_url": f"/api/images/{image['filename']}/delete",
         "download_url": f"/images/{image['filename']}/download",
@@ -1431,6 +1436,7 @@ def test_api_blur_image_writes_new_gallery_image(app_config, app_factory):
     image = response.json["image"]
     assert image == {
         "clean_download_url": f"/images/{image['filename']}/download-clean",
+        "blur_save_url": f"/api/images/{image['filename']}/blur",
         "crop_save_url": f"/api/images/{image['filename']}/crop",
         "delete_url": f"/api/images/{image['filename']}/delete",
         "download_url": f"/images/{image['filename']}/download",

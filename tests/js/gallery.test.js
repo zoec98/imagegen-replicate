@@ -18,6 +18,7 @@ function renderGalleryWorkspace() {
 
 function imageFixture(overrides = {}) {
   return {
+    blur_save_url: "/api/images/example.png/blur",
     clean_download_url: "/downloads/clean/example.png",
     content_type: "image/png",
     crop_save_url: "/api/images/example.png/crop",
@@ -43,6 +44,7 @@ describe("setupGallery", () => {
 
     const figure = document.querySelector(".gallery-item");
     expect(figure.dataset.filename).toBe("example.png");
+    expect(figure.dataset.blurSaveUrl).toBe("/api/images/example.png/blur");
     expect(figure.dataset.cropSaveUrl).toBe("/api/images/example.png/crop");
     expect(figure.dataset.metadataUrl).toBe("/api/images/example.png/metadata");
     expect(figure.querySelector("img").getAttribute("src")).toBe("/images/example.png");

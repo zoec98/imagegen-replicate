@@ -222,6 +222,7 @@ function imageFigure(image) {
     className: "gallery-item image-card",
   });
   figure.dataset.filename = image.filename;
+  setDatasetValue(figure, "blurSaveUrl", image.blur_save_url);
   setDatasetValue(figure, "cleanDownloadUrl", image.clean_download_url);
   setDatasetValue(figure, "contentType", image.content_type);
   setDatasetValue(figure, "cropSaveUrl", image.crop_save_url);
