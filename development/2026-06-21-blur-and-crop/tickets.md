@@ -75,6 +75,8 @@ before adding new endpoints.
 
 ## Ticket 2: Add Backend Crop Operation
 
+Status: Complete.
+
 ### Goal
 
 Add a server-side crop endpoint that creates a new gallery image from a
@@ -111,6 +113,19 @@ validated rectangle without modifying the source image.
 - Add failing tests before implementation.
 - `uv run pytest`
 - `uv run ruff check src tests`
+
+### Implementation Notes
+
+- Added `imagegen.image_edits.crop_image()` as the backend crop operation.
+- Added `POST /api/images/<path:filename>/crop` as a CSRF-protected JSON API.
+- Crop outputs use server-generated `source-crop-<uuid>` filenames and preserve
+  the source file extension.
+- Crop reads existing embedded application metadata and writes the exact same
+  metadata dictionary to the edited output when present.
+- Sources without embedded application metadata produce cropped outputs without
+  added operation metadata.
+- Added operation-level tests in `tests/test_image_edits.py`.
+- Added route-level tests in `tests/test_image_routes.py`.
 
 ## Ticket 3: Add Frontend Image Editor Mode Shell
 

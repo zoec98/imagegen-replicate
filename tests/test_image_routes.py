@@ -14,6 +14,7 @@ from dataclasses import replace
 from io import BytesIO
 
 import httpx
+import pytest
 from PIL import Image
 
 from imagegen.app import create_app
@@ -717,7 +718,9 @@ def test_api_import_uploaded_image_rejects_unsupported_image_format(app_factory)
     assert response.json == {"error": "Unsupported image format: GIF."}
 
 
-def test_api_import_uploaded_image_ignores_misleading_mime_type(app_config, app_factory):
+def test_api_import_uploaded_image_ignores_misleading_mime_type(
+    app_config, app_factory
+):
     client = app_factory().test_client()
     token = extract_csrf_token(client.get("/"))
 
@@ -1169,6 +1172,228 @@ def test_api_save_mask_writes_mask_png_next_to_source(app_config, app_factory):
         assert image.format == "PNG"
         assert image.size == (8, 8)
         assert image.mode == "L"
+
+
+def test_api_crop_image_writes_new_gallery_image(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (20, 20), (255, 0, 0)).save(source_path, "PNG")
+    original_bytes = source_path.read_bytes()
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/crop",
+        json={"rectangle": {"x": 2, "y": 3, "width": 10, "height": 11}},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 201
+    image = response.json["image"]
+    assert image == {
+        "clean_download_url": f"/images/{image['filename']}/download-clean",
+        "delete_url": f"/api/images/{image['filename']}/delete",
+        "download_url": f"/images/{image['filename']}/download",
+        "filename": image["filename"],
+        "mask_save_url": f"/api/images/{image['filename']}/mask",
+        "mask_url": f"/images/{image['filename'].removesuffix('.png')}-mask.png",
+        "url": f"/images/{image['filename']}",
+        "metadata_url": None,
+        "content_type": None,
+        "created_at": None,
+    }
+    assert image["filename"].startswith("sample-crop-")
+    assert image["filename"].endswith(".png")
+    assert source_path.read_bytes() == original_bytes
+    with Image.open(app_config.output_dir / image["filename"]) as cropped:
+        assert cropped.size == (10, 11)
+        assert cropped.getpixel((0, 0)) == (255, 0, 0)
+
+
+def test_api_crop_image_preserves_embedded_metadata(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (20, 20), (255, 0, 0)).save(source_path, "PNG")
+    metadata = {
+        "content_type": "image/png",
+        "created_at": "2026-06-22T12:00:00+00:00",
+        "provider": "manual",
+        "prompt": "existing metadata",
+    }
+    write_embedded_metadata(source_path, metadata)
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/crop",
+        json={"rectangle": {"x": 0, "y": 0, "width": 10, "height": 10}},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 201
+    cropped_path = app_config.output_dir / response.json["image"]["filename"]
+    assert read_embedded_metadata(cropped_path) == metadata
+    assert read_embedded_metadata(source_path) == metadata
+
+
+def test_api_crop_image_does_not_add_metadata_when_source_has_none(
+    app_config,
+    app_factory,
+):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (20, 20), (255, 0, 0)).save(source_path, "PNG")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/crop",
+        json={"rectangle": {"x": 0, "y": 0, "width": 10, "height": 10}},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 201
+    cropped_path = app_config.output_dir / response.json["image"]["filename"]
+    assert read_embedded_metadata(cropped_path) is None
+
+
+def test_api_crop_image_does_not_overwrite_collision(
+    app_config,
+    app_factory,
+    monkeypatch,
+):
+    class Token:
+        def __init__(self, value):
+            self.hex = value
+
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (20, 20), (255, 0, 0)).save(source_path, "PNG")
+    existing = app_config.output_dir / "sample-crop-collision.png"
+    existing.write_bytes(b"existing")
+    tokens = iter([Token("collision"), Token("unique")])
+    monkeypatch.setattr("imagegen.image_edits.uuid4", lambda: next(tokens))
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/crop",
+        json={"rectangle": {"x": 0, "y": 0, "width": 10, "height": 10}},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 201
+    assert response.json["image"]["filename"] == "sample-crop-unique.png"
+    assert existing.read_bytes() == b"existing"
+
+
+def test_api_crop_image_rejects_unsafe_source_filename(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (20, 20), (255, 0, 0)).save(source_path, "PNG")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/../sample.png/crop",
+        json={"rectangle": {"x": 0, "y": 0, "width": 10, "height": 10}},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 404
+    assert response.json == {"error": "Image not found."}
+    assert len(list(app_config.output_dir.glob("sample-crop-*.png"))) == 0
+
+
+def test_api_crop_image_rejects_missing_source_image(app_factory):
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/missing.png/crop",
+        json={"rectangle": {"x": 0, "y": 0, "width": 10, "height": 10}},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 404
+    assert response.json == {"error": "Image not found."}
+
+
+@pytest.mark.parametrize(
+    ("payload", "error"),
+    [
+        ({}, "Crop rectangle is required."),
+        (
+            {"rectangle": {"x": "0", "y": 0, "width": 10, "height": 10}},
+            "Crop rectangle x must be an integer.",
+        ),
+        (
+            {"rectangle": {"x": -1, "y": 0, "width": 10, "height": 10}},
+            "Crop rectangle must be inside the source image.",
+        ),
+        (
+            {"rectangle": {"x": 0, "y": 0, "width": 9, "height": 10}},
+            "Crop rectangle must be at least 10 by 10 pixels.",
+        ),
+        (
+            {"rectangle": {"x": 15, "y": 0, "width": 10, "height": 10}},
+            "Crop rectangle must be inside the source image.",
+        ),
+    ],
+)
+def test_api_crop_image_rejects_invalid_rectangle(
+    app_config,
+    app_factory,
+    payload,
+    error,
+):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (20, 20), (255, 0, 0)).save(source_path, "PNG")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/images/sample.png/crop",
+        json=payload,
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": error}
+    assert len(list(app_config.output_dir.glob("sample-crop-*.png"))) == 0
+
+
+def test_api_crop_image_requires_csrf(app_config, app_factory):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (20, 20), (255, 0, 0)).save(source_path, "PNG")
+    client = app_factory().test_client()
+    client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+
+    response = client.post(
+        "/api/images/sample.png/crop",
+        json={"rectangle": {"x": 0, "y": 0, "width": 10, "height": 10}},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 403
+    assert response.json == {"error": "Invalid CSRF token."}
+    assert len(list(app_config.output_dir.glob("sample-crop-*.png"))) == 0
 
 
 def test_api_save_mask_preserves_black_white_and_gray_pixels(

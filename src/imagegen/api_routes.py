@@ -36,6 +36,7 @@ from imagegen.image_imports import (
     import_image_from_url,
     store_imported_image,
 )
+from imagegen.image_edits import ImageEditError, crop_image
 from imagegen.mask_store import MaskPayloadError, save_mask_payload
 from imagegen.model_registry import (
     GenerationTarget,
@@ -442,6 +443,24 @@ def register_api_routes(app: Flask) -> None:
             ),
             201,
         )
+
+    @app.post("/api/images/<path:filename>/crop")
+    @require_api_csrf
+    def api_crop_image(filename: str):
+        app_config = app.config["IMAGEGEN_APP_CONFIG"]
+        try:
+            edited = crop_image(
+                request.get_json(silent=True) or {},
+                source_filename=filename,
+                output_dir=app_config.output_dir,
+            )
+        except ImageEditError as error:
+            return jsonify({"error": str(error)}), 400
+        except ValueError:
+            return jsonify({"error": "Image not found."}), 404
+
+        image = _gallery_image_by_filename(app, edited.path.name)
+        return jsonify({"image": _gallery_image_json(app, image)}), 201
 
     if app.config.get("IMAGEGEN_ENABLE_TEST_API"):
 
