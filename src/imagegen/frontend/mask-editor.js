@@ -12,6 +12,10 @@ export function setupMaskEditor(root = document, services = {}) {
   const wrap = overlay?.querySelector(".mask-editor-canvas-wrap");
   const sourceCanvas = overlay?.querySelector(".mask-editor-source");
   const maskCanvas = overlay?.querySelector(".mask-editor-mask");
+  const operationInput = overlay?.querySelector(".mask-editor-operation");
+  const brushControls = overlay?.querySelector(".mask-editor-brush-controls");
+  const cropControls = overlay?.querySelector(".mask-editor-crop-controls");
+  const blurControls = overlay?.querySelector(".mask-editor-blur-controls");
   const brushSizeInput = overlay?.querySelector(".mask-editor-brush-size");
   const brushFalloffInput = overlay?.querySelector(".mask-editor-brush-falloff");
   const brushSizeValue = overlay?.querySelector(".mask-editor-brush-size-value");
@@ -25,6 +29,7 @@ export function setupMaskEditor(root = document, services = {}) {
   let isPainting = false;
   let brushSize = 48;
   let brushFalloff = 0.65;
+  let operation = "mask";
 
   function numberFromInput(input, fallback) {
     const value = Number.parseFloat(input?.value || "");
@@ -44,6 +49,39 @@ export function setupMaskEditor(root = document, services = {}) {
     if (brushFalloffValue) {
       brushFalloffValue.textContent = `${Math.round(brushFalloff * 100)}%`;
     }
+  }
+
+  function updateOperationControls() {
+    operation = operationInput?.value || "mask";
+    if (!["crop", "blur", "mask"].includes(operation)) {
+      operation = "mask";
+    }
+    if (operationInput && operationInput.value !== operation) {
+      operationInput.value = operation;
+    }
+    if (brushControls) {
+      brushControls.hidden = operation === "crop";
+    }
+    if (cropControls) {
+      cropControls.hidden = operation !== "crop";
+    }
+    if (blurControls) {
+      blurControls.hidden = operation !== "blur";
+    }
+    if (invertButton) {
+      invertButton.hidden = operation !== "mask";
+    }
+    if (saveButton) {
+      saveButton.hidden = operation !== "mask";
+    }
+  }
+
+  function resetOperation() {
+    operation = "mask";
+    if (operationInput) {
+      operationInput.value = operation;
+    }
+    updateOperationControls();
   }
 
   function open(figure) {
@@ -69,6 +107,7 @@ export function setupMaskEditor(root = document, services = {}) {
     if (title) {
       title.textContent = filename;
     }
+    resetOperation();
     updateBrushControls();
     overlay.hidden = false;
     loadImage(imageUrl);
@@ -87,9 +126,10 @@ export function setupMaskEditor(root = document, services = {}) {
     sourceImage = null;
     maskData = null;
     isPainting = false;
+    resetOperation();
     resetCanvases();
     if (title) {
-      title.textContent = "Mask";
+      title.textContent = "Image editor";
     }
   }
 
@@ -337,6 +377,7 @@ export function setupMaskEditor(root = document, services = {}) {
   maskCanvas?.addEventListener("pointerleave", stopPainting);
   brushSizeInput?.addEventListener("input", updateBrushControls);
   brushFalloffInput?.addEventListener("input", updateBrushControls);
+  operationInput?.addEventListener("change", updateOperationControls);
   invertButton?.addEventListener("click", invert);
   saveButton?.addEventListener("click", () => {
     save().catch((error) => {
@@ -350,6 +391,7 @@ export function setupMaskEditor(root = document, services = {}) {
   });
 
   updateBrushControls();
+  updateOperationControls();
 
   return {
     close,
@@ -358,5 +400,6 @@ export function setupMaskEditor(root = document, services = {}) {
     redraw,
     save,
     updateBrushControls,
+    updateOperationControls,
   };
 }

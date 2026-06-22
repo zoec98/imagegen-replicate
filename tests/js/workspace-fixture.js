@@ -68,13 +68,26 @@ export function renderWorkspace({ modelRegistry = [], selectedProvider = "" } = 
       <div class="mask-editor-canvas-wrap"></div>
       <canvas class="mask-editor-source"></canvas>
       <canvas class="mask-editor-mask"></canvas>
-      <input class="mask-editor-brush-size" type="range" value="48">
-      <input class="mask-editor-brush-falloff" type="range" value="0.65">
-      <span class="mask-editor-brush-size-value"></span>
-      <span class="mask-editor-brush-falloff-value"></span>
+      <select class="mask-editor-operation">
+        <option value="crop">Crop</option>
+        <option value="blur">Blur</option>
+        <option value="mask" selected>Mask</option>
+      </select>
+      <div class="mask-editor-control-group mask-editor-brush-controls">
+        <input class="mask-editor-brush-size" type="range" value="48">
+        <input class="mask-editor-brush-falloff" type="range" value="0.65">
+        <span class="mask-editor-brush-size-value"></span>
+        <span class="mask-editor-brush-falloff-value"></span>
+      </div>
+      <div class="mask-editor-control-group mask-editor-crop-controls" hidden>
+        <button class="mask-editor-crop" type="button"></button>
+      </div>
+      <div class="mask-editor-control-group mask-editor-blur-controls" hidden>
+        <button class="mask-editor-blur" type="button"></button>
+      </div>
       <button class="mask-editor-invert" type="button"></button>
       <button class="mask-editor-save" type="button"></button>
-      <h2 id="mask-editor-title"></h2>
+      <h2 id="mask-editor-title">Image editor</h2>
       <button class="mask-editor-close" type="button"></button>
     </div>
   `;

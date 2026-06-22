@@ -46,7 +46,12 @@ describe("setupGallery", () => {
     expect(figure.querySelector("img").getAttribute("src")).toBe("/images/example.png");
     expect(figure.querySelector(".source-select")).toBeTruthy();
     expect(figure.querySelector(".gallery-load").disabled).toBe(false);
-    expect(figure.querySelector(".gallery-mask")).toBeTruthy();
+    expect(figure.querySelector(".gallery-mask").getAttribute("aria-label")).toBe(
+      "Edit image example.png",
+    );
+    expect(figure.querySelector(".gallery-mask").getAttribute("title")).toBe(
+      "Edit image",
+    );
     expect(figure.querySelector(".gallery-immich")).toBeTruthy();
     expect(figure.querySelector(".gallery-download").getAttribute("href")).toBe(
       "/downloads/example.png",

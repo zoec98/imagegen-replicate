@@ -400,7 +400,9 @@ def test_index_renders_upload_button_and_overlay_shell(app_factory):
     assert b'role="dialog"' in response.data
     assert b'aria-modal="true"' in response.data
     assert b'aria-labelledby="upload-title"' in response.data
-    assert b'aria-labelledby="upload-title"\n      data-api-import-url=' in response.data
+    assert (
+        b'aria-labelledby="upload-title"\n      data-api-import-url=' in response.data
+    )
     assert b'data-api-import-url="/api/images/import-url"' in response.data
     assert b'data-api-upload-url="/api/images/import-upload"' in response.data
     assert b'id="upload-title">Upload' in response.data
@@ -414,11 +416,11 @@ def test_index_renders_upload_button_and_overlay_shell(app_factory):
         response.data
     )
     assert b'class="upload-file-choose" type="button">Choose image' in response.data
-    assert b'image/*' in response.data
+    assert b"image/*" in response.data
     assert b'class="upload-status" aria-live="polite"' in response.data
     assert b'class="upload-immich-browser"' not in response.data
-    assert b'data-api-immich-assets-url' not in response.data
-    assert b'data-api-immich-import-url' not in response.data
+    assert b"data-api-immich-assets-url" not in response.data
+    assert b"data-api-immich-import-url" not in response.data
 
 
 def test_index_renders_upload_immich_browser_when_configured(
@@ -475,7 +477,7 @@ def test_index_hides_immich_upload_action_without_upload_album(
     assert b'data-immich-upload-url="/api/images/source.png/immich-upload"' not in (
         response.data
     )
-    assert b"class=\"gallery-action gallery-immich\"" not in response.data
+    assert b'class="gallery-action gallery-immich"' not in response.data
 
 
 def test_index_excludes_invalid_palette_fragments(app_config, app_factory):
@@ -564,12 +566,12 @@ def test_index_exposes_gallery_filenames_for_source_selection(app_config, app_fa
     assert b'class="gallery-action gallery-mask"' in response.data
     assert b'aria-label="Download source.png"' in response.data
     assert b'aria-label="Download clean source.png"' in response.data
-    assert b'aria-label="Create mask for source.png"' in response.data
+    assert b'aria-label="Edit image source.png"' in response.data
     assert b'aria-label="Select source.png as source image"' in response.data
     assert b'title="Load metadata"' in response.data
     assert b'title="Download with metadata"' in response.data
     assert b'title="Download without metadata"' in response.data
-    assert b'title="Create mask"' in response.data
+    assert b'title="Edit image"' in response.data
     assert b'title="Delete image"' in response.data
     assert b'class="image-type"' not in response.data
     assert b"gallery-immich" not in response.data

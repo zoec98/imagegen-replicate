@@ -285,7 +285,7 @@
 		if (image.immich_upload_url) immichButton = iconButton("gallery-immich", `Upload ${image.filename} to Immich`, "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 17h-4v-4H7l5-5 5 5h-3z", "Upload to Immich");
 		const downloadLink = iconLink("gallery-download", `Download ${image.filename}`, image.download_url, "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 12h3l-5 5-5-5h3V8h4z", null, "Download with metadata");
 		const cleanDownloadLink = iconLink("gallery-download-clean", `Download clean ${image.filename}`, image.clean_download_url, "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 12h3l-5 5-5-5h3V8h4z", "M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z", "Download without metadata");
-		const maskButton = iconButton("gallery-mask", `Create mask for ${image.filename}`, "M7 20c-1.7 0-3-1.3-3-3 0-1.1.6-2.1 1.5-2.6L15 4.9c.9-.9 2.3-.9 3.2 0l.9.9c.9.9.9 2.3 0 3.2l-9.5 9.5C9.1 19.4 8.1 20 7 20zm1.2-3.1 8.8-8.8-1.1-1.1-8.8 8.8c-.4.4-.4.9 0 1.2.3.3.8.3 1.1-.1z", "Create mask");
+		const maskButton = iconButton("gallery-mask", `Edit image ${image.filename}`, "M7 20c-1.7 0-3-1.3-3-3 0-1.1.6-2.1 1.5-2.6L15 4.9c.9-.9 2.3-.9 3.2 0l.9.9c.9.9.9 2.3 0 3.2l-9.5 9.5C9.1 19.4 8.1 20 7 20zm1.2-3.1 8.8-8.8-1.1-1.1-8.8 8.8c-.4.4-.4.9 0 1.2.3.3.8.3 1.1-.1z", "Edit image");
 		const loadButton = iconButton("gallery-load", `Load metadata from ${image.filename}`, "M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2h6.5A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z", "Load metadata");
 		loadButton.disabled = !image.metadata_url;
 		const deleteButton = iconButton("gallery-delete", `Delete ${image.filename}`, "M9 3h6l1 2h4v2H4V5h4zm-3 6h12l-.7 11H6.7z", "Delete image");
@@ -862,6 +862,10 @@
 		const wrap = overlay?.querySelector(".mask-editor-canvas-wrap");
 		const sourceCanvas = overlay?.querySelector(".mask-editor-source");
 		const maskCanvas = overlay?.querySelector(".mask-editor-mask");
+		const operationInput = overlay?.querySelector(".mask-editor-operation");
+		const brushControls = overlay?.querySelector(".mask-editor-brush-controls");
+		const cropControls = overlay?.querySelector(".mask-editor-crop-controls");
+		const blurControls = overlay?.querySelector(".mask-editor-blur-controls");
 		const brushSizeInput = overlay?.querySelector(".mask-editor-brush-size");
 		const brushFalloffInput = overlay?.querySelector(".mask-editor-brush-falloff");
 		const brushSizeValue = overlay?.querySelector(".mask-editor-brush-size-value");
@@ -875,6 +879,7 @@
 		let isPainting = false;
 		let brushSize = 48;
 		let brushFalloff = .65;
+		let operation = "mask";
 		function numberFromInput(input, fallback) {
 			const value = Number.parseFloat(input?.value || "");
 			return Number.isFinite(value) ? value : fallback;
@@ -884,6 +889,25 @@
 			brushFalloff = Math.min(Math.max(numberFromInput(brushFalloffInput, brushFalloff * 100), 0), 100) / 100;
 			if (brushSizeValue) brushSizeValue.textContent = `${Math.round(brushSize)} px`;
 			if (brushFalloffValue) brushFalloffValue.textContent = `${Math.round(brushFalloff * 100)}%`;
+		}
+		function updateOperationControls() {
+			operation = operationInput?.value || "mask";
+			if (![
+				"crop",
+				"blur",
+				"mask"
+			].includes(operation)) operation = "mask";
+			if (operationInput && operationInput.value !== operation) operationInput.value = operation;
+			if (brushControls) brushControls.hidden = operation === "crop";
+			if (cropControls) cropControls.hidden = operation !== "crop";
+			if (blurControls) blurControls.hidden = operation !== "blur";
+			if (invertButton) invertButton.hidden = operation !== "mask";
+			if (saveButton) saveButton.hidden = operation !== "mask";
+		}
+		function resetOperation() {
+			operation = "mask";
+			if (operationInput) operationInput.value = operation;
+			updateOperationControls();
 		}
 		function open(figure) {
 			const filename = figure?.dataset.filename;
@@ -896,6 +920,7 @@
 			overlay.dataset.maskUrl = maskUrl;
 			overlay.dataset.maskSaveUrl = maskSaveUrl;
 			if (title) title.textContent = filename;
+			resetOperation();
 			updateBrushControls();
 			overlay.hidden = false;
 			loadImage(imageUrl);
@@ -911,8 +936,9 @@
 			sourceImage = null;
 			maskData = null;
 			isPainting = false;
+			resetOperation();
 			resetCanvases();
-			if (title) title.textContent = "Mask";
+			if (title) title.textContent = "Image editor";
 		}
 		function loadImage(imageUrl) {
 			const image = imageFactory();
@@ -1088,6 +1114,7 @@
 		maskCanvas?.addEventListener("pointerleave", stopPainting);
 		brushSizeInput?.addEventListener("input", updateBrushControls);
 		brushFalloffInput?.addEventListener("input", updateBrushControls);
+		operationInput?.addEventListener("change", updateOperationControls);
 		invertButton?.addEventListener("click", invert);
 		saveButton?.addEventListener("click", () => {
 			save().catch((error) => {
@@ -1098,13 +1125,15 @@
 			if (overlay && !overlay.hidden) redraw();
 		});
 		updateBrushControls();
+		updateOperationControls();
 		return {
 			close,
 			isOpen: () => Boolean(overlay && !overlay.hidden),
 			open,
 			redraw,
 			save,
-			updateBrushControls
+			updateBrushControls,
+			updateOperationControls
 		};
 	}
 	//#endregion

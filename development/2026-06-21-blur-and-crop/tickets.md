@@ -129,6 +129,8 @@ validated rectangle without modifying the source image.
 
 ## Ticket 3: Add Frontend Image Editor Mode Shell
 
+Status: Complete.
+
 ### Goal
 
 Convert the existing mask editor UI into a mode-aware image editor shell while
@@ -164,6 +166,21 @@ preserving current mask behavior.
 - `uv run pytest`
 - `uv run ruff check src tests`
 - Manual browser smoke test of opening, closing, and mask mode.
+
+### Implementation Notes
+
+- Kept the pencil icon but changed browser-facing labels/tooltips to
+  `Edit image`.
+- Added an operation selector with `Crop`, `Blur`, and `Mask` modes to the
+  editor controls.
+- Kept `Mask` as the default mode to preserve existing behavior.
+- Added mode-specific shell control groups for crop and blur without
+  implementing crop drawing or blur submission yet.
+- Mask mode still owns the existing brush size, falloff, invert, and save mask
+  controls.
+- Closing and reopening the editor resets transient mode state back to `Mask`.
+- Added jsdom tests for mode switching, control visibility, close reset, and
+  dynamic gallery labels.
 
 ## Ticket 4: Add Frontend Crop Interaction
 

@@ -266,8 +266,8 @@
               <button
                 class="gallery-action gallery-mask"
                 type="button"
-                aria-label="Create mask for {{ image.filename }}"
-                title="Create mask"
+                aria-label="Edit image {{ image.filename }}"
+                title="Edit image"
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24">
                   <path d="M7 20c-1.7 0-3-1.3-3-3 0-1.1.6-2.1 1.5-2.6L15 4.9c.9-.9 2.3-.9 3.2 0l.9.9c.9.9.9 2.3 0 3.2l-9.5 9.5C9.1 19.4 8.1 20 7 20zm1.2-3.1 8.8-8.8-1.1-1.1-8.8 8.8c-.4.4-.4.9 0 1.2.3.3.8.3 1.1-.1z"/>
@@ -307,24 +307,40 @@
     <div class="mask-editor-overlay" role="dialog" aria-modal="true" aria-labelledby="mask-editor-title" hidden>
       <div class="mask-editor">
         <div class="mask-editor-bar">
-          <h2 id="mask-editor-title">Mask</h2>
-          <button class="mask-editor-close" type="button" aria-label="Close mask editor" title="Close">
+          <h2 id="mask-editor-title">Image editor</h2>
+          <button class="mask-editor-close" type="button" aria-label="Close image editor" title="Close">
             <svg aria-hidden="true" viewBox="0 0 24 24">
               <path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4z"/>
             </svg>
           </button>
         </div>
-        <div class="mask-editor-tools" aria-label="Mask brush controls">
-          <label class="mask-editor-tool">
-            <span>Brush size</span>
-            <input class="mask-editor-brush-size" type="range" min="8" max="160" step="1" value="48">
-            <output class="mask-editor-brush-size-value">48 px</output>
+        <div class="mask-editor-tools" aria-label="Image editor controls">
+          <label class="mask-editor-tool mask-editor-operation-tool">
+            <span>Operation</span>
+            <select class="mask-editor-operation">
+              <option value="crop">Crop</option>
+              <option value="blur">Blur</option>
+              <option value="mask" selected>Mask</option>
+            </select>
           </label>
-          <label class="mask-editor-tool">
-            <span>Falloff</span>
-            <input class="mask-editor-brush-falloff" type="range" min="0" max="100" step="1" value="65">
-            <output class="mask-editor-brush-falloff-value">65%</output>
-          </label>
+          <div class="mask-editor-control-group mask-editor-brush-controls">
+            <label class="mask-editor-tool">
+              <span>Brush size</span>
+              <input class="mask-editor-brush-size" type="range" min="8" max="160" step="1" value="48">
+              <output class="mask-editor-brush-size-value">48 px</output>
+            </label>
+            <label class="mask-editor-tool">
+              <span>Falloff</span>
+              <input class="mask-editor-brush-falloff" type="range" min="0" max="100" step="1" value="65">
+              <output class="mask-editor-brush-falloff-value">65%</output>
+            </label>
+          </div>
+          <div class="mask-editor-control-group mask-editor-crop-controls" hidden>
+            <button class="mask-editor-crop" type="button" disabled>Crop</button>
+          </div>
+          <div class="mask-editor-control-group mask-editor-blur-controls" hidden>
+            <button class="mask-editor-blur" type="button" disabled>Blur</button>
+          </div>
           <button class="mask-editor-invert" type="button">Invert mask</button>
           <button class="mask-editor-save" type="button">Save mask</button>
         </div>
