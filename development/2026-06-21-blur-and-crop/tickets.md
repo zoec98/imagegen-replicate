@@ -27,6 +27,10 @@ Source stories: `development/2026-06-21-blur-and-crop/user-stories.md`.
 
 ## Ticket 1: Confirm Image Editing Boundaries
 
+Status: Complete.
+
+Result: `development/2026-06-21-blur-and-crop/boundary-audit.md`.
+
 ### Goal
 
 Identify the existing server-side boundaries that crop and blur should reuse
@@ -55,6 +59,19 @@ before adding new endpoints.
 - Documentation-only ticket unless helper extraction is required.
 - If code changes are required: `uv run pytest`
 - If code changes are required: `uv run ruff check src tests`
+
+### Implementation Notes
+
+- Reuse `imagegen.source_images.validate_source_image_filename()` and
+  `source_image_path()` for source image validation and path resolution.
+- Reuse `imagegen.security.require_api_csrf` for crop and blur JSON endpoints.
+- Reuse `api_routes._gallery_image_by_filename()` and
+  `api_routes._gallery_image_json()` for successful edited-image responses.
+- Add a new local edit helper module for crop/blur output writing; existing
+  provider download, import, trash, and mask writers do not exactly match the
+  metadata-preserving edited-image contract.
+- Extract reusable mask payload decoding from `mask_store.py` before blur so
+  blur can validate the same mask payload shape without writing a mask file.
 
 ## Ticket 2: Add Backend Crop Operation
 
