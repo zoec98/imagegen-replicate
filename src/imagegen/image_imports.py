@@ -116,7 +116,9 @@ def store_imported_image(
         raise ImageImportError(f"Unsupported image format: {image_format}.")
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    path = _write_collision_safe(image_bytes, output_dir=output_dir, extension=extension)
+    path = _write_collision_safe(
+        image_bytes, output_dir=output_dir, extension=extension
+    )
     return ImportedImage(
         path=path,
         content_type=FORMAT_CONTENT_TYPES[image_format],
@@ -132,7 +134,9 @@ def _validated_image_format(image_bytes: bytes) -> str:
     except (OSError, UnidentifiedImageError) as error:
         raise ImageImportError("Uploaded file is not a valid image.") from error
     if image_format not in FORMAT_EXTENSIONS:
-        raise ImageImportError(f"Unsupported image format: {image_format or 'unknown'}.")
+        raise ImageImportError(
+            f"Unsupported image format: {image_format or 'unknown'}."
+        )
     return image_format
 
 

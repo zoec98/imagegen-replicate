@@ -574,9 +574,7 @@ def test_api_import_immich_asset_returns_sanitized_download_failure(
     )
 
     assert response.status_code == 502
-    assert response.json == {
-        "error": "Immich asset download failed with status 404."
-    }
+    assert response.json == {"error": "Immich asset download failed with status 404."}
     assert "secret-key" not in response.get_data(as_text=True)
 
 

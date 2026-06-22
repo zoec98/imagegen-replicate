@@ -187,7 +187,8 @@ def _workspace_context(
         ],
         "app_config": app_config,
         "parameters": [
-            parameter for parameter in _target_parameters(selected_provider_model, target)
+            parameter
+            for parameter in _target_parameters(selected_provider_model, target)
         ],
         "prompt": "",
         "csrf_token": csrf_token,

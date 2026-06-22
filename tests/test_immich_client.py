@@ -99,7 +99,9 @@ def test_immich_client_raises_sanitized_upload_error(tmp_path):
         album_id="album-123",
     )
 
-    with pytest.raises(ImmichUploadError, match=r"key \[redacted\] cannot upload") as error:
+    with pytest.raises(
+        ImmichUploadError, match=r"key \[redacted\] cannot upload"
+    ) as error:
         client.upload_image(image_path, client=http_client)
     assert "test-key" not in str(error.value)
 
@@ -182,9 +184,7 @@ def test_immich_client_lists_first_gallery_page():
     assert str(calls[0].url) == "https://immich.example.test/api/search/metadata"
     assert calls[0].headers["x-api-key"] == "test-key"
     assert calls[0].read()
-    assert calls[0].content == (
-        b'{"page":1,"size":20,"type":"IMAGE","withExif":true}'
-    )
+    assert calls[0].content == (b'{"page":1,"size":20,"type":"IMAGE","withExif":true}')
 
 
 def test_immich_client_lists_subsequent_gallery_page():
@@ -198,8 +198,7 @@ def test_immich_client_lists_subsequent_gallery_page():
             json={
                 "assets": {
                     "items": [
-                        {"id": f"asset-{index}", "type": "IMAGE"}
-                        for index in range(20)
+                        {"id": f"asset-{index}", "type": "IMAGE"} for index in range(20)
                     ],
                     "total": 40,
                 }
@@ -258,7 +257,9 @@ def test_immich_client_raises_sanitized_gallery_api_error():
         album_id="album-123",
     )
 
-    with pytest.raises(ImmichGalleryError, match="Missing required permission: asset.read"):
+    with pytest.raises(
+        ImmichGalleryError, match="Missing required permission: asset.read"
+    ):
         client.list_main_gallery_assets(client=http_client)
 
 
@@ -320,7 +321,9 @@ def test_immich_client_raises_sanitized_asset_download_error():
         album_id="album-123",
     )
 
-    with pytest.raises(ImmichGalleryError, match=r"asset missing for key \[redacted\]") as error:
+    with pytest.raises(
+        ImmichGalleryError, match=r"asset missing for key \[redacted\]"
+    ) as error:
         client.download_asset("missing-asset", client=http_client)
     assert "test-key" not in str(error.value)
 
@@ -370,5 +373,7 @@ def test_immich_client_raises_sanitized_asset_thumbnail_error():
         album_id="album-123",
     )
 
-    with pytest.raises(ImmichGalleryError, match="Missing required permission: asset.view"):
+    with pytest.raises(
+        ImmichGalleryError, match="Missing required permission: asset.view"
+    ):
         client.download_thumbnail("asset-1", client=http_client)

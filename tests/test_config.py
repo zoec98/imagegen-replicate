@@ -267,8 +267,7 @@ def test_load_config_prefers_immich_upload_album_id_over_legacy_name(
     monkeypatch.delenv("IMMICH_UPLOAD_ALBUM_ID", raising=False)
     env_path = tmp_path / ".env"
     env_path.write_text(
-        "IMMICH_GALLERY_ID=legacy-album\n"
-        "IMMICH_UPLOAD_ALBUM_ID=upload-album\n",
+        "IMMICH_GALLERY_ID=legacy-album\nIMMICH_UPLOAD_ALBUM_ID=upload-album\n",
         encoding="utf-8",
     )
 

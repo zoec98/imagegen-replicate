@@ -1141,6 +1141,27 @@ def grayscale_png_payload(pixels, size):
     return f"data:image/png;base64,{encoded}"
 
 
+def crop_image_via_api(client, token, filename="sample.png"):
+    return client.post(
+        f"/api/images/{filename}/crop",
+        json={"rectangle": {"x": 0, "y": 0, "width": 10, "height": 10}},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+
+def blur_image_via_api(client, token, filename="sample.png"):
+    return client.post(
+        f"/api/images/{filename}/blur",
+        json={
+            "blur_radius": 2,
+            "mask_png": grayscale_png_payload([255] + [0] * 63, (8, 8)),
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+
 def mask_limit_values(size):
     width, height = size
     decoded = (
@@ -1511,6 +1532,176 @@ def test_api_blur_image_does_not_add_metadata_when_source_has_none(
     assert response.status_code == 201
     blurred_path = app_config.output_dir / response.json["image"]["filename"]
     assert read_embedded_metadata(blurred_path) is None
+
+
+def test_cropped_image_uses_normal_gallery_metadata_download_and_trash_workflows(
+    app_config,
+    app_factory,
+):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (20, 20), (255, 0, 0)).save(source_path, "PNG")
+    metadata = {
+        "content_type": "image/png",
+        "created_at": "2026-06-22T12:00:00+00:00",
+        "model_alias": "seedream45",
+        "model": "bytedance/seedream-4.5",
+        "prompt": "existing metadata",
+        "parameters": {"size": "2K"},
+    }
+    write_embedded_metadata(source_path, metadata)
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    crop_response = crop_image_via_api(client, token)
+
+    assert crop_response.status_code == 201
+    filename = crop_response.json["image"]["filename"]
+    image_path = app_config.output_dir / filename
+    assert image_path.is_file()
+    gallery_response = client.get("/api/images")
+    gallery_image = next(
+        image
+        for image in gallery_response.json["images"]
+        if image["filename"] == filename
+    )
+    assert gallery_image["metadata_url"] == f"/images/{filename}/metadata"
+    assert gallery_image["clean_download_url"] == f"/images/{filename}/download-clean"
+    assert gallery_image["delete_url"] == f"/api/images/{filename}/delete"
+    assert gallery_image["content_type"] == "image/png"
+    assert gallery_image["created_at"] == "2026-06-22T12:00:00+00:00"
+
+    metadata_response = client.get(f"/images/{filename}/metadata")
+    clean_response = client.get(f"/images/{filename}/download-clean")
+    clean_path = app_config.tmp_dir / "cropped-clean.png"
+    clean_path.write_bytes(clean_response.data)
+
+    assert metadata_response.status_code == 200
+    assert metadata_response.json == {
+        **metadata,
+        "provider": "replicate",
+        "edit_mode": False,
+    }
+    assert clean_response.status_code == 200
+    assert read_embedded_metadata(clean_path) is None
+    assert read_embedded_metadata(image_path) == metadata
+
+    delete_response = client.post(
+        f"/api/images/{filename}/delete",
+        json={},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+    restore_response = client.post(
+        f"/api/trash/{filename}/restore",
+        json={},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert delete_response.status_code == 200
+    assert delete_response.json == {"deleted": filename}
+    assert restore_response.status_code == 200
+    assert restore_response.json["filename"] == filename
+    assert (app_config.output_dir / filename).is_file()
+    assert not (app_config.trash_dir / filename).exists()
+
+
+def test_blurred_image_appears_in_gallery_and_can_be_reused_as_source_image(
+    app_config,
+    app_factory,
+):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8), (255, 0, 0)).save(source_path, "PNG")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    blur_response = blur_image_via_api(client, token)
+
+    assert blur_response.status_code == 201
+    filename = blur_response.json["image"]["filename"]
+    gallery_response = client.get("/api/images")
+    assert any(
+        image["filename"] == filename for image in gallery_response.json["images"]
+    )
+
+    generate_response = client.post(
+        "/api/generate",
+        json={
+            "prompt": "edit this",
+            "edit_mode": True,
+            "source_images": [filename],
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert generate_response.status_code == 202
+    assert generate_response.json["source_images"] == [filename]
+    request_log = client.application.config[
+        "IMAGEGEN_GENERATION_LOG"
+    ].get_logged_request(generate_response.json["request_id"])
+    assert request_log is not None
+    assert request_log.source_images == [filename]
+    assert request_log.request_sent["image_input"] == [filename]
+
+
+@pytest.mark.parametrize(
+    ("endpoint", "payload", "prefix"),
+    [
+        (
+            "crop",
+            {
+                "filename": "client-chosen.png",
+                "rectangle": {"x": 0, "y": 0, "width": 10, "height": 10},
+            },
+            "sample-crop-",
+        ),
+        (
+            "blur",
+            {
+                "filename": "client-chosen.png",
+                "blur_radius": 2,
+                "mask_png": grayscale_png_payload([255] + [0] * 63, (8, 8)),
+            },
+            "sample-blur-",
+        ),
+    ],
+)
+def test_edited_image_outputs_ignore_browser_submitted_filenames(
+    app_config,
+    app_factory,
+    endpoint,
+    payload,
+    prefix,
+):
+    source_path = app_config.output_dir / "sample.png"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    if endpoint == "crop":
+        Image.new("RGB", (20, 20), (255, 0, 0)).save(source_path, "PNG")
+    else:
+        Image.new("RGB", (8, 8), (255, 0, 0)).save(source_path, "PNG")
+    client = app_factory().test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        f"/api/images/sample.png/{endpoint}",
+        json=payload,
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 201
+    filename = response.json["image"]["filename"]
+    assert filename.startswith(prefix)
+    assert filename.endswith(".png")
+    assert filename != "client-chosen.png"
+    assert not (app_config.output_dir / "client-chosen.png").exists()
+    assert (app_config.output_dir / filename).is_file()
 
 
 def test_api_blur_image_rejects_unsafe_source_filename(app_config, app_factory):

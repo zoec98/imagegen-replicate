@@ -369,6 +369,8 @@ mask to the blur endpoint.
 
 ## Ticket 7: Preserve Gallery Integration For Edited Images
 
+Status: Complete.
+
 ### Goal
 
 Ensure crop and blur outputs behave like normal generated gallery images across
@@ -405,6 +407,22 @@ existing gallery workflows.
 - `uv run ruff check src tests`
 - Manual browser validation of gallery integration for one crop output and one
   blur output.
+
+### Implementation Notes
+
+- No production gallery special-casing was needed; crop and blur outputs already
+  use the same generated filename, output directory, gallery listing, metadata,
+  download, delete, trash, restore, and source-image validation boundaries as
+  normal gallery images.
+- Added route integration coverage proving cropped outputs appear in `/api/images`
+  with metadata, support metadata inspection, support clean download without
+  stripping metadata from the stored gallery file, and can be deleted and
+  restored through the existing trash workflow.
+- Added route integration coverage proving blurred outputs appear in the gallery
+  and can be reused as edit-mode source images in `/api/generate`.
+- Added route coverage proving crop and blur ignore browser-submitted output
+  filenames and use server-generated safe names.
+- Manual browser validation remains in Ticket 8.
 
 ## Ticket 8: Manual Browser Validation And Epic Closeout
 

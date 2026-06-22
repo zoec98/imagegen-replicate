@@ -114,7 +114,11 @@ class ImmichClient:
                 )
             payload = _json_response(response)
             assets, total = self._gallery_assets(payload)
-            next_page = page + 1 if _has_next_page(page, page_size, len(assets), total) else None
+            next_page = (
+                page + 1
+                if _has_next_page(page, page_size, len(assets), total)
+                else None
+            )
             previous_page = page - 1 if page > 1 else None
             return ImmichGalleryPage(
                 assets=assets,
@@ -267,7 +271,9 @@ class ImmichClient:
     def _api_url(self, path: str) -> str:
         return f"{self.base_url.rstrip('/')}{path}"
 
-    def _gallery_assets(self, payload: Any) -> tuple[list[ImmichGalleryAsset], int | None]:
+    def _gallery_assets(
+        self, payload: Any
+    ) -> tuple[list[ImmichGalleryAsset], int | None]:
         items, total = _search_items(payload)
         if items is None:
             raise ImmichGalleryError("Immich gallery response was malformed.")
@@ -286,7 +292,9 @@ class ImmichClient:
             raise ImmichGalleryError("Immich gallery response was malformed.")
 
         asset_type = item.get("type")
-        import_eligible = not isinstance(asset_type, str) or asset_type.upper() == "IMAGE"
+        import_eligible = (
+            not isinstance(asset_type, str) or asset_type.upper() == "IMAGE"
+        )
         if not import_eligible:
             return None
 
