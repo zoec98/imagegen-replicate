@@ -263,6 +263,7 @@
 		figure.dataset.filename = image.filename;
 		setDatasetValue(figure, "cleanDownloadUrl", image.clean_download_url);
 		setDatasetValue(figure, "contentType", image.content_type);
+		setDatasetValue(figure, "cropSaveUrl", image.crop_save_url);
 		setDatasetValue(figure, "createdAt", image.created_at);
 		setDatasetValue(figure, "deleteUrl", image.delete_url);
 		setDatasetValue(figure, "downloadUrl", image.download_url);
@@ -866,6 +867,7 @@
 		const brushControls = overlay?.querySelector(".mask-editor-brush-controls");
 		const cropControls = overlay?.querySelector(".mask-editor-crop-controls");
 		const blurControls = overlay?.querySelector(".mask-editor-blur-controls");
+		const cropButton = overlay?.querySelector(".mask-editor-crop");
 		const brushSizeInput = overlay?.querySelector(".mask-editor-brush-size");
 		const brushFalloffInput = overlay?.querySelector(".mask-editor-brush-falloff");
 		const brushSizeValue = overlay?.querySelector(".mask-editor-brush-size-value");
@@ -879,7 +881,10 @@
 		let isPainting = false;
 		let brushSize = 48;
 		let brushFalloff = .65;
-		let operation = "mask";
+		let operation = "crop";
+		let cropStart = null;
+		let cropSelection = null;
+		let isCropping = false;
 		function numberFromInput(input, fallback) {
 			const value = Number.parseFloat(input?.value || "");
 			return Number.isFinite(value) ? value : fallback;
@@ -905,21 +910,30 @@
 			if (saveButton) saveButton.hidden = operation !== "mask";
 		}
 		function resetOperation() {
-			operation = "mask";
+			operation = "crop";
 			if (operationInput) operationInput.value = operation;
 			updateOperationControls();
+		}
+		function resetCropSelection() {
+			cropStart = null;
+			cropSelection = null;
+			isCropping = false;
+			updateCropControls();
 		}
 		function open(figure) {
 			const filename = figure?.dataset.filename;
 			const imageUrl = figure?.querySelector("img")?.src;
+			const cropSaveUrl = figure?.dataset.cropSaveUrl;
 			const maskUrl = figure?.dataset.maskUrl;
 			const maskSaveUrl = figure?.dataset.maskSaveUrl;
-			if (!overlay || !sourceCanvas || !maskCanvas || !filename || !imageUrl || !maskUrl || !maskSaveUrl) return;
+			if (!overlay || !sourceCanvas || !maskCanvas || !filename || !imageUrl || !cropSaveUrl || !maskUrl || !maskSaveUrl) return;
 			overlay.dataset.filename = filename;
 			overlay.dataset.imageUrl = imageUrl;
+			overlay.dataset.cropSaveUrl = cropSaveUrl;
 			overlay.dataset.maskUrl = maskUrl;
 			overlay.dataset.maskSaveUrl = maskSaveUrl;
 			if (title) title.textContent = filename;
+			resetCropSelection();
 			resetOperation();
 			updateBrushControls();
 			overlay.hidden = false;
@@ -931,11 +945,13 @@
 			overlay.hidden = true;
 			delete overlay.dataset.filename;
 			delete overlay.dataset.imageUrl;
+			delete overlay.dataset.cropSaveUrl;
 			delete overlay.dataset.maskUrl;
 			delete overlay.dataset.maskSaveUrl;
 			sourceImage = null;
 			maskData = null;
 			isPainting = false;
+			resetCropSelection();
 			resetOperation();
 			resetCanvases();
 			if (title) title.textContent = "Image editor";
@@ -997,6 +1013,10 @@
 			if (!maskCanvas || !maskData) return;
 			const context = maskCanvas.getContext("2d");
 			if (!context) return;
+			if (operation === "crop") {
+				redrawCropOverlay(context);
+				return;
+			}
 			const imageData = context.createImageData(maskCanvas.width, maskCanvas.height);
 			for (let index = 0; index < maskData.length; index += 1) {
 				const alpha = Math.round(Math.min(maskData[index], 1) * 150);
@@ -1007,6 +1027,16 @@
 				imageData.data[offset + 3] = alpha;
 			}
 			context.putImageData(imageData, 0, 0);
+		}
+		function redrawCropOverlay(context) {
+			context.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+			if (!cropSelection) return;
+			context.fillStyle = "rgba(15, 23, 42, 0.48)";
+			context.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+			context.clearRect(cropSelection.x, cropSelection.y, cropSelection.width, cropSelection.height);
+			context.strokeStyle = "#ffffff";
+			context.lineWidth = Math.max(Math.round(maskCanvas.width / 300), 1);
+			context.strokeRect(cropSelection.x, cropSelection.y, cropSelection.width, cropSelection.height);
 		}
 		function pointerPosition(event) {
 			if (!maskCanvas) return null;
@@ -1034,6 +1064,77 @@
 				maskData[index] = Math.max(maskData[index], intensity);
 			}
 			redrawOverlay();
+		}
+		function cropRectangle(start, end) {
+			if (!start || !end) return null;
+			const minX = Math.max(Math.min(start.x, end.x), 0);
+			const minY = Math.max(Math.min(start.y, end.y), 0);
+			const maxX = Math.min(Math.max(start.x, end.x), maskCanvas.width);
+			const maxY = Math.min(Math.max(start.y, end.y), maskCanvas.height);
+			return {
+				height: Math.round(maxY - minY),
+				width: Math.round(maxX - minX),
+				x: Math.round(minX),
+				y: Math.round(minY)
+			};
+		}
+		function isValidCropSelection() {
+			return Boolean(cropSelection?.width >= 10 && cropSelection?.height >= 10);
+		}
+		function updateCropControls() {
+			if (cropButton) cropButton.disabled = !isValidCropSelection();
+		}
+		function startCrop(event) {
+			if (!maskCanvas || !sourceImage) return;
+			const position = pointerPosition(event);
+			if (!position) return;
+			event.preventDefault();
+			cropStart = position;
+			cropSelection = null;
+			isCropping = true;
+			maskCanvas.setPointerCapture?.(event.pointerId);
+			updateCropControls();
+			redrawOverlay();
+		}
+		function continueCrop(event) {
+			if (!isCropping || !cropStart) return;
+			const position = pointerPosition(event);
+			if (!position) return;
+			event.preventDefault();
+			cropSelection = cropRectangle(cropStart, position);
+			updateCropControls();
+			redrawOverlay();
+		}
+		function stopCrop(event) {
+			if (!isCropping) return;
+			isCropping = false;
+			maskCanvas?.releasePointerCapture?.(event.pointerId);
+			updateCropControls();
+		}
+		async function crop() {
+			if (!overlay?.dataset.cropSaveUrl) {
+				showMessage("Crop URL is unavailable.", "error");
+				return;
+			}
+			if (!csrfToken) {
+				showMessage("Missing CSRF token.", "error");
+				return;
+			}
+			if (!isValidCropSelection()) return;
+			if (cropButton) cropButton.disabled = true;
+			showMessage("Cropping image.", "info");
+			try {
+				const data = await csrfJsonRequest(overlay.dataset.cropSaveUrl, { rectangle: cropSelection }, {
+					csrfToken,
+					fallbackMessage: "Image could not be cropped."
+				});
+				close();
+				await refreshGallery();
+				showMessage(`${data.image?.filename || "Image"} cropped.`, "success");
+			} catch (error) {
+				showMessage(error.message || "Image could not be cropped.", "error");
+				updateCropControls();
+			}
 		}
 		function invert() {
 			if (!maskData) return;
@@ -1085,6 +1186,10 @@
 			}
 		}
 		function startPainting(event) {
+			if (operation === "crop") {
+				startCrop(event);
+				return;
+			}
 			if (!maskData || !maskCanvas) return;
 			event.preventDefault();
 			isPainting = true;
@@ -1092,11 +1197,19 @@
 			paintAt(pointerPosition(event));
 		}
 		function continuePainting(event) {
+			if (operation === "crop") {
+				continueCrop(event);
+				return;
+			}
 			if (!isPainting) return;
 			event.preventDefault();
 			paintAt(pointerPosition(event));
 		}
 		function stopPainting(event) {
+			if (operation === "crop") {
+				stopCrop(event);
+				return;
+			}
 			if (!isPainting) return;
 			isPainting = false;
 			maskCanvas?.releasePointerCapture?.(event.pointerId);
@@ -1115,6 +1228,11 @@
 		brushSizeInput?.addEventListener("input", updateBrushControls);
 		brushFalloffInput?.addEventListener("input", updateBrushControls);
 		operationInput?.addEventListener("change", updateOperationControls);
+		cropButton?.addEventListener("click", () => {
+			crop().catch((error) => {
+				showMessage(error.message || "Image could not be cropped.", "error");
+			});
+		});
 		invertButton?.addEventListener("click", invert);
 		saveButton?.addEventListener("click", () => {
 			save().catch((error) => {

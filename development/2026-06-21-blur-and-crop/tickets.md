@@ -173,16 +173,18 @@ preserving current mask behavior.
   `Edit image`.
 - Added an operation selector with `Crop`, `Blur`, and `Mask` modes to the
   editor controls.
-- Kept `Mask` as the default mode to preserve existing behavior.
+- Set `Crop` as the default mode per the ticket 3 addendum.
 - Added mode-specific shell control groups for crop and blur without
   implementing crop drawing or blur submission yet.
 - Mask mode still owns the existing brush size, falloff, invert, and save mask
   controls.
-- Closing and reopening the editor resets transient mode state back to `Mask`.
+- Closing and reopening the editor resets transient mode state back to `Crop`.
 - Added jsdom tests for mode switching, control visibility, close reset, and
   dynamic gallery labels.
 
 ## Ticket 4: Add Frontend Crop Interaction
+
+Status: Complete.
 
 ### Goal
 
@@ -222,6 +224,23 @@ to the crop endpoint.
 - `uv run pytest`
 - `uv run ruff check src tests`
 - Manual browser validation of crop drawing, dimming, save, and gallery refresh.
+
+### Implementation Notes
+
+- Added crop save URLs to server-rendered and API-rendered gallery image data.
+- Crop mode is now the default editor mode.
+- Crop mode uses rectangle pointer interaction on the editor overlay canvas.
+- The overlay canvas dims the non-selected region and outlines the crop
+  rectangle.
+- The crop action remains disabled until the natural-image crop rectangle is at
+  least 10 by 10 pixels.
+- Crop submissions send natural image coordinates to
+  `POST /api/images/<filename>/crop` through the existing CSRF JSON helper.
+- Successful crop closes the editor, refreshes the gallery, and reports the
+  new image filename.
+- Crop errors leave the editor open and show the backend error.
+- Added jsdom tests for crop control state, crop payload assembly, success
+  handling, and error handling.
 
 ## Ticket 5: Add Backend Blur Operation
 

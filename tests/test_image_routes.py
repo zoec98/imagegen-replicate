@@ -286,6 +286,7 @@ def test_api_images_returns_gallery_json_newest_first(app_config, app_factory):
         "images": [
             {
                 "clean_download_url": "/images/newer.jpg/download-clean",
+                "crop_save_url": "/api/images/newer.jpg/crop",
                 "delete_url": "/api/images/newer.jpg/delete",
                 "download_url": "/images/newer.jpg/download",
                 "filename": "newer.jpg",
@@ -298,6 +299,7 @@ def test_api_images_returns_gallery_json_newest_first(app_config, app_factory):
             },
             {
                 "clean_download_url": "/images/older.png/download-clean",
+                "crop_save_url": "/api/images/older.png/crop",
                 "delete_url": "/api/images/older.png/delete",
                 "download_url": "/images/older.png/download",
                 "filename": "older.png",
@@ -390,6 +392,7 @@ def test_api_images_includes_embedded_metadata(app_config, app_factory):
         "images": [
             {
                 "clean_download_url": "/images/sample.png/download-clean",
+                "crop_save_url": "/api/images/sample.png/crop",
                 "delete_url": "/api/images/sample.png/delete",
                 "download_url": "/images/sample.png/download",
                 "filename": "sample.png",
@@ -427,6 +430,7 @@ def test_api_import_image_url_stores_http_image(app_config, app_factory):
     image = response.json["image"]
     assert image == {
         "clean_download_url": f"/images/{image['filename']}/download-clean",
+        "crop_save_url": f"/api/images/{image['filename']}/crop",
         "delete_url": f"/api/images/{image['filename']}/delete",
         "download_url": f"/images/{image['filename']}/download",
         "filename": image["filename"],
@@ -1194,6 +1198,7 @@ def test_api_crop_image_writes_new_gallery_image(app_config, app_factory):
     image = response.json["image"]
     assert image == {
         "clean_download_url": f"/images/{image['filename']}/download-clean",
+        "crop_save_url": f"/api/images/{image['filename']}/crop",
         "delete_url": f"/api/images/{image['filename']}/delete",
         "download_url": f"/images/{image['filename']}/download",
         "filename": image["filename"],

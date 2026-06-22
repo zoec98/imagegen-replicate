@@ -20,6 +20,7 @@ function imageFixture(overrides = {}) {
   return {
     clean_download_url: "/downloads/clean/example.png",
     content_type: "image/png",
+    crop_save_url: "/api/images/example.png/crop",
     created_at: "2026-06-21T12:00:00Z",
     delete_url: "/api/images/example.png/delete",
     download_url: "/downloads/example.png",
@@ -42,6 +43,7 @@ describe("setupGallery", () => {
 
     const figure = document.querySelector(".gallery-item");
     expect(figure.dataset.filename).toBe("example.png");
+    expect(figure.dataset.cropSaveUrl).toBe("/api/images/example.png/crop");
     expect(figure.dataset.metadataUrl).toBe("/api/images/example.png/metadata");
     expect(figure.querySelector("img").getAttribute("src")).toBe("/images/example.png");
     expect(figure.querySelector(".source-select")).toBeTruthy();

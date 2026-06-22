@@ -224,6 +224,7 @@ function imageFigure(image) {
   figure.dataset.filename = image.filename;
   setDatasetValue(figure, "cleanDownloadUrl", image.clean_download_url);
   setDatasetValue(figure, "contentType", image.content_type);
+  setDatasetValue(figure, "cropSaveUrl", image.crop_save_url);
   setDatasetValue(figure, "createdAt", image.created_at);
   setDatasetValue(figure, "deleteUrl", image.delete_url);
   setDatasetValue(figure, "downloadUrl", image.download_url);

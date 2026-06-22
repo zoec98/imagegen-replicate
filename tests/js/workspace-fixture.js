@@ -69,9 +69,9 @@ export function renderWorkspace({ modelRegistry = [], selectedProvider = "" } = 
       <canvas class="mask-editor-source"></canvas>
       <canvas class="mask-editor-mask"></canvas>
       <select class="mask-editor-operation">
-        <option value="crop">Crop</option>
+        <option value="crop" selected>Crop</option>
         <option value="blur">Blur</option>
-        <option value="mask" selected>Mask</option>
+        <option value="mask">Mask</option>
       </select>
       <div class="mask-editor-control-group mask-editor-brush-controls">
         <input class="mask-editor-brush-size" type="range" value="48">

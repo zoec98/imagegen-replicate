@@ -684,6 +684,7 @@ def _gallery_image_json(app: Flask, image: GalleryImage) -> dict[str, str | None
         "filename": image.filename,
         "url": image.url,
         "mask_url": image.mask_url,
+        "crop_save_url": url_for("api_crop_image", filename=image.filename),
         "mask_save_url": url_for("api_save_mask", filename=image.filename),
         "download_url": url_for("image_download", filename=image.filename),
         "clean_download_url": url_for(

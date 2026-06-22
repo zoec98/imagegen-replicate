@@ -15,6 +15,7 @@ function renderMaskWorkspace() {
       <figure
         class="gallery-item"
         data-filename="source.png"
+        data-crop-save-url="/api/images/source.png/crop"
         data-mask-url="/images/source-mask.png"
         data-mask-save-url="/api/images/source-mask.png"
       >
@@ -38,7 +39,7 @@ function renderMaskWorkspace() {
         <span class="mask-editor-brush-falloff-value"></span>
       </div>
       <div class="mask-editor-control-group mask-editor-crop-controls" hidden>
-        <button class="mask-editor-crop" type="button"></button>
+        <button class="mask-editor-crop" type="button" disabled></button>
       </div>
       <div class="mask-editor-control-group mask-editor-blur-controls" hidden>
         <input class="mask-editor-blur-radius" type="range" value="0">
@@ -58,7 +59,9 @@ function stubCanvas() {
       data: new Uint8ClampedArray(width * height * 4),
     })),
     drawImage: vi.fn(),
+    fillRect: vi.fn(),
     putImageData: vi.fn(),
+    strokeRect: vi.fn(),
   };
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context);
   vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue(
@@ -81,6 +84,41 @@ function fakeImageFactory() {
   return image;
 }
 
+function largeFakeImageFactory() {
+  const image = {
+    naturalHeight: 50,
+    naturalWidth: 100,
+    onerror: null,
+    onload: null,
+    set src(value) {
+      this.currentSrc = value;
+      queueMicrotask(() => this.onload?.());
+    },
+  };
+  return image;
+}
+
+function setCanvasRect(canvas, rect) {
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue(rect);
+}
+
+function pointer(type, x, y) {
+  const EventConstructor = window.PointerEvent || window.Event;
+  const event = new EventConstructor(type, { bubbles: true });
+  Object.defineProperties(event, {
+    clientX: { value: x },
+    clientY: { value: y },
+    pointerId: { value: 1 },
+  });
+  return event;
+}
+
+function selectMaskMode() {
+  const operation = document.querySelector(".mask-editor-operation");
+  operation.value = "mask";
+  operation.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
 describe("setupMaskEditor", () => {
   it("opens and closes the image editor for a gallery image", () => {
     renderMaskWorkspace();
@@ -92,9 +130,10 @@ describe("setupMaskEditor", () => {
 
     expect(overlay.hidden).toBe(false);
     expect(overlay.dataset.filename).toBe("source.png");
+    expect(overlay.dataset.cropSaveUrl).toBe("/api/images/source.png/crop");
     expect(overlay.dataset.maskSaveUrl).toBe("/api/images/source-mask.png");
     expect(document.querySelector("#mask-editor-title").textContent).toBe("source.png");
-    expect(document.querySelector(".mask-editor-operation").value).toBe("mask");
+    expect(document.querySelector(".mask-editor-operation").value).toBe("crop");
 
     document.querySelector(".mask-editor-close").click();
 
@@ -118,16 +157,16 @@ describe("setupMaskEditor", () => {
       "blur",
       "mask",
     ]);
-    expect(document.querySelector(".mask-editor-brush-controls").hidden).toBe(false);
-    expect(document.querySelector(".mask-editor-crop-controls").hidden).toBe(true);
+    expect(document.querySelector(".mask-editor-brush-controls").hidden).toBe(true);
+    expect(document.querySelector(".mask-editor-crop-controls").hidden).toBe(false);
     expect(document.querySelector(".mask-editor-blur-controls").hidden).toBe(true);
 
-    operation.value = "crop";
+    operation.value = "mask";
     operation.dispatchEvent(new Event("change", { bubbles: true }));
 
     expect(overlay.hidden).toBe(false);
-    expect(document.querySelector(".mask-editor-brush-controls").hidden).toBe(true);
-    expect(document.querySelector(".mask-editor-crop-controls").hidden).toBe(false);
+    expect(document.querySelector(".mask-editor-brush-controls").hidden).toBe(false);
+    expect(document.querySelector(".mask-editor-crop-controls").hidden).toBe(true);
     expect(document.querySelector(".mask-editor-blur-controls").hidden).toBe(true);
 
     operation.value = "blur";
@@ -151,16 +190,155 @@ describe("setupMaskEditor", () => {
     const editor = setupMaskEditor(document, { imageFactory: fakeImageFactory });
     editor.open(document.querySelector(".gallery-item"));
     const operation = document.querySelector(".mask-editor-operation");
-    operation.value = "crop";
+    operation.value = "mask";
     operation.dispatchEvent(new Event("change", { bubbles: true }));
 
     document.querySelector(".mask-editor-close").click();
     editor.open(document.querySelector(".gallery-item"));
 
-    expect(operation.value).toBe("mask");
-    expect(document.querySelector(".mask-editor-brush-controls").hidden).toBe(false);
-    expect(document.querySelector(".mask-editor-crop-controls").hidden).toBe(true);
+    expect(operation.value).toBe("crop");
+    expect(document.querySelector(".mask-editor-brush-controls").hidden).toBe(true);
+    expect(document.querySelector(".mask-editor-crop-controls").hidden).toBe(false);
     expect(document.querySelector(".mask-editor-blur-controls").hidden).toBe(true);
+  });
+
+  it("draws a crop rectangle and enables crop when the selection is valid", async () => {
+    renderMaskWorkspace();
+    const context = stubCanvas();
+    const editor = setupMaskEditor(document, {
+      imageFactory: largeFakeImageFactory,
+    });
+    editor.open(document.querySelector(".gallery-item"));
+    await new Promise((resolve) => queueMicrotask(resolve));
+    const canvas = document.querySelector(".mask-editor-mask");
+    setCanvasRect(canvas, {
+      height: 100,
+      left: 20,
+      top: 10,
+      width: 200,
+    });
+
+    canvas.dispatchEvent(pointer("pointerdown", 40, 30));
+    canvas.dispatchEvent(pointer("pointermove", 100, 80));
+    canvas.dispatchEvent(pointer("pointerup", 100, 80));
+
+    expect(document.querySelector(".mask-editor-crop").disabled).toBe(false);
+    expect(context.fillRect).toHaveBeenCalledWith(0, 0, 100, 50);
+    expect(context.clearRect).toHaveBeenCalledWith(10, 10, 30, 25);
+    expect(context.strokeRect).toHaveBeenCalledWith(10, 10, 30, 25);
+  });
+
+  it("keeps crop disabled for too-small selections", async () => {
+    renderMaskWorkspace();
+    stubCanvas();
+    const editor = setupMaskEditor(document, {
+      imageFactory: largeFakeImageFactory,
+    });
+    editor.open(document.querySelector(".gallery-item"));
+    await new Promise((resolve) => queueMicrotask(resolve));
+    const canvas = document.querySelector(".mask-editor-mask");
+    setCanvasRect(canvas, {
+      height: 100,
+      left: 0,
+      top: 0,
+      width: 200,
+    });
+
+    canvas.dispatchEvent(pointer("pointerdown", 0, 0));
+    canvas.dispatchEvent(pointer("pointermove", 10, 10));
+    canvas.dispatchEvent(pointer("pointerup", 10, 10));
+
+    expect(document.querySelector(".mask-editor-crop").disabled).toBe(true);
+  });
+
+  it("submits natural image crop coordinates and refreshes the gallery", async () => {
+    renderMaskWorkspace();
+    stubCanvas();
+    const refreshGallery = vi.fn().mockResolvedValue(undefined);
+    const showMessage = vi.fn();
+    const fetcher = vi.fn().mockResolvedValue(
+      jsonResponse({
+        image: { filename: "source-crop-123.png" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetcher);
+    const editor = setupMaskEditor(document, {
+      csrfToken: "csrf-token",
+      imageFactory: largeFakeImageFactory,
+      refreshGallery,
+      showMessage,
+    });
+    editor.open(document.querySelector(".gallery-item"));
+    await new Promise((resolve) => queueMicrotask(resolve));
+    const canvas = document.querySelector(".mask-editor-mask");
+    setCanvasRect(canvas, {
+      height: 100,
+      left: 20,
+      top: 10,
+      width: 200,
+    });
+    canvas.dispatchEvent(pointer("pointerdown", 40, 30));
+    canvas.dispatchEvent(pointer("pointermove", 100, 80));
+    canvas.dispatchEvent(pointer("pointerup", 100, 80));
+
+    document.querySelector(".mask-editor-crop").click();
+
+    await vi.waitFor(() => {
+      expect(fetcher).toHaveBeenCalledWith(
+        "/api/images/source.png/crop",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+    expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({
+      rectangle: { height: 25, width: 30, x: 10, y: 10 },
+    });
+    await vi.waitFor(() => {
+      expect(refreshGallery).toHaveBeenCalled();
+      expect(showMessage).toHaveBeenCalledWith(
+        "source-crop-123.png cropped.",
+        "success",
+      );
+      expect(document.querySelector(".mask-editor-overlay").hidden).toBe(true);
+    });
+  });
+
+  it("reports crop errors and leaves the editor open", async () => {
+    renderMaskWorkspace();
+    stubCanvas();
+    const showMessage = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse({ error: "Crop rectangle is invalid." }, { status: 400 }),
+        ),
+    );
+    const editor = setupMaskEditor(document, {
+      csrfToken: "csrf-token",
+      imageFactory: largeFakeImageFactory,
+      showMessage,
+    });
+    editor.open(document.querySelector(".gallery-item"));
+    await new Promise((resolve) => queueMicrotask(resolve));
+    const canvas = document.querySelector(".mask-editor-mask");
+    setCanvasRect(canvas, {
+      height: 100,
+      left: 0,
+      top: 0,
+      width: 200,
+    });
+    canvas.dispatchEvent(pointer("pointerdown", 20, 20));
+    canvas.dispatchEvent(pointer("pointermove", 80, 80));
+    canvas.dispatchEvent(pointer("pointerup", 80, 80));
+
+    document.querySelector(".mask-editor-crop").click();
+
+    await vi.waitFor(() => {
+      expect(showMessage).toHaveBeenCalledWith("Crop rectangle is invalid.", "error");
+    });
+    expect(document.querySelector(".mask-editor-overlay").hidden).toBe(false);
+    expect(document.querySelector(".mask-editor-crop").disabled).toBe(false);
   });
 
   it("updates brush control labels", () => {
@@ -197,6 +375,7 @@ describe("setupMaskEditor", () => {
       showMessage,
     });
     editor.open(document.querySelector(".gallery-item"));
+    selectMaskMode();
     await new Promise((resolve) => queueMicrotask(resolve));
 
     document.querySelector(".mask-editor-save").click();
@@ -235,6 +414,7 @@ describe("setupMaskEditor", () => {
       imageFactory: fakeImageFactory,
     });
     editor.open(document.querySelector(".gallery-item"));
+    selectMaskMode();
     await new Promise((resolve) => queueMicrotask(resolve));
 
     const save = document.querySelector(".mask-editor-save");
@@ -265,6 +445,7 @@ describe("setupMaskEditor", () => {
       showMessage,
     });
     editor.open(document.querySelector(".gallery-item"));
+    selectMaskMode();
     await new Promise((resolve) => queueMicrotask(resolve));
 
     document.querySelector(".mask-editor-save").click();

@@ -199,6 +199,7 @@
             class="gallery-item image-card"
             data-filename="{{ image.filename }}"
             data-delete-url="{{ url_for('api_delete_image', filename=image.filename) }}"
+            data-crop-save-url="{{ url_for('api_crop_image', filename=image.filename) }}"
             data-mask-url="{{ image.mask_url }}"
             data-mask-save-url="{{ url_for('api_save_mask', filename=image.filename) }}"
             {% if immich_upload_enabled %}data-immich-upload-url="{{ url_for('api_immich_upload', filename=image.filename) }}"{% endif %}
@@ -318,9 +319,9 @@
           <label class="mask-editor-tool mask-editor-operation-tool">
             <span>Operation</span>
             <select class="mask-editor-operation">
-              <option value="crop">Crop</option>
+              <option value="crop" selected>Crop</option>
               <option value="blur">Blur</option>
-              <option value="mask" selected>Mask</option>
+              <option value="mask">Mask</option>
             </select>
           </label>
           <div class="mask-editor-control-group mask-editor-brush-controls">
