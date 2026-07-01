@@ -135,6 +135,10 @@ FALAI_FIXED_SAFE_IMAGE_INPUTS = {
     **FALAI_FIXED_IMAGE_OUTPUT_INPUTS,
     "enable_safety_checker": False,
 }
+FALAI_FIXED_SAFE_NO_PROMPT_EXPANSION_INPUTS = {
+    **FALAI_FIXED_SAFE_IMAGE_INPUTS,
+    "enable_prompt_expansion": False,
+}
 
 
 def _ernie_parameters(*, turbo: bool) -> tuple[ModelParameter, ...]:
@@ -146,18 +150,12 @@ def _ernie_parameters(*, turbo: bool) -> tuple[ModelParameter, ...]:
             order=1,
         ),
         _param(
-            "negative_prompt",
-            "Negative prompt to guide what should not be in the image.",
-            "string",
-            order=2,
-        ),
-        _param(
             "image_size",
             "The size of the generated image.",
             "select",
             "square_hd",
             choices=ERNIE_IMAGE_SIZE_CHOICES,
-            order=3,
+            order=2,
         ),
         _param(
             "num_inference_steps",
@@ -166,7 +164,7 @@ def _ernie_parameters(*, turbo: bool) -> tuple[ModelParameter, ...]:
             8 if turbo else 50,
             minimum=1,
             maximum=20 if turbo else 100,
-            order=4,
+            order=3,
         ),
         _param(
             "guidance_scale",
@@ -175,14 +173,14 @@ def _ernie_parameters(*, turbo: bool) -> tuple[ModelParameter, ...]:
             1 if turbo else 5,
             minimum=1,
             maximum=20,
-            order=5,
+            order=4,
         ),
         _param(
             "seed",
             "Random seed for reproducibility.",
             "integer",
             "",
-            order=6,
+            order=5,
             semantic_type="seed",
         ),
         _param(
@@ -192,14 +190,7 @@ def _ernie_parameters(*, turbo: bool) -> tuple[ModelParameter, ...]:
             1,
             minimum=1,
             maximum=4,
-            order=7,
-        ),
-        _param(
-            "enable_prompt_expansion",
-            "Enhance the prompt using an LLM for more detailed results.",
-            "boolean",
-            True,
-            order=8,
+            order=6,
         ),
         _param(
             "output_format",
@@ -232,7 +223,7 @@ def _seedream45_parameters() -> tuple[ModelParameter, ...]:
             "image_size",
             "The size of the generated image.",
             "select",
-            "auto_2K",
+            "portrait_4_3",
             choices=SEEDREAM45_IMAGE_SIZE_CHOICES,
             order=2,
         ),
@@ -368,7 +359,7 @@ def _nano_banana_2_parameters() -> tuple[ModelParameter, ...]:
             "output_format",
             "The format of the generated image.",
             "select",
-            "png",
+            "jpeg",
             choices=EXTENDED_OUTPUT_FORMAT_CHOICES,
             order=5,
         ),
@@ -376,7 +367,7 @@ def _nano_banana_2_parameters() -> tuple[ModelParameter, ...]:
             "safety_tolerance",
             "Safety tolerance level for content moderation.",
             "select",
-            "4",
+            "6",
             choices=SAFETY_TOLERANCE_6_CHOICES,
             order=6,
         ),
@@ -423,12 +414,6 @@ def _hidream_parameters(
             "The prompt to generate an image from.",
             "string",
             order=1,
-        ),
-        _param(
-            "negative_prompt",
-            "Negative prompt to guide details that should not appear in the image.",
-            "string",
-            order=2,
         ),
         _param(
             "image_size",
@@ -579,13 +564,6 @@ def _flux2_parameters(
             order=7,
         ),
         _param(
-            "enable_prompt_expansion",
-            "Expand the prompt for better results.",
-            "boolean",
-            False,
-            order=8,
-        ),
-        _param(
             "sync_mode",
             "Return media inline instead of storing it in request history.",
             "boolean",
@@ -596,7 +574,7 @@ def _flux2_parameters(
             "output_format",
             "The format of the generated image.",
             "select",
-            "png",
+            "jpeg",
             choices=EXTENDED_OUTPUT_FORMAT_CHOICES,
             order=11,
         ),
@@ -718,7 +696,7 @@ def _flux2_realism_parameters() -> tuple[ModelParameter, ...]:
             "output_format",
             "The format of the generated image.",
             "select",
-            "png",
+            "jpeg",
             choices=("png", "jpeg", "webp"),
             order=9,
         ),
@@ -801,7 +779,7 @@ def _z_image_parameters(
             "output_format",
             "The format of the generated image.",
             "select",
-            "png",
+            "jpeg",
             choices=EXTENDED_OUTPUT_FORMAT_CHOICES,
             order=8,
         ),
@@ -812,13 +790,6 @@ def _z_image_parameters(
             "regular",
             choices=("none", "regular", "high"),
             order=9,
-        ),
-        _param(
-            "enable_prompt_expansion",
-            "Expand the prompt for better results.",
-            "boolean",
-            False,
-            order=10,
         ),
     ]
     if include_strength:
@@ -891,7 +862,7 @@ def _gpt_image15_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
                 "output_format",
                 "Output format for the images.",
                 "select",
-                "png",
+                "jpeg",
                 choices=EXTENDED_OUTPUT_FORMAT_CHOICES,
                 order=8 if edit else 6,
             ),
@@ -943,7 +914,7 @@ def _gpt_image2_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
             "output_format",
             "Output format for the images.",
             "select",
-            "png",
+            "jpeg",
             choices=EXTENDED_OUTPUT_FORMAT_CHOICES,
             order=6 if edit else 5,
         ),
@@ -1000,13 +971,13 @@ def _bria_text_parameters() -> tuple[ModelParameter, ...]:
     return (
         _param("prompt", "Prompt for image generation.", "string", order=1),
         _param(
-            "structured_prompt",
-            "Structured prompt for image generation.",
-            "string",
+            "seed",
+            "Random seed for reproducibility.",
+            "integer",
+            "",
             order=2,
+            semantic_type="seed",
         ),
-        _param("image_url", "Reference image URL.", "string", order=3),
-        _param("seed", "Random seed for reproducibility.", "integer", 5555, order=4),
         _param(
             "steps_num",
             "Number of inference steps.",
@@ -1014,7 +985,7 @@ def _bria_text_parameters() -> tuple[ModelParameter, ...]:
             50,
             minimum=20,
             maximum=50,
-            order=5,
+            order=3,
         ),
         _param(
             "aspect_ratio",
@@ -1022,13 +993,7 @@ def _bria_text_parameters() -> tuple[ModelParameter, ...]:
             "select",
             "1:1",
             choices=BRIA_ASPECT_RATIO_CHOICES,
-            order=6,
-        ),
-        _param(
-            "negative_prompt",
-            "Negative prompt for image generation.",
-            "string",
-            order=7,
+            order=4,
         ),
         _param(
             "resolution",
@@ -1060,7 +1025,14 @@ def _bria_edit_parameters() -> tuple[ModelParameter, ...]:
         _param(
             "new_vgl", "New VGL describing the image after edit.", "string", order=6
         ),
-        _param("seed", "Random seed for reproducibility.", "integer", 5555, order=7),
+        _param(
+            "seed",
+            "Random seed for reproducibility.",
+            "integer",
+            "",
+            order=7,
+            semantic_type="seed",
+        ),
         _param(
             "steps_num",
             "Number of inference steps.",
@@ -1070,13 +1042,7 @@ def _bria_edit_parameters() -> tuple[ModelParameter, ...]:
             maximum=50,
             order=8,
         ),
-        _param(
-            "negative_prompt",
-            "Negative prompt for image generation.",
-            "string",
-            order=9,
-        ),
-        _param("guidance_scale", "Guidance scale for text.", "number", 5, order=10),
+        _param("guidance_scale", "Guidance scale for text.", "number", 5, order=9),
     )
 
 
@@ -1273,7 +1239,7 @@ FLUX_2 = ProviderModel(
         runtime_url="https://fal.run/fal-ai/flux-2",
         mode="text-to-image",
         parameters=_flux2_parameters(),
-        fixed_inputs=FALAI_FIXED_SAFE_IMAGE_INPUTS,
+        fixed_inputs=FALAI_FIXED_SAFE_NO_PROMPT_EXPANSION_INPUTS,
         pricing=(
             _falai_price("$0.00167", "per compute second", metric="compute_seconds"),
         ),
@@ -1287,7 +1253,7 @@ FLUX_2 = ProviderModel(
         runtime_url="https://fal.run/fal-ai/flux-2/edit",
         mode="image-edit",
         parameters=_flux2_parameters(),
-        fixed_inputs=FALAI_FIXED_SAFE_IMAGE_INPUTS,
+        fixed_inputs=FALAI_FIXED_SAFE_NO_PROMPT_EXPANSION_INPUTS,
         source_images=SourceImageBinding(provider_field="image_urls", max_count=4),
         pricing=(
             _falai_price("$0.00167", "per compute second", metric="compute_seconds"),
@@ -1376,7 +1342,7 @@ Z_IMAGE_TURBO = ProviderModel(
         runtime_url="https://fal.run/fal-ai/z-image/turbo",
         mode="text-to-image",
         parameters=_z_image_parameters(),
-        fixed_inputs=FALAI_FIXED_SAFE_IMAGE_INPUTS,
+        fixed_inputs=FALAI_FIXED_SAFE_NO_PROMPT_EXPANSION_INPUTS,
         pricing=(
             _falai_price(
                 "$0.005", "per output megapixel", metric="image_output_megapixel_count"
@@ -1396,7 +1362,7 @@ Z_IMAGE_TURBO = ProviderModel(
             image_size_choices=AUTO_IMAGE_SIZE_CHOICES,
             include_strength=True,
         ),
-        fixed_inputs=FALAI_FIXED_SAFE_IMAGE_INPUTS,
+        fixed_inputs=FALAI_FIXED_SAFE_NO_PROMPT_EXPANSION_INPUTS,
         source_images=SourceImageBinding(provider_field="image_url", max_count=1),
         pricing=(
             _falai_price(
@@ -1454,7 +1420,7 @@ SEEDREAM5 = ProviderModel(
         runtime_url="https://fal.run/fal-ai/bytedance/seedream/v5/lite/text-to-image",
         mode="text-to-image",
         parameters=_seedream_parameters(
-            image_size_default="auto_2K",
+            image_size_default="portrait_4_3",
             image_size_choices=SEEDREAM5_IMAGE_SIZE_CHOICES,
             include_seed=False,
         ),
@@ -1472,7 +1438,7 @@ SEEDREAM5 = ProviderModel(
         runtime_url="https://fal.run/fal-ai/bytedance/seedream/v5/lite/edit",
         mode="image-edit",
         parameters=_seedream_parameters(
-            image_size_default="auto_2K",
+            image_size_default="portrait_4_3",
             image_size_choices=SEEDREAM5_IMAGE_SIZE_CHOICES,
             include_seed=False,
         ),
@@ -1497,7 +1463,7 @@ SEEDREAM4 = ProviderModel(
         runtime_url="https://fal.run/fal-ai/bytedance/seedream/v4/text-to-image",
         mode="text-to-image",
         parameters=_seedream_parameters(
-            image_size_default="auto_2K",
+            image_size_default="portrait_4_3",
             image_size_choices=SEEDREAM4_IMAGE_SIZE_CHOICES,
             include_seed=True,
             include_enhance_prompt_mode=True,
@@ -1516,7 +1482,7 @@ SEEDREAM4 = ProviderModel(
         runtime_url="https://fal.run/fal-ai/bytedance/seedream/v4/edit",
         mode="image-edit",
         parameters=_seedream_parameters(
-            image_size_default="auto_2K",
+            image_size_default="portrait_4_3",
             image_size_choices=SEEDREAM4_IMAGE_SIZE_CHOICES,
             include_seed=True,
             include_enhance_prompt_mode=True,
