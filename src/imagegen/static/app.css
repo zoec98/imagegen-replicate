@@ -1216,6 +1216,19 @@ select {
   width: 0.62rem;
 }
 
+.gallery-info-active {
+  background: #172033;
+  border-color: #172033;
+  color: #ffffff;
+}
+
+.gallery-info-active:hover,
+.gallery-info-active:focus-visible {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+}
+
 .gallery-delete {
   color: #b00020;
   margin-left: auto;

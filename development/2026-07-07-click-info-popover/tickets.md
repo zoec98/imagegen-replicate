@@ -63,7 +63,7 @@ by the tooltip: filename, model, dimensions, and prompt.
 
 ## Ticket 2: Toggle And Active State
 
-Status: Planned.
+Status: Complete.
 
 ### User Story
 
@@ -95,6 +95,14 @@ active and the second click closes the box and removes the active state.
 
 - Add failing Vitest test before implementation.
 - `npm run js:check`
+
+### Implementation Notes
+
+- Added a repeated-click Vitest test for opening, active state, and closing.
+- Added `.gallery-info-active` to the active `(i)` button while its box is
+  open.
+- A second click on the same `(i)` now closes the information box and removes
+  the active state.
 
 ## Ticket 3: Only One Info Box Open
 

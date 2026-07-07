@@ -144,7 +144,14 @@ export function setupGallery(root = document, services = {}) {
     const infoButton = event.target.closest(".gallery-info");
     if (infoButton) {
       disarmDelete();
-      infoButton.closest(".image-info-wrap")?.classList.add("image-info-open");
+      const infoWrap = infoButton.closest(".image-info-wrap");
+      if (infoWrap?.classList.contains("image-info-open")) {
+        infoWrap.classList.remove("image-info-open");
+        infoButton.classList.remove("gallery-info-active");
+        return;
+      }
+      infoWrap?.classList.add("image-info-open");
+      infoButton.classList.add("gallery-info-active");
       metadata.refreshTooltip?.(infoButton.closest(".gallery-item"));
       return;
     }

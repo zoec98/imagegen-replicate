@@ -153,6 +153,26 @@ describe("setupGallery", () => {
     });
   });
 
+  it("toggles image information active state on repeated clicks", () => {
+    renderGalleryWorkspace();
+    const gallery = setupGallery(document, {
+      metadata: { refreshTooltip: vi.fn() },
+    });
+    gallery.render([imageFixture()]);
+    const infoButton = document.querySelector(".gallery-info");
+    const infoWrap = document.querySelector(".image-info-wrap");
+
+    infoButton.click();
+
+    expect(infoWrap.classList.contains("image-info-open")).toBe(true);
+    expect(infoButton.classList.contains("gallery-info-active")).toBe(true);
+
+    infoButton.click();
+
+    expect(infoWrap.classList.contains("image-info-open")).toBe(false);
+    expect(infoButton.classList.contains("gallery-info-active")).toBe(false);
+  });
+
   it("deletes an armed gallery image and refreshes the gallery", async () => {
     renderGalleryWorkspace();
     const showMessage = vi.fn();
