@@ -198,6 +198,27 @@ describe("setupGallery", () => {
     expect(infoButtons[1].classList.contains("gallery-info-active")).toBe(true);
   });
 
+  it("keeps image information text selectable without closing the box", () => {
+    renderGalleryWorkspace();
+    const gallery = setupGallery(document, {
+      metadata: { refreshTooltip: vi.fn() },
+    });
+    gallery.render([imageFixture()]);
+    const infoButton = document.querySelector(".gallery-info");
+
+    infoButton.click();
+    const tooltip = document.querySelector(".image-info-tooltip");
+    tooltip
+      .querySelector(".tooltip-line")
+      .dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    expect(tooltip.classList.contains("image-info-selectable")).toBe(true);
+    expect(tooltip.querySelector(".tooltip-line").textContent).toBe("example.png");
+    expect(
+      document.querySelector(".image-info-wrap").classList.contains("image-info-open"),
+    ).toBe(true);
+  });
+
   it("deletes an armed gallery image and refreshes the gallery", async () => {
     renderGalleryWorkspace();
     const showMessage = vi.fn();

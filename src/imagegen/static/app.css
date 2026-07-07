@@ -1313,6 +1313,11 @@ select {
   overflow-wrap: anywhere;
 }
 
+.image-info-selectable {
+  cursor: text;
+  user-select: text;
+}
+
 .tooltip-copy-prompt {
   align-items: center;
   background: rgb(255 255 255 / 10%);

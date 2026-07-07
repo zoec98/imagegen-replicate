@@ -371,7 +371,7 @@ function createInfoAction({ label, tooltipText }) {
   const tooltip = createElement("span", {
     attributes: { role: "tooltip" },
     children: [tooltipLine],
-    className: "image-info-tooltip",
+    className: "image-info-tooltip image-info-selectable",
   });
   infoWrap.append(infoButton, tooltip);
   return infoWrap;

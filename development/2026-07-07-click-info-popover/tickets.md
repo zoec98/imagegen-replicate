@@ -147,7 +147,7 @@ button.
 
 ## Ticket 4: Selectable Information Text
 
-Status: Planned.
+Status: Complete.
 
 ### User Story
 
@@ -180,6 +180,14 @@ with prompt selection.
 - Browser smoke test text selection in Safari or another browser where the
   hover bug reproduced.
 - `npm run js:check`
+
+### Implementation Notes
+
+- Added a Vitest test that verifies opened info text is marked selectable and
+  does not close during text interaction.
+- Added `image-info-selectable` to server-rendered, gallery-rendered, and
+  trash-rendered info boxes.
+- Added CSS for normal text selection and text cursor inside info boxes.
 
 ## Ticket 5: Remove Clipboard Copy Button
 

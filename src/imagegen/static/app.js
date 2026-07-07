@@ -346,7 +346,7 @@
 				className: "tooltip-line",
 				textContent: tooltipText
 			})],
-			className: "image-info-tooltip"
+			className: "image-info-tooltip image-info-selectable"
 		});
 		infoWrap.append(infoButton, tooltip);
 		return infoWrap;
@@ -1979,7 +1979,7 @@
 					className: "tooltip-line",
 					textContent: tooltipText
 				})],
-				className: "image-info-tooltip"
+				className: "image-info-tooltip image-info-selectable"
 			})],
 			className: "image-info-wrap"
 		});
