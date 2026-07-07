@@ -26,7 +26,6 @@ export default [
         document: "readonly",
         fetch: "readonly",
         globalThis: "readonly",
-        navigator: "readonly",
         queueMicrotask: "readonly",
         setTimeout: "readonly",
         window: "readonly",

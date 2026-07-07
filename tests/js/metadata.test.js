@@ -101,10 +101,8 @@ describe("setupMetadata", () => {
     });
   });
 
-  it("shows a copy prompt button in the tooltip when prompt is available", async () => {
+  it("does not show a copy prompt button when prompt is available", async () => {
     const figure = renderMetadataFigure();
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    globalThis.navigator = { clipboard: { writeText } };
     globalThis.fetch = vi.fn().mockResolvedValue(
       jsonResponse({
         model_alias: "flux",
@@ -115,12 +113,14 @@ describe("setupMetadata", () => {
 
     metadata.refreshTooltip(figure);
     await vi.waitFor(() => {
-      expect(figure.querySelector(".tooltip-copy-prompt")).not.toBeNull();
+      expect(
+        [...figure.querySelectorAll(".tooltip-line")].some((el) =>
+          el.textContent.includes("A copyable prompt"),
+        ),
+      ).toBe(true);
     });
 
-    const copyBtn = figure.querySelector(".tooltip-copy-prompt");
-    copyBtn.click();
-    expect(writeText).toHaveBeenCalledWith("A copyable prompt");
+    expect(figure.querySelector(".tooltip-copy-prompt")).toBeNull();
   });
 
   it("does not show a copy prompt button when prompt is unavailable", async () => {

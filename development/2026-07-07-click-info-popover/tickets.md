@@ -191,7 +191,7 @@ with prompt selection.
 
 ## Ticket 5: Remove Clipboard Copy Button
 
-Status: Planned.
+Status: Complete.
 
 ### User Story
 
@@ -222,6 +222,15 @@ metadata does not render `.tooltip-copy-prompt` and does not require
 
 - Add failing Vitest test before implementation.
 - `npm run js:check`
+
+### Implementation Notes
+
+- Replaced the previous copy-button test with no-copy-button behavior for
+  prompts.
+- Removed the copy prompt button, copied-state UI, and
+  `navigator.clipboard.writeText()` path from metadata rendering.
+- Removed obsolete copy prompt CSS and the now-unused `navigator` ESLint
+  global.
 
 ## Ticket 6: Rebuild Assets And Run Full Checks
 
