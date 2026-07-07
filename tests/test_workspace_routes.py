@@ -301,14 +301,19 @@ def test_index_renders_no_provider_state(app_config, app_factory):
     assert b"disabled\n              >Generate" in response.data
 
 
-def test_index_exposes_empty_palette_data_when_fragment_root_is_missing(app_factory):
+def test_index_exposes_default_empty_palette_data_on_startup(app_factory):
     client = app_factory().test_client()
 
     response = client.get("/")
 
     assert response.status_code == 200
-    assert extract_palette_data(response) == []
-    assert b'class="palette-controls"' not in response.data
+    assert extract_palette_data(response) == [
+        {"name": "character", "display_name": "character", "fragments": []},
+        {"name": "dress", "display_name": "dress", "fragments": []},
+        {"name": "place", "display_name": "place", "fragments": []},
+        {"name": "style", "display_name": "style", "fragments": []},
+    ]
+    assert b'class="palette-controls" aria-label="Prompt palettes"' in response.data
 
 
 def test_index_exposes_palette_data(app_config, app_factory):

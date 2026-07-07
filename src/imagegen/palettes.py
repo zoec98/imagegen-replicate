@@ -9,6 +9,7 @@ from pathlib import Path
 
 FRAGMENT_EXTENSION = ".txt"
 MAX_FRAGMENT_BYTES = 1024
+DEFAULT_PALETTE_NAMES = ("character", "dress", "place", "style")
 NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 DISALLOWED_CONTENT = {"(", ")", ":"}
 
@@ -154,6 +155,13 @@ class PaletteRepository:
             msg = "Fragment path is outside the configured fragment root."
             raise PaletteError(msg)
         return path
+
+
+def initialize_default_palettes(root: Path) -> None:
+    if any(path.is_dir() for path in root.iterdir()):
+        return
+    for name in DEFAULT_PALETTE_NAMES:
+        (root / name).mkdir()
 
 
 def normalize_fragment_name(value: str) -> str:

@@ -36,6 +36,10 @@ def test_create_app_creates_derived_data_directories(app_config, app_factory):
     assert app_config.data_dir.is_dir()
     assert app_config.output_dir.is_dir()
     assert app_config.fragment_root.is_dir()
+    assert (app_config.fragment_root / "character").is_dir()
+    assert (app_config.fragment_root / "dress").is_dir()
+    assert (app_config.fragment_root / "place").is_dir()
+    assert (app_config.fragment_root / "style").is_dir()
     assert app_config.trash_dir.is_dir()
     assert app_config.tmp_dir.is_dir()
 

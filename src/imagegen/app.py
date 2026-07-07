@@ -17,6 +17,7 @@ from imagegen.generation_provider import default_generation_providers
 from imagegen.generation_log import SQLiteGenerationLog
 from imagegen.image_export import clean_tmp_exports
 from imagegen.metadata import EmbeddedImageMetadataProvider
+from imagegen.palettes import initialize_default_palettes
 from imagegen.request_store import RequestStore
 from imagegen.routes import register_routes
 from imagegen.security import no_cors_response
@@ -67,6 +68,7 @@ def _ensure_data_directories(app_config: AppConfig) -> None:
         app_config.tmp_dir,
     ):
         directory.mkdir(parents=True, exist_ok=True)
+    initialize_default_palettes(app_config.fragment_root)
     clean_tmp_exports(app_config.tmp_dir)
 
 

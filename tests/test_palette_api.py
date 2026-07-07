@@ -117,14 +117,14 @@ def test_api_create_palette_fragment_rejects_missing_palette(app_factory):
     token = extract_csrf_token(index)
 
     response = client.post(
-        "/api/palettes/style/fragments",
+        "/api/palettes/vehicle/fragments",
         json={"name": "photo", "content": "photo"},
         headers={"X-CSRF-Token": token},
         environ_base={"REMOTE_ADDR": "192.0.2.10"},
     )
 
     assert response.status_code == 404
-    assert response.json == {"error": "Palette not found: style."}
+    assert response.json == {"error": "Palette not found: vehicle."}
 
 
 def test_api_create_palette_fragment_rejects_conflict(app_config, app_factory):
