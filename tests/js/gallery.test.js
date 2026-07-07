@@ -173,6 +173,31 @@ describe("setupGallery", () => {
     expect(infoButton.classList.contains("gallery-info-active")).toBe(false);
   });
 
+  it("keeps only one image information box open", () => {
+    renderGalleryWorkspace();
+    const gallery = setupGallery(document, {
+      metadata: { refreshTooltip: vi.fn() },
+    });
+    gallery.render([
+      imageFixture(),
+      imageFixture({
+        filename: "second.png",
+        metadata_url: "/api/images/second.png/metadata",
+        url: "/images/second.png",
+      }),
+    ]);
+    const infoButtons = [...document.querySelectorAll(".gallery-info")];
+    const infoWraps = [...document.querySelectorAll(".image-info-wrap")];
+
+    infoButtons[0].click();
+    infoButtons[1].click();
+
+    expect(infoWraps[0].classList.contains("image-info-open")).toBe(false);
+    expect(infoButtons[0].classList.contains("gallery-info-active")).toBe(false);
+    expect(infoWraps[1].classList.contains("image-info-open")).toBe(true);
+    expect(infoButtons[1].classList.contains("gallery-info-active")).toBe(true);
+  });
+
   it("deletes an armed gallery image and refreshes the gallery", async () => {
     renderGalleryWorkspace();
     const showMessage = vi.fn();

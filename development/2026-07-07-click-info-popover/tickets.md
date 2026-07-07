@@ -106,7 +106,7 @@ active and the second click closes the box and removes the active state.
 
 ## Ticket 3: Only One Info Box Open
 
-Status: Planned.
+Status: Complete.
 
 ### User Story
 
@@ -137,6 +137,13 @@ button.
 
 - Add failing Vitest test before implementation.
 - `npm run js:check`
+
+### Implementation Notes
+
+- Added a two-image Vitest test proving a newly opened info box closes the
+  previous one.
+- Added a gallery-level `closeInfoBoxes()` helper that removes open and active
+  state from other info controls before opening a new one.
 
 ## Ticket 4: Selectable Information Text
 

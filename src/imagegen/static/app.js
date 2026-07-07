@@ -116,6 +116,13 @@
 			button.setAttribute("title", "Confirm delete image");
 			showMessage(`Click delete again to remove ${filename}.`, "info");
 		}
+		function closeInfoBoxes({ except = null } = {}) {
+			gallery?.querySelectorAll(".image-info-wrap").forEach((infoWrap) => {
+				if (infoWrap === except) return;
+				infoWrap.classList.remove("image-info-open");
+				infoWrap.querySelector(".gallery-info")?.classList.remove("gallery-info-active");
+			});
+		}
 		async function deleteImage(figure) {
 			const deleteUrl = figure?.dataset.deleteUrl;
 			const filename = figure?.dataset.filename || "image";
@@ -201,6 +208,7 @@
 					infoButton.classList.remove("gallery-info-active");
 					return;
 				}
+				closeInfoBoxes({ except: infoWrap });
 				infoWrap?.classList.add("image-info-open");
 				infoButton.classList.add("gallery-info-active");
 				metadata.refreshTooltip?.(infoButton.closest(".gallery-item"));
