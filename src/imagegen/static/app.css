@@ -1290,8 +1290,7 @@ select {
   z-index: 4;
 }
 
-.image-info-wrap:hover .image-info-tooltip,
-.image-info-wrap:focus-within .image-info-tooltip {
+.image-info-wrap.image-info-open .image-info-tooltip {
   opacity: 1;
   pointer-events: auto;
   visibility: visible;

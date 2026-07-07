@@ -15,7 +15,7 @@ calls or internal state that users cannot observe.
 
 ## Ticket 1: Open Image Info On Click
 
-Status: Planned.
+Status: Complete.
 
 ### User Story
 
@@ -51,6 +51,15 @@ by the tooltip: filename, model, dimensions, and prompt.
 
 - Add failing Vitest test before implementation.
 - `npm run js:check`
+
+### Implementation Notes
+
+- Added a gallery integration-style Vitest test that wires `setupGallery()` to
+  `setupMetadata()` and verifies click-open metadata text.
+- Added `.image-info-open` as the visible information-box state.
+- Removed hover/focus metadata refresh listeners from the gallery behavior.
+- Changed tooltip visibility CSS to depend on `.image-info-open` rather than
+  `:hover`.
 
 ## Ticket 2: Toggle And Active State
 
@@ -228,4 +237,3 @@ after tickets 1-5 are green.
 - `npm run js:check`
 - `uv run pytest`
 - `uv run ruff check src tests`
-

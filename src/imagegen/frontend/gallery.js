@@ -144,6 +144,7 @@ export function setupGallery(root = document, services = {}) {
     const infoButton = event.target.closest(".gallery-info");
     if (infoButton) {
       disarmDelete();
+      infoButton.closest(".image-info-wrap")?.classList.add("image-info-open");
       metadata.refreshTooltip?.(infoButton.closest(".gallery-item"));
       return;
     }
@@ -193,21 +194,6 @@ export function setupGallery(root = document, services = {}) {
     disarmDelete();
     const figure = button.closest(".gallery-item");
     toggleSourceImage(figure?.dataset.filename || "");
-  });
-
-  gallery?.addEventListener("mouseover", (event) => {
-    const infoButton = event.target.closest(".gallery-info");
-    if (!infoButton) {
-      return;
-    }
-    metadata.refreshTooltip?.(infoButton.closest(".gallery-item"));
-  });
-  gallery?.addEventListener("focusin", (event) => {
-    const infoButton = event.target.closest(".gallery-info");
-    if (!infoButton) {
-      return;
-    }
-    metadata.refreshTooltip?.(infoButton.closest(".gallery-item"));
   });
 
   return {

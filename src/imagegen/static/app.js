@@ -195,6 +195,7 @@
 			const infoButton = event.target.closest(".gallery-info");
 			if (infoButton) {
 				disarmDelete();
+				infoButton.closest(".image-info-wrap")?.classList.add("image-info-open");
 				metadata.refreshTooltip?.(infoButton.closest(".gallery-item"));
 				return;
 			}
@@ -241,16 +242,6 @@
 			if (!button) return;
 			disarmDelete();
 			toggleSourceImage(button.closest(".gallery-item")?.dataset.filename || "");
-		});
-		gallery?.addEventListener("mouseover", (event) => {
-			const infoButton = event.target.closest(".gallery-info");
-			if (!infoButton) return;
-			metadata.refreshTooltip?.(infoButton.closest(".gallery-item"));
-		});
-		gallery?.addEventListener("focusin", (event) => {
-			const infoButton = event.target.closest(".gallery-info");
-			if (!infoButton) return;
-			metadata.refreshTooltip?.(infoButton.closest(".gallery-item"));
 		});
 		return {
 			disarmDelete,

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { setupGallery } from "../../src/imagegen/frontend/gallery.js";
+import { setupMetadata } from "../../src/imagegen/frontend/metadata.js";
 
 function jsonResponse(data, init = {}) {
   return new Response(JSON.stringify(data), {
@@ -117,6 +118,39 @@ describe("setupGallery", () => {
     expect(metadata.refreshTooltip).toHaveBeenCalledWith(figure);
     expect(metadata.load).toHaveBeenCalledWith(figure);
     expect(openMaskEditor).toHaveBeenCalledWith(figure);
+  });
+
+  it("opens image information with metadata on click", async () => {
+    renderGalleryWorkspace();
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        model_alias: "flux",
+        prompt: "A click-open prompt",
+      }),
+    );
+    const metadata = setupMetadata(document, {
+      modelRegistry: [{ alias: "flux", display_name: "Flux Schnell" }],
+    });
+    const gallery = setupGallery(document, { metadata });
+    gallery.render([imageFixture()]);
+
+    document.querySelector(".gallery-info").click();
+
+    await vi.waitFor(() => {
+      expect(
+        document
+          .querySelector(".image-info-wrap")
+          .classList.contains("image-info-open"),
+      ).toBe(true);
+      expect(
+        [...document.querySelectorAll(".tooltip-line")].map((line) => line.textContent),
+      ).toEqual([
+        "example.png",
+        "Flux Schnell",
+        "Dimensions unavailable",
+        "A click-open prompt",
+      ]);
+    });
   });
 
   it("deletes an armed gallery image and refreshes the gallery", async () => {
