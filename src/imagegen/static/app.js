@@ -1359,16 +1359,40 @@
 			const tooltip = figure?.querySelector(".image-info-tooltip");
 			if (!figure || !tooltip) return;
 			const model = metadata ? modelForMetadata(metadata) : null;
-			const lines = [
+			const prompt = metadata?.prompt || null;
+			const children = [...[
 				figure.dataset.filename || "Image",
 				model?.display_name || metadata?.model_alias || metadata?.model || "Model unavailable",
 				imageDimensions(figure),
-				metadata?.prompt || "Prompt unavailable"
-			];
-			tooltip.replaceChildren(...lines.map((line) => createElement("span", {
+				prompt || "Prompt unavailable"
+			].map((line) => createElement("span", {
 				className: "tooltip-line",
 				textContent: line
-			})));
+			}))];
+			if (prompt) {
+				const copyBtn = createElement("button", {
+					attributes: {
+						"aria-label": "Copy prompt",
+						title: "Copy prompt"
+					},
+					className: "tooltip-copy-prompt",
+					type: "button",
+					children: [createSvgIcon("M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z")]
+				});
+				copyBtn.addEventListener("click", (event) => {
+					event.stopPropagation();
+					navigator.clipboard.writeText(prompt).then(() => {
+						copyBtn.classList.add("tooltip-copy-prompt-done");
+						copyBtn.setAttribute("aria-label", "Prompt copied!");
+						setTimeout(() => {
+							copyBtn.classList.remove("tooltip-copy-prompt-done");
+							copyBtn.setAttribute("aria-label", "Copy prompt");
+						}, 1500);
+					});
+				});
+				children.push(copyBtn);
+			}
+			tooltip.replaceChildren(...children);
 		}
 		return {
 			load,

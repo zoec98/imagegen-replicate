@@ -100,4 +100,43 @@ describe("setupMetadata", () => {
       ]);
     });
   });
+
+  it("shows a copy prompt button in the tooltip when prompt is available", async () => {
+    const figure = renderMetadataFigure();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    globalThis.navigator = { clipboard: { writeText } };
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        model_alias: "flux",
+        prompt: "A copyable prompt",
+      }),
+    );
+    const metadata = setupMetadata(document);
+
+    metadata.refreshTooltip(figure);
+    await vi.waitFor(() => {
+      expect(figure.querySelector(".tooltip-copy-prompt")).not.toBeNull();
+    });
+
+    const copyBtn = figure.querySelector(".tooltip-copy-prompt");
+    copyBtn.click();
+    expect(writeText).toHaveBeenCalledWith("A copyable prompt");
+  });
+
+  it("does not show a copy prompt button when prompt is unavailable", async () => {
+    const figure = renderMetadataFigure();
+    globalThis.fetch = vi.fn().mockResolvedValue(jsonResponse({ model_alias: "flux" }));
+    const metadata = setupMetadata(document);
+
+    metadata.refreshTooltip(figure);
+    await vi.waitFor(() => {
+      expect(
+        [...figure.querySelectorAll(".tooltip-line")].some((el) =>
+          el.textContent.includes("Prompt unavailable"),
+        ),
+      ).toBe(true);
+    });
+
+    expect(figure.querySelector(".tooltip-copy-prompt")).toBeNull();
+  });
 });
