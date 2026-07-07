@@ -234,7 +234,7 @@ metadata does not render `.tooltip-copy-prompt` and does not require
 
 ## Ticket 6: Rebuild Assets And Run Full Checks
 
-Status: Planned.
+Status: Complete.
 
 ### User Story
 
@@ -269,3 +269,10 @@ after tickets 1-5 are green.
 - `npm run js:check`
 - `uv run pytest`
 - `uv run ruff check src tests`
+
+### Implementation Notes
+
+- Re-ran JavaScript formatting, lint, Vitest, and Vite build after tickets 1-5.
+- Re-ran the full Python test suite and Ruff check.
+- Confirmed no active implementation change was needed beyond generated asset
+  updates already committed in the preceding tickets.
