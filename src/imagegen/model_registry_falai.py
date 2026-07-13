@@ -1059,8 +1059,8 @@ def _bria_edit_parameters() -> tuple[ModelParameter, ...]:
     )
 
 
-def _krea2_turbo_parameters() -> tuple[ModelParameter, ...]:
-    return (
+def _krea2_turbo_parameters(*, style: bool = False) -> tuple[ModelParameter, ...]:
+    parameters = [
         _param(
             "prompt",
             "Base text description of the image to generate.",
@@ -1101,6 +1101,13 @@ def _krea2_turbo_parameters() -> tuple[ModelParameter, ...]:
             order=5,
         ),
         _param(
+            "enable_prompt_expansion",
+            "Expand the prompt with an LLM before image generation.",
+            "boolean",
+            False,
+            order=6,
+        ),
+        _param(
             "output_format",
             "The format of the generated image.",
             "select",
@@ -1108,7 +1115,20 @@ def _krea2_turbo_parameters() -> tuple[ModelParameter, ...]:
             choices=OUTPUT_FORMAT_CHOICES,
             order=9,
         ),
-    )
+    ]
+    if style:
+        parameters.append(
+            _param(
+                "style_scale",
+                "Scale for the style adapter residual.",
+                "number",
+                1,
+                minimum=0,
+                maximum=4,
+                order=11,
+            )
+        )
+    return tuple(parameters)
 
 
 def _krea2_parameters() -> tuple[ModelParameter, ...]:
@@ -1270,10 +1290,32 @@ KREA_2_TURBO = ProviderModel(
         runtime_url="https://fal.run/fal-ai/krea-2/turbo",
         mode="text-to-image",
         parameters=_krea2_turbo_parameters(),
-        fixed_inputs=FALAI_FIXED_SAFE_NO_PROMPT_EXPANSION_INPUTS,
+        fixed_inputs=FALAI_FIXED_SAFE_IMAGE_INPUTS,
         pricing=(
             _falai_price(
                 "$0.008",
+                "per output megapixel",
+                metric="image_output_megapixel_count",
+            ),
+        ),
+    ),
+    edit_target=GenerationTarget(
+        provider="falai",
+        alias="krea-2-turbo",
+        display_name="Krea 2 Turbo",
+        provider_model="fal-ai/krea-2/turbo/style",
+        documentation_url="https://fal.ai/models/fal-ai/krea-2/turbo/style/api",
+        runtime_url="https://fal.run/fal-ai/krea-2/turbo/style",
+        mode="image-edit",
+        parameters=_krea2_turbo_parameters(style=True),
+        fixed_inputs=FALAI_FIXED_SAFE_IMAGE_INPUTS,
+        source_images=SourceImageBinding(
+            provider_field="reference_image_urls",
+            max_count=3,
+        ),
+        pricing=(
+            _falai_price(
+                "$0.01",
                 "per output megapixel",
                 metric="image_output_megapixel_count",
             ),

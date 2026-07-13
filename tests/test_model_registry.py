@@ -204,6 +204,7 @@ def test_falai_plan_ticket_models_use_linked_edit_endpoints():
         "gpt-image-2": ("openai/gpt-image-2/edit", "image_urls", 10),
         "gpt-image15": ("fal-ai/gpt-image-1.5/edit", "image_urls", 10),
         "grok": ("xai/grok-imagine-image/edit", "image_urls", 3),
+        "krea-2-turbo": ("fal-ai/krea-2/turbo/style", "reference_image_urls", 3),
         "nano-banana-2": ("fal-ai/nano-banana-2/edit", "image_urls", 10),
         "seedream": ("fal-ai/bytedance/seedream/v4/edit", "image_urls", 10),
         "seedream5": (
@@ -232,10 +233,10 @@ def test_falai_krea_models_use_documented_text_endpoints():
                 "image_size",
                 "num_images",
                 "acceleration",
+                "enable_prompt_expansion",
                 "output_format",
             },
             "fixed_inputs": {
-                "enable_prompt_expansion": False,
                 "enable_safety_checker": False,
                 "sync_mode": False,
             },
@@ -259,6 +260,36 @@ def test_falai_krea_models_use_documented_text_endpoints():
         assert target.provider_model == expectation["provider_model"]
         assert parameter_names == expectation["parameters"]
         assert target.fixed_inputs == expectation["fixed_inputs"]
+        if alias == "krea-2-turbo":
+            prompt_expansion = next(
+                parameter
+                for parameter in target.parameters
+                if parameter.name == "enable_prompt_expansion"
+            )
+            assert prompt_expansion.default is False
+
+
+def test_falai_krea_turbo_style_model_uses_source_images_for_reference_urls():
+    target = resolve_generation_target("falai", "krea-2-turbo", edit_mode=True)
+    parameter_names = {parameter.name for parameter in target.parameters}
+    prompt_expansion = next(
+        parameter
+        for parameter in target.parameters
+        if parameter.name == "enable_prompt_expansion"
+    )
+
+    assert target.provider_model == "fal-ai/krea-2/turbo/style"
+    assert target.mode == "image-edit"
+    assert "reference_image_urls" not in parameter_names
+    assert "style_scale" in parameter_names
+    assert prompt_expansion.default is False
+    assert target.fixed_inputs == {
+        "enable_safety_checker": False,
+        "sync_mode": False,
+    }
+    assert target.source_images is not None
+    assert target.source_images.provider_field == "reference_image_urls"
+    assert target.source_images.max_count == 3
 
 
 def test_falai_models_keep_safety_checker_fixed_when_supported():
