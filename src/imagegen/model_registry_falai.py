@@ -129,6 +129,17 @@ BRIA_ASPECT_RATIO_CHOICES = (
     "9:16",
     "16:9",
 )
+KREA_ASPECT_RATIO_CHOICES = (
+    "1:1",
+    "4:3",
+    "3:2",
+    "16:9",
+    "2.35:1",
+    "4:5",
+    "2:3",
+    "9:16",
+)
+KREA_CREATIVITY_CHOICES = ("raw", "low", "medium", "high")
 
 FALAI_FIXED_IMAGE_OUTPUT_INPUTS = {"sync_mode": False}
 FALAI_FIXED_SAFE_IMAGE_INPUTS = {
@@ -1048,6 +1059,90 @@ def _bria_edit_parameters() -> tuple[ModelParameter, ...]:
     )
 
 
+def _krea2_turbo_parameters() -> tuple[ModelParameter, ...]:
+    return (
+        _param(
+            "prompt",
+            "Base text description of the image to generate.",
+            "string",
+            order=1,
+        ),
+        _param(
+            "seed",
+            "Random seed for reproducible generation.",
+            "integer",
+            "",
+            order=2,
+            semantic_type="seed",
+        ),
+        _param(
+            "image_size",
+            "The size of the generated image.",
+            "select",
+            "square_hd",
+            choices=IMAGE_SIZE_CHOICES,
+            order=3,
+        ),
+        _param(
+            "num_images",
+            "The number of images to generate.",
+            "integer",
+            1,
+            minimum=1,
+            maximum=4,
+            order=4,
+        ),
+        _param(
+            "acceleration",
+            "The acceleration level to use for image generation.",
+            "select",
+            "none",
+            choices=("none", "regular"),
+            order=5,
+        ),
+        _param(
+            "output_format",
+            "The format of the generated image.",
+            "select",
+            "png",
+            choices=OUTPUT_FORMAT_CHOICES,
+            order=9,
+        ),
+    )
+
+
+def _krea2_parameters() -> tuple[ModelParameter, ...]:
+    return (
+        _param(
+            "prompt", "Text description of the image to generate.", "string", order=1
+        ),
+        _param(
+            "aspect_ratio",
+            "Aspect ratio of the generated image.",
+            "select",
+            "1:1",
+            choices=KREA_ASPECT_RATIO_CHOICES,
+            order=2,
+        ),
+        _param(
+            "creativity",
+            "Controls how loosely the model interprets the prompt.",
+            "select",
+            "medium",
+            choices=KREA_CREATIVITY_CHOICES,
+            order=3,
+        ),
+        _param(
+            "seed",
+            "Random seed for reproducible generation.",
+            "integer",
+            "",
+            order=4,
+            semantic_type="seed",
+        ),
+    )
+
+
 ERNIE_IMAGE = ProviderModel(
     provider="falai",
     alias="ernie-image",
@@ -1158,6 +1253,70 @@ BRIA_FIBO = ProviderModel(
         source_images=SourceImageBinding(provider_field="image_url", max_count=1),
         pricing=(
             _falai_price("$0.04", "per output image", metric="image_output_count"),
+        ),
+    ),
+)
+
+KREA_2_TURBO = ProviderModel(
+    provider="falai",
+    alias="krea-2-turbo",
+    display_name="Krea 2 Turbo",
+    text_target=GenerationTarget(
+        provider="falai",
+        alias="krea-2-turbo",
+        display_name="Krea 2 Turbo",
+        provider_model="fal-ai/krea-2/turbo",
+        documentation_url="https://fal.ai/models/fal-ai/krea-2/turbo/api",
+        runtime_url="https://fal.run/fal-ai/krea-2/turbo",
+        mode="text-to-image",
+        parameters=_krea2_turbo_parameters(),
+        fixed_inputs=FALAI_FIXED_SAFE_NO_PROMPT_EXPANSION_INPUTS,
+        pricing=(
+            _falai_price(
+                "$0.008",
+                "per output megapixel",
+                metric="image_output_megapixel_count",
+            ),
+        ),
+    ),
+)
+
+KREA_2_LARGE = ProviderModel(
+    provider="falai",
+    alias="krea-2-large",
+    display_name="Krea 2 Large",
+    text_target=GenerationTarget(
+        provider="falai",
+        alias="krea-2-large",
+        display_name="Krea 2 Large",
+        provider_model="krea/v2/large/text-to-image",
+        documentation_url="https://fal.ai/models/krea/v2/large/text-to-image/api",
+        runtime_url="https://fal.run/krea/v2/large/text-to-image",
+        mode="text-to-image",
+        parameters=_krea2_parameters(),
+        fixed_inputs={},
+        pricing=(
+            _falai_price("$0.001", "per billing unit", metric="billing_unit_count"),
+        ),
+    ),
+)
+
+KREA_2_MEDIUM = ProviderModel(
+    provider="falai",
+    alias="krea-2-medium",
+    display_name="Krea 2 Medium",
+    text_target=GenerationTarget(
+        provider="falai",
+        alias="krea-2-medium",
+        display_name="Krea 2 Medium",
+        provider_model="krea/v2/medium/text-to-image",
+        documentation_url="https://fal.ai/models/krea/v2/medium/text-to-image/api",
+        runtime_url="https://fal.run/krea/v2/medium/text-to-image",
+        mode="text-to-image",
+        parameters=_krea2_parameters(),
+        fixed_inputs={},
+        pricing=(
+            _falai_price("$0.001", "per billing unit", metric="billing_unit_count"),
         ),
     ),
 )
@@ -1608,6 +1767,9 @@ MODEL_REGISTRY: dict[str, ProviderModel] = {
     HIDREAM_DEV.alias: HIDREAM_DEV,
     HIDREAM_FAST.alias: HIDREAM_FAST,
     HIDREAM_FULL.alias: HIDREAM_FULL,
+    KREA_2_LARGE.alias: KREA_2_LARGE,
+    KREA_2_MEDIUM.alias: KREA_2_MEDIUM,
+    KREA_2_TURBO.alias: KREA_2_TURBO,
     NANO_BANANA_2.alias: NANO_BANANA_2,
     SEEDREAM4.alias: SEEDREAM4,
     SEEDREAM45.alias: SEEDREAM45,

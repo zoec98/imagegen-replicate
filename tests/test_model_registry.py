@@ -120,6 +120,9 @@ def test_provider_model_lists_are_scoped_by_provider():
         "hidream-dev",
         "hidream-fast",
         "hidream-full",
+        "krea-2-large",
+        "krea-2-medium",
+        "krea-2-turbo",
         "nano-banana-2",
         "seedream",
         "seedream45",
@@ -219,6 +222,45 @@ def test_falai_plan_ticket_models_use_linked_edit_endpoints():
         assert target.source_images.max_count == max_count
 
 
+def test_falai_krea_models_use_documented_text_endpoints():
+    expected = {
+        "krea-2-turbo": {
+            "provider_model": "fal-ai/krea-2/turbo",
+            "parameters": {
+                "prompt",
+                "seed",
+                "image_size",
+                "num_images",
+                "acceleration",
+                "output_format",
+            },
+            "fixed_inputs": {
+                "enable_prompt_expansion": False,
+                "enable_safety_checker": False,
+                "sync_mode": False,
+            },
+        },
+        "krea-2-large": {
+            "provider_model": "krea/v2/large/text-to-image",
+            "parameters": {"prompt", "aspect_ratio", "creativity", "seed"},
+            "fixed_inputs": {},
+        },
+        "krea-2-medium": {
+            "provider_model": "krea/v2/medium/text-to-image",
+            "parameters": {"prompt", "aspect_ratio", "creativity", "seed"},
+            "fixed_inputs": {},
+        },
+    }
+
+    for alias, expectation in expected.items():
+        target = resolve_generation_target("falai", alias, edit_mode=False)
+        parameter_names = {parameter.name for parameter in target.parameters}
+
+        assert target.provider_model == expectation["provider_model"]
+        assert parameter_names == expectation["parameters"]
+        assert target.fixed_inputs == expectation["fixed_inputs"]
+
+
 def test_falai_models_keep_safety_checker_fixed_when_supported():
     for alias in (
         "flux-2",
@@ -227,6 +269,7 @@ def test_falai_models_keep_safety_checker_fixed_when_supported():
         "hidream-dev",
         "hidream-fast",
         "hidream-full",
+        "krea-2-turbo",
         "seedream",
         "seedream5",
         "zit",
