@@ -113,5 +113,24 @@ function imageDimensions(figure) {
   if (!image?.naturalWidth || !image?.naturalHeight) {
     return "Dimensions unavailable";
   }
-  return `${image.naturalWidth} x ${image.naturalHeight}`;
+  return `${image.naturalWidth} x ${image.naturalHeight} (${imageRatio(
+    image.naturalWidth,
+    image.naturalHeight,
+  )})`;
+}
+
+function imageRatio(width, height) {
+  const divisor = gcd(width, height);
+  return `${width / divisor}:${height / divisor}`;
+}
+
+function gcd(a, b) {
+  let x = a;
+  let y = b;
+  while (y) {
+    const next = x % y;
+    x = y;
+    y = next;
+  }
+  return x;
 }

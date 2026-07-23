@@ -19,6 +19,14 @@ function renderMetadataFigure() {
   return document.querySelector(".gallery-item");
 }
 
+function setNaturalSize(figure, width, height) {
+  const image = figure.querySelector("img");
+  Object.defineProperties(image, {
+    naturalHeight: { configurable: true, value: height },
+    naturalWidth: { configurable: true, value: width },
+  });
+}
+
 describe("setupMetadata", () => {
   it("loads embedded metadata into the prompt workspace", async () => {
     const figure = renderMetadataFigure();
@@ -78,6 +86,7 @@ describe("setupMetadata", () => {
 
   it("presents metadata in the image information tooltip", async () => {
     const figure = renderMetadataFigure();
+    setNaturalSize(figure, 540, 720);
     globalThis.fetch = vi.fn().mockResolvedValue(
       jsonResponse({
         model_alias: "flux",
@@ -95,7 +104,7 @@ describe("setupMetadata", () => {
       ).toEqual([
         "example.png",
         "Flux Schnell",
-        "Dimensions unavailable",
+        "540 x 720 (3:4)",
         "A tooltip prompt",
       ]);
     });
