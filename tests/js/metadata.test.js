@@ -27,6 +27,20 @@ function setNaturalSize(figure, width, height) {
   });
 }
 
+async function tooltipLinesForNaturalSize(width, height) {
+  const figure = renderMetadataFigure();
+  setNaturalSize(figure, width, height);
+  globalThis.fetch = vi.fn().mockResolvedValue(jsonResponse({}));
+  const metadata = setupMetadata(document);
+
+  metadata.refreshTooltip(figure);
+  await vi.waitFor(() => {
+    expect(figure.querySelectorAll(".tooltip-line").length).toBe(4);
+  });
+
+  return [...figure.querySelectorAll(".tooltip-line")].map((line) => line.textContent);
+}
+
 describe("setupMetadata", () => {
   it("loads embedded metadata into the prompt workspace", async () => {
     const figure = renderMetadataFigure();
@@ -108,6 +122,21 @@ describe("setupMetadata", () => {
         "A tooltip prompt",
       ]);
     });
+  });
+
+  it.each([
+    [720, 540, "720 x 540 (4:3)"],
+    [1024, 1024, "1024 x 1024 (1:1)"],
+    [1920, 1080, "1920 x 1080 (16:9)"],
+    [3072, 4096, "3072 x 4096 (3:4)"],
+  ])("reduces %i x %i dimensions for the tooltip", async (width, height, line) => {
+    await expect(tooltipLinesForNaturalSize(width, height)).resolves.toContain(line);
+  });
+
+  it("does not produce a ratio for non-finite dimensions", async () => {
+    await expect(tooltipLinesForNaturalSize(Number.POSITIVE_INFINITY, 720)).resolves.toContain(
+      "Dimensions unavailable",
+    );
   });
 
   it("does not show a copy prompt button when prompt is available", async () => {

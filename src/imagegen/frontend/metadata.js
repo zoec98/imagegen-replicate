@@ -110,13 +110,17 @@ export function setupMetadata(root = document, services = {}) {
 
 function imageDimensions(figure) {
   const image = figure?.querySelector("img");
-  if (!image?.naturalWidth || !image?.naturalHeight) {
+  if (!validDimension(image?.naturalWidth) || !validDimension(image?.naturalHeight)) {
     return "Dimensions unavailable";
   }
   return `${image.naturalWidth} x ${image.naturalHeight} (${imageRatio(
     image.naturalWidth,
     image.naturalHeight,
   )})`;
+}
+
+function validDimension(value) {
+  return Number.isFinite(value) && value > 0;
 }
 
 function imageRatio(width, height) {
