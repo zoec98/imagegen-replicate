@@ -138,6 +138,8 @@ describe("setupMetadata", () => {
     [1023, 1536, "1023 x 1536 (2:3)"],
     [1536, 1023, "1536 x 1023 (3:2)"],
     [1910, 1080, "1910 x 1080 (16:9)"],
+    [640, 799, "640 x 799 (4:5)"],
+    [799, 640, "799 x 640 (5:4)"],
   ])(
     "snaps near-miss %i x %i dimensions to a common tooltip ratio",
     async (width, height, line) => {

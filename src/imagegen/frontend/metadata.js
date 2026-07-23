@@ -9,6 +9,8 @@ const COMMON_RATIOS = [
   [9, 16],
   [2, 3],
   [3, 2],
+  [4, 5],
+  [5, 4],
 ];
 const COMMON_RATIO_TOLERANCE = 0.02;
 

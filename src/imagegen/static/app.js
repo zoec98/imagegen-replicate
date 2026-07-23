@@ -1331,7 +1331,9 @@
 		[16, 9],
 		[9, 16],
 		[2, 3],
-		[3, 2]
+		[3, 2],
+		[4, 5],
+		[5, 4]
 	];
 	var COMMON_RATIO_TOLERANCE = .02;
 	function setupMetadata(root = document, services = {}) {
