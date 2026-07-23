@@ -115,12 +115,7 @@ describe("setupMetadata", () => {
     await vi.waitFor(() => {
       expect(
         [...figure.querySelectorAll(".tooltip-line")].map((line) => line.textContent),
-      ).toEqual([
-        "example.png",
-        "Flux Schnell",
-        "540 x 720 (3:4)",
-        "A tooltip prompt",
-      ]);
+      ).toEqual(["example.png", "Flux Schnell", "540 x 720 (3:4)", "A tooltip prompt"]);
     });
   });
 
@@ -134,9 +129,9 @@ describe("setupMetadata", () => {
   });
 
   it("does not produce a ratio for non-finite dimensions", async () => {
-    await expect(tooltipLinesForNaturalSize(Number.POSITIVE_INFINITY, 720)).resolves.toContain(
-      "Dimensions unavailable",
-    );
+    await expect(
+      tooltipLinesForNaturalSize(Number.POSITIVE_INFINITY, 720),
+    ).resolves.toContain("Dimensions unavailable");
   });
 
   it.each([

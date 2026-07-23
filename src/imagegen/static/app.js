@@ -1324,6 +1324,16 @@
 	}
 	//#endregion
 	//#region src/imagegen/frontend/metadata.js
+	var COMMON_RATIOS = [
+		[1, 1],
+		[3, 4],
+		[4, 3],
+		[16, 9],
+		[9, 16],
+		[2, 3],
+		[3, 2]
+	];
+	var COMMON_RATIO_TOLERANCE = .02;
 	function setupMetadata(root = document, services = {}) {
 		const { applyMetadata = () => {}, modelRegistry = [], showMessage = () => {} } = services;
 		async function load(figure) {
@@ -1384,8 +1394,41 @@
 	}
 	function imageDimensions(figure) {
 		const image = figure?.querySelector("img");
-		if (!image?.naturalWidth || !image?.naturalHeight) return "Dimensions unavailable";
-		return `${image.naturalWidth} x ${image.naturalHeight}`;
+		if (!validDimension(image?.naturalWidth) || !validDimension(image?.naturalHeight)) return "Dimensions unavailable";
+		return `${image.naturalWidth} x ${image.naturalHeight} (${imageRatio(image.naturalWidth, image.naturalHeight)})`;
+	}
+	function validDimension(value) {
+		return Number.isFinite(value) && value > 0;
+	}
+	function imageRatio(width, height) {
+		const commonRatio = commonRatioFor(width, height);
+		if (commonRatio) return commonRatio;
+		const divisor = gcd(width, height);
+		return `${width / divisor}:${height / divisor}`;
+	}
+	function commonRatioFor(width, height) {
+		const actualRatio = width / height;
+		let bestMatch = null;
+		let bestDistance = Number.POSITIVE_INFINITY;
+		for (const [ratioWidth, ratioHeight] of COMMON_RATIOS) {
+			const commonRatio = ratioWidth / ratioHeight;
+			const relativeDistance = Math.abs(actualRatio - commonRatio) / commonRatio;
+			if (relativeDistance <= COMMON_RATIO_TOLERANCE && relativeDistance < bestDistance) {
+				bestMatch = `${ratioWidth}:${ratioHeight}`;
+				bestDistance = relativeDistance;
+			}
+		}
+		return bestMatch;
+	}
+	function gcd(a, b) {
+		let x = a;
+		let y = b;
+		while (y) {
+			const next = x % y;
+			x = y;
+			y = next;
+		}
+		return x;
 	}
 	//#endregion
 	//#region src/imagegen/frontend/palettes.js
