@@ -26,6 +26,15 @@ dimensions for the info tooltip.
 - If no test surface exists, keep this ticket to discovery and use the later
   manual verification ticket instead of creating tooling.
 
+**Implementation notes:**
+
+- Tooltip formatting lives in `src/imagegen/frontend/metadata.js` through
+  `setupMetadata(...).refreshTooltip(figure)`, which updates
+  `.image-info-tooltip` from the gallery figure and its contained `img`.
+- Existing JavaScript unit coverage lives in `tests/js/metadata.test.js`; use
+  the public `setupMetadata` interface and assert visible `.tooltip-line` text.
+- No new JavaScript test toolchain is needed.
+
 ## Ticket 2: Exact Ratio Formatting Tracer Bullet
 
 **Goal:** Add the smallest behavior slice that displays an exact reduced ratio
