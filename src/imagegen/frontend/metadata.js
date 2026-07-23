@@ -145,16 +145,17 @@ function imageRatio(width, height) {
 
 function commonRatioFor(width, height) {
   const actualRatio = width / height;
+  let bestMatch = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
   for (const [ratioWidth, ratioHeight] of COMMON_RATIOS) {
     const commonRatio = ratioWidth / ratioHeight;
-    if (
-      Math.abs(actualRatio - commonRatio) / commonRatio <=
-      COMMON_RATIO_TOLERANCE
-    ) {
-      return `${ratioWidth}:${ratioHeight}`;
+    const relativeDistance = Math.abs(actualRatio - commonRatio) / commonRatio;
+    if (relativeDistance <= COMMON_RATIO_TOLERANCE && relativeDistance < bestDistance) {
+      bestMatch = `${ratioWidth}:${ratioHeight}`;
+      bestDistance = relativeDistance;
     }
   }
-  return null;
+  return bestMatch;
 }
 
 function gcd(a, b) {
