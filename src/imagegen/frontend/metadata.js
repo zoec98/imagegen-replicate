@@ -1,6 +1,17 @@
 import { requestJson } from "./api.js";
 import { createElement } from "./dom.js";
 
+const COMMON_RATIOS = [
+  [1, 1],
+  [3, 4],
+  [4, 3],
+  [16, 9],
+  [9, 16],
+  [2, 3],
+  [3, 2],
+];
+const COMMON_RATIO_TOLERANCE = 0.02;
+
 export function setupMetadata(root = document, services = {}) {
   void root;
   const {
@@ -124,8 +135,26 @@ function validDimension(value) {
 }
 
 function imageRatio(width, height) {
+  const commonRatio = commonRatioFor(width, height);
+  if (commonRatio) {
+    return commonRatio;
+  }
   const divisor = gcd(width, height);
   return `${width / divisor}:${height / divisor}`;
+}
+
+function commonRatioFor(width, height) {
+  const actualRatio = width / height;
+  for (const [ratioWidth, ratioHeight] of COMMON_RATIOS) {
+    const commonRatio = ratioWidth / ratioHeight;
+    if (
+      Math.abs(actualRatio - commonRatio) / commonRatio <=
+      COMMON_RATIO_TOLERANCE
+    ) {
+      return `${ratioWidth}:${ratioHeight}`;
+    }
+  }
+  return null;
 }
 
 function gcd(a, b) {

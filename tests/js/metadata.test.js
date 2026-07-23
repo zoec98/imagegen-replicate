@@ -139,6 +139,23 @@ describe("setupMetadata", () => {
     );
   });
 
+  it.each([
+    [1023, 1536, "1023 x 1536 (2:3)"],
+    [1536, 1023, "1536 x 1023 (3:2)"],
+    [1910, 1080, "1910 x 1080 (16:9)"],
+  ])(
+    "snaps near-miss %i x %i dimensions to a common tooltip ratio",
+    async (width, height, line) => {
+      await expect(tooltipLinesForNaturalSize(width, height)).resolves.toContain(line);
+    },
+  );
+
+  it("uses the exact reduced ratio outside the common-ratio tolerance", async () => {
+    await expect(tooltipLinesForNaturalSize(1000, 1400)).resolves.toContain(
+      "1000 x 1400 (5:7)",
+    );
+  });
+
   it("does not show a copy prompt button when prompt is available", async () => {
     const figure = renderMetadataFigure();
     globalThis.fetch = vi.fn().mockResolvedValue(
