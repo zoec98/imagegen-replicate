@@ -1335,7 +1335,7 @@
 		[4, 5],
 		[5, 4]
 	];
-	var COMMON_RATIO_TOLERANCE = .02;
+	var COMMON_RATIO_TOLERANCE = .05;
 	function setupMetadata(root = document, services = {}) {
 		const { applyMetadata = () => {}, modelRegistry = [], showMessage = () => {} } = services;
 		async function load(figure) {

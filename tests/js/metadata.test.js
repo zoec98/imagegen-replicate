@@ -140,6 +140,7 @@ describe("setupMetadata", () => {
     [1910, 1080, "1910 x 1080 (16:9)"],
     [640, 799, "640 x 799 (4:5)"],
     [799, 640, "799 x 640 (5:4)"],
+    [344, 358, "344 x 358 (1:1)"],
   ])(
     "snaps near-miss %i x %i dimensions to a common tooltip ratio",
     async (width, height, line) => {
@@ -148,8 +149,8 @@ describe("setupMetadata", () => {
   );
 
   it("uses the exact reduced ratio outside the common-ratio tolerance", async () => {
-    await expect(tooltipLinesForNaturalSize(1000, 1400)).resolves.toContain(
-      "1000 x 1400 (5:7)",
+    await expect(tooltipLinesForNaturalSize(1000, 1600)).resolves.toContain(
+      "1000 x 1600 (5:8)",
     );
   });
 

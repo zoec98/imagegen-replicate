@@ -12,7 +12,7 @@ const COMMON_RATIOS = [
   [4, 5],
   [5, 4],
 ];
-const COMMON_RATIO_TOLERANCE = 0.02;
+const COMMON_RATIO_TOLERANCE = 0.05;
 
 export function setupMetadata(root = document, services = {}) {
   void root;
