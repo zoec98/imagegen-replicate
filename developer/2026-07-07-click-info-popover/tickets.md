@@ -252,7 +252,7 @@ after tickets 1-5 are green.
 - Rebuild `src/imagegen/static/app.js` and `src/imagegen/static/app.js.map`.
 - Remove obsolete CSS selectors for the copy prompt button if they are no
   longer used.
-- Confirm no hover-only info behavior remains in CSS or JavaScript.
+- Confirm no hover-only inefo behavior remains in CSS or JavaScript.
 - Run required project checks.
 
 ### Acceptance Criteria
