@@ -127,6 +127,7 @@ def test_provider_model_lists_are_scoped_by_provider():
         "seedream",
         "seedream45",
         "seedream5",
+        "seedream5-pro",
         "zit",
     } <= falai_aliases
     assert {model.provider for model in replicate_models} == {"replicate"}
@@ -209,6 +210,11 @@ def test_falai_plan_ticket_models_use_linked_edit_endpoints():
         "seedream": ("fal-ai/bytedance/seedream/v4/edit", "image_urls", 10),
         "seedream5": (
             "fal-ai/bytedance/seedream/v5/lite/edit",
+            "image_urls",
+            10,
+        ),
+        "seedream5-pro": (
+            "bytedance/seedream/v5/pro/edit",
             "image_urls",
             10,
         ),
@@ -303,10 +309,44 @@ def test_falai_models_keep_safety_checker_fixed_when_supported():
         "krea-2-turbo",
         "seedream",
         "seedream5",
+        "seedream5-pro",
         "zit",
     ):
         target = resolve_generation_target("falai", alias, edit_mode=False)
         assert target.fixed_inputs["enable_safety_checker"] is False
+
+
+def test_falai_seedream5_pro_uses_documented_endpoints_and_parameters():
+    text_target = resolve_generation_target("falai", "seedream5-pro", edit_mode=False)
+    edit_target = resolve_generation_target("falai", "seedream5-pro", edit_mode=True)
+    parameter_names = {parameter.name for parameter in text_target.parameters}
+    image_size = next(
+        parameter
+        for parameter in text_target.parameters
+        if parameter.name == "image_size"
+    )
+
+    assert text_target.provider_model == "bytedance/seedream/v5/pro/text-to-image"
+    assert edit_target.provider_model == "bytedance/seedream/v5/pro/edit"
+    assert parameter_names == {"prompt", "image_size", "num_images", "output_format"}
+    assert image_size.default == "auto_2K"
+    assert image_size.choices == (
+        "square_hd",
+        "square",
+        "portrait_4_3",
+        "portrait_16_9",
+        "landscape_4_3",
+        "landscape_16_9",
+        "auto_1K",
+        "auto_2K",
+    )
+    assert text_target.fixed_inputs == {
+        "enable_safety_checker": False,
+        "sync_mode": False,
+    }
+    assert edit_target.source_images is not None
+    assert edit_target.source_images.provider_field == "image_urls"
+    assert edit_target.source_images.max_count == 10
 
 
 def test_falai_models_do_not_expose_byteplus_url_outputs():

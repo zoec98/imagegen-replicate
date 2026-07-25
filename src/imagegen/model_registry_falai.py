@@ -77,6 +77,7 @@ ERNIE_IMAGE_SIZE_CHOICES = (
 SEEDREAM45_IMAGE_SIZE_CHOICES = (*IMAGE_SIZE_CHOICES, "auto_2K", "auto_4K")
 SEEDREAM4_IMAGE_SIZE_CHOICES = (*IMAGE_SIZE_CHOICES, "auto", "auto_2K", "auto_4K")
 SEEDREAM5_IMAGE_SIZE_CHOICES = (*IMAGE_SIZE_CHOICES, "auto_2K", "auto_3K", "auto_4K")
+SEEDREAM5_PRO_IMAGE_SIZE_CHOICES = (*IMAGE_SIZE_CHOICES, "auto_1K", "auto_2K")
 AUTO_IMAGE_SIZE_CHOICES = (*IMAGE_SIZE_CHOICES, "auto")
 OUTPUT_FORMAT_CHOICES = ("jpeg", "png")
 EXTENDED_OUTPUT_FORMAT_CHOICES = ("jpeg", "png", "webp")
@@ -331,6 +332,42 @@ def _seedream_parameters(
             )
         )
     return tuple(sorted(parameters, key=lambda item: item.order or 999))
+
+
+def _seedream5_pro_parameters() -> tuple[ModelParameter, ...]:
+    return (
+        _param(
+            "prompt",
+            "The text prompt used to generate or edit the image.",
+            "string",
+            order=1,
+        ),
+        _param(
+            "image_size",
+            "The size of the generated image.",
+            "select",
+            "auto_2K",
+            choices=SEEDREAM5_PRO_IMAGE_SIZE_CHOICES,
+            order=2,
+        ),
+        _param(
+            "num_images",
+            "Number of separate model generations to run with the prompt.",
+            "integer",
+            1,
+            minimum=1,
+            maximum=6,
+            order=3,
+        ),
+        _param(
+            "output_format",
+            "The file format of the generated image.",
+            "select",
+            "jpeg",
+            choices=OUTPUT_FORMAT_CHOICES,
+            order=4,
+        ),
+    )
 
 
 def _nano_banana_2_parameters() -> tuple[ModelParameter, ...]:
@@ -1653,6 +1690,41 @@ SEEDREAM5 = ProviderModel(
     ),
 )
 
+SEEDREAM5_PRO = ProviderModel(
+    provider="falai",
+    alias="seedream5-pro",
+    display_name="Seedream 5 Pro",
+    text_target=GenerationTarget(
+        provider="falai",
+        alias="seedream5-pro",
+        display_name="Seedream 5 Pro",
+        provider_model="bytedance/seedream/v5/pro/text-to-image",
+        documentation_url="https://fal.ai/models/bytedance/seedream/v5/pro/text-to-image/api",
+        runtime_url="https://fal.run/bytedance/seedream/v5/pro/text-to-image",
+        mode="text-to-image",
+        parameters=_seedream5_pro_parameters(),
+        fixed_inputs=FALAI_FIXED_SAFE_IMAGE_INPUTS,
+        pricing=(
+            _falai_price("$0.0675", "per output image", metric="image_output_count"),
+        ),
+    ),
+    edit_target=GenerationTarget(
+        provider="falai",
+        alias="seedream5-pro",
+        display_name="Seedream 5 Pro",
+        provider_model="bytedance/seedream/v5/pro/edit",
+        documentation_url="https://fal.ai/models/bytedance/seedream/v5/pro/edit/api",
+        runtime_url="https://fal.run/bytedance/seedream/v5/pro/edit",
+        mode="image-edit",
+        parameters=_seedream5_pro_parameters(),
+        fixed_inputs=FALAI_FIXED_SAFE_IMAGE_INPUTS,
+        source_images=SourceImageBinding(provider_field="image_urls", max_count=10),
+        pricing=(
+            _falai_price("$0.0675", "per output image", metric="image_output_count"),
+        ),
+    ),
+)
+
 SEEDREAM4 = ProviderModel(
     provider="falai",
     alias="seedream",
@@ -1816,5 +1888,6 @@ MODEL_REGISTRY: dict[str, ProviderModel] = {
     SEEDREAM4.alias: SEEDREAM4,
     SEEDREAM45.alias: SEEDREAM45,
     SEEDREAM5.alias: SEEDREAM5,
+    SEEDREAM5_PRO.alias: SEEDREAM5_PRO,
     Z_IMAGE_TURBO.alias: Z_IMAGE_TURBO,
 }
