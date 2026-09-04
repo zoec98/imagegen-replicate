@@ -29,8 +29,8 @@ function renderMaskWorkspace() {
       <canvas class="mask-editor-source"></canvas>
       <canvas class="mask-editor-mask"></canvas>
       <select class="mask-editor-operation">
-        <option value="crop">Crop</option>
         <option value="blur">Blur</option>
+        <option value="crop">Crop</option>
         <option value="mask">Mask</option>
       </select>
       <div class="mask-editor-control-group mask-editor-brush-controls">
@@ -159,8 +159,8 @@ describe("setupMaskEditor", () => {
 
     const operation = document.querySelector(".mask-editor-operation");
     expect([...operation.options].map((option) => option.value)).toEqual([
-      "crop",
       "blur",
+      "crop",
       "mask",
     ]);
     expect(document.querySelector(".mask-editor-brush-controls").hidden).toBe(true);
