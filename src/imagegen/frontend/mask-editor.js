@@ -2,7 +2,6 @@ import { csrfJsonRequest } from "./api.js";
 
 const DEFAULT_BRUSH_SIZE = 50;
 const DEFAULT_BRUSH_FALLOFF = 0;
-const DEFAULT_BLUR_RADIUS = 20;
 const MAX_BLUR_RADIUS = 50;
 
 export function setupMaskEditor(root = document, services = {}) {
@@ -38,7 +37,8 @@ export function setupMaskEditor(root = document, services = {}) {
   let isPainting = false;
   let brushSize = DEFAULT_BRUSH_SIZE;
   let brushFalloff = DEFAULT_BRUSH_FALLOFF;
-  let blurRadius = DEFAULT_BLUR_RADIUS;
+  let blurRadius = 0;
+  let blurRadiusEdited = false;
   let operation = "crop";
   let cropStart = null;
   let cropSelection = null;
@@ -143,6 +143,7 @@ export function setupMaskEditor(root = document, services = {}) {
     overlay.dataset.cropSaveUrl = cropSaveUrl;
     overlay.dataset.maskUrl = maskUrl;
     overlay.dataset.maskSaveUrl = maskSaveUrl;
+    blurRadiusEdited = false;
     if (title) {
       title.textContent = filename;
     }
@@ -169,6 +170,7 @@ export function setupMaskEditor(root = document, services = {}) {
     sourceImage = null;
     maskData = null;
     isPainting = false;
+    blurRadiusEdited = false;
     resetCropSelection();
     resetOperation();
     resetCanvases();
@@ -185,6 +187,15 @@ export function setupMaskEditor(root = document, services = {}) {
       }
       sourceImage = image;
       maskData = new Float32Array(image.naturalWidth * image.naturalHeight);
+      if (blurRadiusInput && !blurRadiusEdited) {
+        blurRadiusInput.value = String(
+          Math.min(
+            Math.max(Math.max(image.naturalWidth, image.naturalHeight) / 50, 0),
+            MAX_BLUR_RADIUS,
+          ),
+        );
+      }
+      updateBlurControls();
       resetCanvases(image.naturalWidth, image.naturalHeight);
       redraw();
     };
@@ -599,7 +610,10 @@ export function setupMaskEditor(root = document, services = {}) {
   maskCanvas?.addEventListener("pointerleave", stopPainting);
   brushSizeInput?.addEventListener("input", updateBrushControls);
   brushFalloffInput?.addEventListener("input", updateBrushControls);
-  blurRadiusInput?.addEventListener("input", updateBlurControls);
+  blurRadiusInput?.addEventListener("input", () => {
+    blurRadiusEdited = true;
+    updateBlurControls();
+  });
   operationInput?.addEventListener("change", updateOperationControls);
   cropButton?.addEventListener("click", () => {
     crop().catch((error) => {

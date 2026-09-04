@@ -865,7 +865,6 @@
 	//#region src/imagegen/frontend/mask-editor.js
 	var DEFAULT_BRUSH_SIZE = 50;
 	var DEFAULT_BRUSH_FALLOFF = 0;
-	var DEFAULT_BLUR_RADIUS = 20;
 	var MAX_BLUR_RADIUS = 50;
 	function setupMaskEditor(root = document, services = {}) {
 		const { csrfToken = "", imageFactory = () => new Image(), refreshGallery = async () => {}, showMessage = () => {} } = services;
@@ -895,7 +894,8 @@
 		let isPainting = false;
 		let brushSize = DEFAULT_BRUSH_SIZE;
 		let brushFalloff = DEFAULT_BRUSH_FALLOFF;
-		let blurRadius = DEFAULT_BLUR_RADIUS;
+		let blurRadius = 0;
+		let blurRadiusEdited = false;
 		let operation = "crop";
 		let cropStart = null;
 		let cropSelection = null;
@@ -956,6 +956,7 @@
 			overlay.dataset.cropSaveUrl = cropSaveUrl;
 			overlay.dataset.maskUrl = maskUrl;
 			overlay.dataset.maskSaveUrl = maskSaveUrl;
+			blurRadiusEdited = false;
 			if (title) title.textContent = filename;
 			resetCropSelection();
 			resetOperation();
@@ -977,6 +978,7 @@
 			sourceImage = null;
 			maskData = null;
 			isPainting = false;
+			blurRadiusEdited = false;
 			resetCropSelection();
 			resetOperation();
 			resetCanvases();
@@ -988,6 +990,8 @@
 				if (overlay?.dataset.imageUrl !== imageUrl) return;
 				sourceImage = image;
 				maskData = new Float32Array(image.naturalWidth * image.naturalHeight);
+				if (blurRadiusInput && !blurRadiusEdited) blurRadiusInput.value = String(Math.min(Math.max(Math.max(image.naturalWidth, image.naturalHeight) / 50, 0), MAX_BLUR_RADIUS));
+				updateBlurControls();
 				resetCanvases(image.naturalWidth, image.naturalHeight);
 				redraw();
 			};
@@ -1288,7 +1292,10 @@
 		maskCanvas?.addEventListener("pointerleave", stopPainting);
 		brushSizeInput?.addEventListener("input", updateBrushControls);
 		brushFalloffInput?.addEventListener("input", updateBrushControls);
-		blurRadiusInput?.addEventListener("input", updateBlurControls);
+		blurRadiusInput?.addEventListener("input", () => {
+			blurRadiusEdited = true;
+			updateBlurControls();
+		});
 		operationInput?.addEventListener("change", updateOperationControls);
 		cropButton?.addEventListener("click", () => {
 			crop().catch((error) => {

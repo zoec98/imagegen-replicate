@@ -103,6 +103,30 @@ function largeFakeImageFactory() {
   return image;
 }
 
+function cappedFakeImageFactory() {
+  const image = largeFakeImageFactory();
+  image.naturalWidth = 5000;
+  image.naturalHeight = 100;
+  return image;
+}
+
+function recomputedFakeImageFactory() {
+  const image = largeFakeImageFactory();
+  image.naturalWidth = 250;
+  image.naturalHeight = 100;
+  return image;
+}
+
+function sequentialImageFactory() {
+  let imageCount = 0;
+  return () => {
+    imageCount += 1;
+    return imageCount === 1
+      ? largeFakeImageFactory()
+      : recomputedFakeImageFactory();
+  };
+}
+
 function setCanvasRect(canvas, rect) {
   vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue(rect);
 }
@@ -375,10 +399,12 @@ describe("setupMaskEditor", () => {
     );
   });
 
-  it("uses image editor defaults", () => {
+  it("uses the selected image dimensions for the blur default", async () => {
     renderMaskWorkspace();
     stubCanvas();
-    setupMaskEditor(document, { imageFactory: fakeImageFactory });
+    const editor = setupMaskEditor(document, { imageFactory: largeFakeImageFactory });
+    editor.open(document.querySelector(".gallery-item"));
+    await new Promise((resolve) => queueMicrotask(resolve));
 
     expect(document.querySelector(".mask-editor-brush-size").value).toBe("50");
     expect(document.querySelector(".mask-editor-brush-size-value").textContent).toBe(
@@ -388,10 +414,63 @@ describe("setupMaskEditor", () => {
     expect(document.querySelector(".mask-editor-brush-falloff-value").textContent).toBe(
       "0%",
     );
-    expect(document.querySelector(".mask-editor-blur-radius").value).toBe("20");
+    expect(document.querySelector(".mask-editor-blur-radius").value).toBe("2");
     expect(document.querySelector(".mask-editor-blur-radius-value").textContent).toBe(
-      "20 px",
+      "2 px",
     );
+  });
+
+  it("caps the image-derived blur default at 50 pixels", async () => {
+    renderMaskWorkspace();
+    stubCanvas();
+    const editor = setupMaskEditor(document, { imageFactory: cappedFakeImageFactory });
+    editor.open(document.querySelector(".gallery-item"));
+    await new Promise((resolve) => queueMicrotask(resolve));
+
+    expect(document.querySelector(".mask-editor-blur-radius").value).toBe("50");
+    expect(document.querySelector(".mask-editor-blur-radius-value").textContent).toBe(
+      "50 px",
+    );
+  });
+
+  it("recomputes the blur default for each image without clobbering current edits", async () => {
+    renderMaskWorkspace();
+    stubCanvas();
+    const editor = setupMaskEditor(document, { imageFactory: sequentialImageFactory() });
+    const firstFigure = document.querySelector(".gallery-item");
+    editor.open(firstFigure);
+    await new Promise((resolve) => queueMicrotask(resolve));
+
+    const radius = document.querySelector(".mask-editor-blur-radius");
+    radius.value = "7.5";
+    radius.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(radius.value).toBe("7.5");
+
+    const secondFigure = firstFigure.cloneNode(true);
+    secondFigure.dataset.filename = "second.png";
+    secondFigure.querySelector("img").src = "/images/second.png";
+    firstFigure.parentElement.append(secondFigure);
+    editor.open(secondFigure);
+    await new Promise((resolve) => queueMicrotask(resolve));
+
+    expect(radius.value).toBe("5");
+    expect(document.querySelector(".mask-editor-blur-radius-value").textContent).toBe(
+      "5 px",
+    );
+  });
+
+  it("preserves a blur edit made while the image is loading", async () => {
+    renderMaskWorkspace();
+    stubCanvas();
+    const editor = setupMaskEditor(document, { imageFactory: largeFakeImageFactory });
+    editor.open(document.querySelector(".gallery-item"));
+
+    const radius = document.querySelector(".mask-editor-blur-radius");
+    radius.value = "7.5";
+    radius.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((resolve) => queueMicrotask(resolve));
+
+    expect(radius.value).toBe("7.5");
   });
 
   it("updates blur radius labels", () => {
