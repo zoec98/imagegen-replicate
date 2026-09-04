@@ -140,10 +140,14 @@ function pointer(type, x, y) {
   return event;
 }
 
-function selectMaskMode() {
+function selectOperationMode(value) {
   const operation = document.querySelector(".mask-editor-operation");
-  operation.value = "mask";
+  operation.value = value;
   operation.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function selectMaskMode() {
+  selectOperationMode("mask");
 }
 
 describe("setupMaskEditor", () => {
@@ -161,7 +165,7 @@ describe("setupMaskEditor", () => {
     expect(overlay.dataset.cropSaveUrl).toBe("/api/images/source.png/crop");
     expect(overlay.dataset.maskSaveUrl).toBe("/api/images/source-mask.png");
     expect(document.querySelector("#mask-editor-title").textContent).toBe("source.png");
-    expect(document.querySelector(".mask-editor-operation").value).toBe("crop");
+    expect(document.querySelector(".mask-editor-operation").value).toBe("blur");
 
     document.querySelector(".mask-editor-close").click();
 
@@ -185,9 +189,9 @@ describe("setupMaskEditor", () => {
       "crop",
       "mask",
     ]);
-    expect(document.querySelector(".mask-editor-brush-controls").hidden).toBe(true);
-    expect(document.querySelector(".mask-editor-crop-controls").hidden).toBe(false);
-    expect(document.querySelector(".mask-editor-blur-controls").hidden).toBe(true);
+    expect(document.querySelector(".mask-editor-brush-controls").hidden).toBe(false);
+    expect(document.querySelector(".mask-editor-crop-controls").hidden).toBe(true);
+    expect(document.querySelector(".mask-editor-blur-controls").hidden).toBe(false);
 
     operation.value = "mask";
     operation.dispatchEvent(new Event("change", { bubbles: true }));
@@ -232,10 +236,10 @@ describe("setupMaskEditor", () => {
     document.querySelector(".mask-editor-close").click();
     editor.open(document.querySelector(".gallery-item"));
 
-    expect(operation.value).toBe("crop");
-    expect(document.querySelector(".mask-editor-brush-controls").hidden).toBe(true);
-    expect(document.querySelector(".mask-editor-crop-controls").hidden).toBe(false);
-    expect(document.querySelector(".mask-editor-blur-controls").hidden).toBe(true);
+    expect(operation.value).toBe("blur");
+    expect(document.querySelector(".mask-editor-brush-controls").hidden).toBe(false);
+    expect(document.querySelector(".mask-editor-crop-controls").hidden).toBe(true);
+    expect(document.querySelector(".mask-editor-blur-controls").hidden).toBe(false);
   });
 
   it("draws a crop rectangle and enables crop when the selection is valid", async () => {
@@ -246,6 +250,7 @@ describe("setupMaskEditor", () => {
     });
     editor.open(document.querySelector(".gallery-item"));
     await new Promise((resolve) => queueMicrotask(resolve));
+    selectOperationMode("crop");
     const canvas = document.querySelector(".mask-editor-mask");
     setCanvasRect(canvas, {
       height: 100,
@@ -272,6 +277,7 @@ describe("setupMaskEditor", () => {
     });
     editor.open(document.querySelector(".gallery-item"));
     await new Promise((resolve) => queueMicrotask(resolve));
+    selectOperationMode("crop");
     const canvas = document.querySelector(".mask-editor-mask");
     setCanvasRect(canvas, {
       height: 100,
@@ -306,6 +312,7 @@ describe("setupMaskEditor", () => {
     });
     editor.open(document.querySelector(".gallery-item"));
     await new Promise((resolve) => queueMicrotask(resolve));
+    selectOperationMode("crop");
     const canvas = document.querySelector(".mask-editor-mask");
     setCanvasRect(canvas, {
       height: 100,
@@ -357,6 +364,7 @@ describe("setupMaskEditor", () => {
     });
     editor.open(document.querySelector(".gallery-item"));
     await new Promise((resolve) => queueMicrotask(resolve));
+    selectOperationMode("crop");
     const canvas = document.querySelector(".mask-editor-mask");
     setCanvasRect(canvas, {
       height: 100,

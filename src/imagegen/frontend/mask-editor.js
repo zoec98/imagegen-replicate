@@ -39,7 +39,7 @@ export function setupMaskEditor(root = document, services = {}) {
   let brushFalloff = DEFAULT_BRUSH_FALLOFF;
   let blurRadius = 0;
   let blurRadiusEdited = false;
-  let operation = "crop";
+  let operation = "blur";
   let cropStart = null;
   let cropSelection = null;
   let isCropping = false;
@@ -103,7 +103,7 @@ export function setupMaskEditor(root = document, services = {}) {
   }
 
   function resetOperation() {
-    operation = "crop";
+    operation = "blur";
     if (operationInput) {
       operationInput.value = operation;
     }
