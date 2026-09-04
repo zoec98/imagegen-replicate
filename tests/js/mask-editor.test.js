@@ -121,9 +121,7 @@ function sequentialImageFactory() {
   let imageCount = 0;
   return () => {
     imageCount += 1;
-    return imageCount === 1
-      ? largeFakeImageFactory()
-      : recomputedFakeImageFactory();
+    return imageCount === 1 ? largeFakeImageFactory() : recomputedFakeImageFactory();
   };
 }
 
@@ -436,7 +434,9 @@ describe("setupMaskEditor", () => {
   it("recomputes the blur default for each image without clobbering current edits", async () => {
     renderMaskWorkspace();
     stubCanvas();
-    const editor = setupMaskEditor(document, { imageFactory: sequentialImageFactory() });
+    const editor = setupMaskEditor(document, {
+      imageFactory: sequentialImageFactory(),
+    });
     const firstFigure = document.querySelector(".gallery-item");
     editor.open(firstFigure);
     await new Promise((resolve) => queueMicrotask(resolve));
