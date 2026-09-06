@@ -67,13 +67,27 @@ def list_models_for_provider(provider: ProviderId) -> tuple[ProviderModel, ...]:
     )
 
 
-def resolve_model(provider: ProviderId, alias: str) -> ProviderModel:
+def resolve_model(provider: ProviderId, model_ref: str) -> ProviderModel:
     registry = _provider_registry(provider)
-    model = registry.get(alias)
+    model = registry.get(model_ref)
+    if model is None:
+        matches = [
+            candidate
+            for candidate in registry.values()
+            if candidate.display_name.casefold() == model_ref.casefold()
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            aliases = ", ".join(sorted(candidate.alias for candidate in matches))
+            raise RegistryLookupError(
+                f"Ambiguous model display name `{model_ref}` for provider "
+                f"`{provider}`. Use an alias: {aliases}."
+            )
     if model is None:
         choices = ", ".join(sorted(registry))
         raise RegistryLookupError(
-            f"Unknown model `{alias}` for provider `{provider}`. Expected one of: {choices}."
+            f"Unknown model `{model_ref}` for provider `{provider}`. Expected one of: {choices}."
         )
     return model
 

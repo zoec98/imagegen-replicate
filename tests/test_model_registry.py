@@ -149,6 +149,24 @@ def test_duplicate_aliases_resolve_inside_selected_provider():
     )
 
 
+def test_model_display_name_resolves_case_insensitively_within_provider():
+    model = resolve_model_ref(
+        "sEeDrEaM 4.5",
+        selected_provider="falai",
+    )
+
+    assert model.alias == "seedream45"
+    assert model.provider == "falai"
+
+
+def test_selectable_model_aliases_and_display_names_are_unique_per_provider():
+    for provider in list_providers():
+        models = list_models_for_provider(provider.id)
+        assert len({model.alias for model in models}) == len(models)
+        display_names = {model.display_name.casefold() for model in models}
+        assert len(display_names) == len(models)
+
+
 def test_replicate_seedream5_models_expose_supported_inputs_only():
     lite = resolve_model("replicate", "seedream5")
     pro = resolve_model("replicate", "seedream5-pro")

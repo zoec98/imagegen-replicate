@@ -18,6 +18,10 @@ Model definitions should be data-driven. Each supported model should declare:
 - Defaults, bounds, choices, array item formats, and display order.
 - Output shape, especially whether outputs are image URLs.
 
+Selectable model aliases must be unique within each provider. Selectable model
+display names must also be unique case-insensitively within each provider;
+display names are valid user-facing model references for the `imagegen` CLI.
+
 ## Replicate
 
 Use the official `replicate` Python package for Replicate API access.
