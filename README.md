@@ -169,6 +169,39 @@ It will notice if the application has updated and will ask you to reload if it i
 Image edit sources are selected from local gallery images.
 Generated images are stored under `IMAGEGEN_DATA_DIR/images`, `data/images` by default.
 
+## Command-line use
+
+Run `imagegen` from the project root. It reads the same `.env` and writes
+results to the same gallery as the web application.
+
+Use help to discover providers and models, then model-specific help to discover
+the model's parameters:
+
+```bash
+imagegen --help
+imagegen --provider replicate --model seedream45 --help
+```
+
+Select a model by its alias or by its display name:
+
+```bash
+imagegen --provider replicate --model seedream45 --prompt "a red fox"
+imagegen --provider falai --model "Seedream 4.5" --file prompts/fox.txt
+```
+
+`--prompt` and `--file` are mutually exclusive. Prompt files are read as UTF-8
+and surrounding whitespace is removed. Model parameters use their registry
+names; both underscore and hyphen spellings are accepted, such as
+`--image_size` and `--image-size`. Boolean parameters use paired options such
+as `--sync_mode` and `--no-sync_mode`.
+
+Without `--quiet`, successful generation prints the completed request JSON.
+With `--quiet`, it prints only reusable project-root-relative image paths, one
+per line, for example `outputs/images/seedream45-prediction-123-01.jpg`.
+Errors go to stderr. Exit status `0` means success, `1` means generation or
+runtime failure, and `2` means argument or validation failure. The same help
+text is intended for both human users and language-model agents.
+
 ## Image Uploads
 
 Use the `Upload` button next to the trash control to add existing images to the
