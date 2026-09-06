@@ -147,6 +147,40 @@ def test_duplicate_aliases_resolve_inside_selected_provider():
     )
 
 
+def test_replicate_seedream5_models_expose_supported_inputs_only():
+    lite = resolve_model("replicate", "seedream5")
+    pro = resolve_model("replicate", "seedream5-pro")
+
+    assert lite.text_target.provider_model == "bytedance/seedream-5-lite"
+    assert lite.edit_target is not None
+    assert lite.edit_target.source_images is not None
+    assert lite.edit_target.source_images.max_count == 14
+    assert pro.text_target.provider_model == "bytedance/seedream-5-pro"
+    assert pro.edit_target is not None
+    assert pro.edit_target.source_images is not None
+    assert pro.edit_target.source_images.max_count == 10
+
+    for target in (lite.text_target, pro.text_target):
+        names = [parameter.name for parameter in target.parameters]
+        output_format = next(
+            parameter
+            for parameter in target.parameters
+            if parameter.name == "output_format"
+        )
+        assert "return_byteplus_urls" not in names
+        assert "layer_decomposition" not in names
+        assert output_format.default == "jpeg"
+        assert output_format.choices == ("jpeg",)
+
+    assert [parameter.name for parameter in pro.text_target.parameters] == [
+        "prompt",
+        "image_input",
+        "size",
+        "aspect_ratio",
+        "output_format",
+    ]
+
+
 def test_fully_qualified_and_bare_model_refs_resolve_by_provider():
     assert resolve_model_ref("replicate:seedream45").provider == "replicate"
     assert resolve_model_ref("falai:seedream45").provider == "falai"

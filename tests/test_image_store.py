@@ -80,27 +80,32 @@ def test_download_image_writes_file_and_embedded_metadata(tmp_path):
 def test_persist_generated_images_creates_output_directory(tmp_path):
     model = MODEL_REGISTRY["seedream45"]
     output_dir = tmp_path / "missing" / "images"
-    response = httpx.Response(
-        200,
-        headers={"content-type": "image/png"},
-        content=image_bytes("PNG"),
-        request=httpx.Request("GET", "https://example.com/out.png"),
-    )
+
+    def handler(request):
+        return httpx.Response(
+            200,
+            headers={"content-type": "image/png"},
+            content=image_bytes("PNG"),
+            request=request,
+        )
 
     stored = persist_generated_images(
-        ["https://example.com/out.png"],
+        ["https://example.com/out-1.png", "https://example.com/out-2.png"],
         output_dir=output_dir,
         model=model,
         prompt="a cookie",
         prediction_id="abc123",
         prediction_input={"prompt": "a cookie"},
         author="Zoé Cordelier",
-        client=response_client(response),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
         resolver=safe_resolver,
     )
 
     assert output_dir.exists()
-    assert stored[0].path == output_dir / "seedream45-abc123-01.png"
+    assert [image.path for image in stored] == [
+        output_dir / "seedream45-abc123-01.png",
+        output_dir / "seedream45-abc123-02.png",
+    ]
 
 
 def test_download_image_rejects_non_image_response(tmp_path):

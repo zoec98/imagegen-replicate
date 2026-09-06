@@ -144,6 +144,158 @@ SEEDREAM45 = ReplicateModel(
 )
 
 
+SEEDREAM5 = ReplicateModel(
+    alias="seedream5",
+    display_name="Seedream 5 Lite",
+    documentation_url="https://replicate.com/bytedance/seedream-5-lite/api/schema",
+    replicate_model="bytedance/seedream-5-lite",
+    edit_capable=True,
+    fixed_inputs={},
+    default_width=2048,
+    default_height=2048,
+    modes=("text-to-image", "image-edit"),
+    source_image_parameter="image_input",
+    source_image_max=14,
+    pricing=(_price("$0.035", "or around 28 images for $1"),),
+    parameters=(
+        _param(
+            "prompt",
+            "Text prompt for image generation. Maximum 4000 characters. BytePlus recommends keeping prompts under 600 English words for best results.",
+            "string",
+            order=0,
+        ),
+        _param(
+            "image_input",
+            "Input image(s) for image-to-image generation. List of 1-14 images for single or multi-reference generation.",
+            "array",
+            (),
+            order=1,
+        ),
+        _param(
+            "size",
+            "Image resolution: 2K (2048px) or 3K (3072px).",
+            "select",
+            "2K",
+            choices=("2K", "3K"),
+            order=2,
+        ),
+        _param(
+            "aspect_ratio",
+            "Image aspect ratio. Use 'match_input_image' to automatically match the input image's aspect ratio.",
+            "select",
+            "match_input_image",
+            choices=(
+                "match_input_image",
+                "1:1",
+                "4:3",
+                "3:4",
+                "16:9",
+                "9:16",
+                "3:2",
+                "2:3",
+                "21:9",
+            ),
+            order=3,
+        ),
+        _param(
+            "sequential_image_generation",
+            "Group image generation mode. 'disabled' generates a single image. 'auto' lets the model decide whether to generate multiple related images (e.g., story scenes, character variations).",
+            "select",
+            "disabled",
+            choices=("disabled", "auto"),
+            order=4,
+        ),
+        _param(
+            "max_images",
+            "Maximum number of images to generate when sequential_image_generation='auto'. Range: 1-15. Total images (input + generated) cannot exceed 15.",
+            "integer",
+            1,
+            minimum=1,
+            maximum=15,
+            order=5,
+        ),
+        _param(
+            "output_format",
+            "Output image format.",
+            "select",
+            "jpeg",
+            choices=("jpeg",),
+            order=6,
+        ),
+    ),
+)
+
+
+SEEDREAM5_PRO = ReplicateModel(
+    alias="seedream5-pro",
+    display_name="Seedream 5 Pro",
+    documentation_url="https://replicate.com/bytedance/seedream-5-pro/api/schema",
+    replicate_model="bytedance/seedream-5-pro",
+    edit_capable=True,
+    fixed_inputs={},
+    default_width=2048,
+    default_height=2048,
+    modes=("text-to-image", "image-edit"),
+    source_image_parameter="image_input",
+    source_image_max=10,
+    pricing=(
+        _price("$0.045", "or around 22 images for $1"),
+        _price("$0.09", "or around 11 images for $1"),
+        _price("$0.0225", "or around 44 images for $1"),
+        _price("$0.045", "or around 22 images for $1"),
+    ),
+    parameters=(
+        _param(
+            "prompt",
+            "Text prompt for image generation. Maximum 4000 characters.",
+            "string",
+            order=0,
+        ),
+        _param(
+            "image_input",
+            "Input image(s) for image-to-image generation. List of 1-10 reference images.",
+            "array",
+            (),
+            order=1,
+        ),
+        _param(
+            "size",
+            "Image resolution. Standard mode supports 1K and 2K.",
+            "select",
+            "2K",
+            choices=("1K", "2K"),
+            order=2,
+        ),
+        _param(
+            "aspect_ratio",
+            "Image aspect ratio. Use 'match_input_image' to automatically match the input image's aspect ratio.",
+            "select",
+            "match_input_image",
+            choices=(
+                "match_input_image",
+                "1:1",
+                "4:3",
+                "3:4",
+                "16:9",
+                "9:16",
+                "3:2",
+                "2:3",
+                "21:9",
+            ),
+            order=3,
+        ),
+        _param(
+            "output_format",
+            "Output image format.",
+            "select",
+            "jpeg",
+            choices=("jpeg",),
+            order=4,
+        ),
+    ),
+)
+
+
 FLUX_FLEX = ReplicateModel(
     alias="flux-flex",
     display_name="Flux 2 Flex",
@@ -1068,6 +1220,8 @@ MODEL_REGISTRY: dict[str, ReplicateModel] = {
     OPENAI_GPT_IMAGE_2.alias: OPENAI_GPT_IMAGE_2,
     QWEN_2512.alias: QWEN_2512,
     SEEDREAM45.alias: SEEDREAM45,
+    SEEDREAM5.alias: SEEDREAM5,
+    SEEDREAM5_PRO.alias: SEEDREAM5_PRO,
     WAN_27_PRO.alias: WAN_27_PRO,
 }
 
