@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import json
+import sqlite3
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from imagegen.config import AppConfig, load_config
+from imagegen.generation_log import GenerationLog, SQLiteGenerationLog
 from imagegen.model_registry import (
     GenerationTarget,
     ModelParameter,
@@ -19,6 +23,11 @@ from imagegen.model_registry import (
     resolve_generation_target,
     resolve_model_ref,
 )
+from imagegen.prompt_annotations import strip_prompt_annotations
+from imagegen.provider_requests import build_provider_request
+from imagegen.request_store import GenerationRequest, RequestStore
+from imagegen.validation import ValidationError, validate_generation_payload
+from imagegen.worker import run_generation_request
 
 
 @dataclass(frozen=True)
@@ -32,6 +41,10 @@ class CliRequest:
 
 
 class CliArgumentError(ValueError):
+    pass
+
+
+class CliRuntimeError(RuntimeError):
     pass
 
 
@@ -58,10 +71,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     if isinstance(request, int):
         return request
-    print(
-        "imagegen: error: generation arguments are not implemented yet", file=sys.stderr
-    )
-    return 1
+    try:
+        record = run_cli_generation(request)
+    except CliArgumentError as error:
+        print(f"imagegen: error: {error}", file=sys.stderr)
+        return 2
+    except (CliRuntimeError, OSError, ValueError, sqlite3.Error) as error:
+        print(f"imagegen: error: {error}", file=sys.stderr)
+        return 1
+    return _emit_result(record, quiet=request.quiet)
 
 
 def parse_cli_request(arguments: Sequence[str]) -> CliRequest | int:
@@ -116,6 +134,75 @@ def parse_cli_request(arguments: Sequence[str]) -> CliRequest | int:
         parameters=parameters,
         quiet=parsed.quiet,
     )
+
+
+def run_cli_generation(
+    request: CliRequest,
+    *,
+    app_config: AppConfig | None = None,
+    providers: Mapping[str, object] | None = None,
+    generation_log: GenerationLog | None = None,
+) -> GenerationRequest:
+    config = app_config or load_config()
+    if request.provider not in config.enabled_providers:
+        raise CliRuntimeError(f"Provider `{request.provider}` is not enabled.")
+    try:
+        validated = validate_generation_payload(
+            {
+                "prompt": request.prompt,
+                "parameters": request.parameters,
+            },
+            model=request.model,
+            target=request.target,
+            output_dir=config.output_dir,
+        )
+    except ValidationError as error:
+        raise CliArgumentError(str(error)) from error
+
+    store = RequestStore()
+    record = store.create(
+        provider=request.provider,
+        model_alias=request.model.alias,
+        prompt=validated.prompt,
+        parameters=validated.parameters,
+        source_images=[],
+        edit_mode=False,
+    )
+    log = generation_log or SQLiteGenerationLog(config.generation_log_path)
+    log.initialize()
+    log.create_request(
+        record,
+        model_alias=request.model.alias,
+        model=request.target.provider_model,
+        replicate_input=build_provider_request(
+            strip_prompt_annotations(validated.prompt),
+            request.model,
+            request.target,
+            parameters=validated.parameters,
+        ),
+    )
+    run_generation_request(
+        store,
+        record,
+        config,
+        providers=providers,
+        generation_log=log,
+    )
+    return store.get(record.request_id) or record
+
+
+def _emit_result(record: GenerationRequest, *, quiet: bool) -> int:
+    if record.status != "succeeded":
+        print(
+            record.error or f"generation ended with status {record.status}",
+            file=sys.stderr,
+        )
+        return 1
+    if quiet:
+        print("\n".join(record.images))
+    else:
+        print(json.dumps(record.to_json(), sort_keys=True))
+    return 0
 
 
 def _bootstrap_parser() -> argparse.ArgumentParser:

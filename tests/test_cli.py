@@ -1,5 +1,14 @@
+import pytest
+
 from imagegen import main
-from imagegen.cli import CliRequest, parse_cli_request
+from imagegen.cli import (
+    CliArgumentError,
+    CliRequest,
+    parse_cli_request,
+    run_cli_generation,
+)
+from imagegen.generation_log import SQLiteGenerationLog
+from imagegen.generation_types import GenerationResult
 
 
 def test_help_lists_providers_and_models_without_loading_configuration(
@@ -137,3 +146,89 @@ def test_model_parameter_aliases_are_normalized_and_typed():
     assert isinstance(request, CliRequest)
     assert request.parameters["image_size"] == "square"
     assert request.parameters["num_images"] == 2
+
+
+def test_cli_generation_runs_synchronously_through_existing_provider_service(
+    app_config,
+):
+    request = parse_cli_request(
+        [
+            "--provider",
+            "replicate",
+            "--model",
+            "seedream45",
+            "--prompt",
+            "a red fox",
+        ]
+    )
+    assert isinstance(request, CliRequest)
+
+    class FakeProvider:
+        def generate(self, request_record, config):
+            assert request_record.prompt == "a red fox"
+            assert request_record.model_alias == "seedream45"
+            return GenerationResult(
+                prediction_id="prediction-1",
+                output_urls=["https://example.test/fox.png"],
+                stored_images=[],
+                logs="",
+            )
+
+    record = run_cli_generation(
+        request,
+        app_config=app_config,
+        providers={"replicate": FakeProvider()},
+    )
+
+    assert record.status == "succeeded"
+    assert record.prediction_id == "prediction-1"
+    assert record.output_urls == ["https://example.test/fox.png"]
+    log = SQLiteGenerationLog(app_config.generation_log_path)
+    assert log.get_request(record.request_id)["model_alias"] == "seedream45"
+    assert log.get_result(record.request_id)["status"] == "succeeded"
+
+
+def test_cli_generation_reuses_existing_parameter_validation(app_config):
+    request = parse_cli_request(
+        [
+            "--provider",
+            "replicate",
+            "--model",
+            "flux-flex",
+            "--prompt",
+            "a red fox",
+            "--guidance",
+            "999",
+        ]
+    )
+    assert isinstance(request, CliRequest)
+
+    with pytest.raises(CliArgumentError, match="guidance must be at most"):
+        run_cli_generation(request, app_config=app_config, providers={})
+
+
+def test_cli_generation_returns_failed_terminal_request(app_config):
+    request = parse_cli_request(
+        [
+            "--provider",
+            "replicate",
+            "--model",
+            "seedream45",
+            "--prompt",
+            "a red fox",
+        ]
+    )
+    assert isinstance(request, CliRequest)
+
+    class FailingProvider:
+        def generate(self, request_record, config):
+            raise RuntimeError("provider is unavailable")
+
+    record = run_cli_generation(
+        request,
+        app_config=app_config,
+        providers={"replicate": FailingProvider()},
+    )
+
+    assert record.status == "failed"
+    assert record.error == "provider is unavailable"
