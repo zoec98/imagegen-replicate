@@ -15,6 +15,8 @@ from typing import Protocol
 from imagegen.config import AppConfig
 from imagegen.falai_client import (
     FalAIRequestTimeout,
+)
+from imagegen.falai_client import (
     generate_image_urls as generate_falai_image_urls,
 )
 from imagegen.generation_types import GenerationProviderTimeout, GenerationResult

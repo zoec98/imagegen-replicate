@@ -20,7 +20,6 @@ from imagegen.image_store import StoredImage, persist_generated_images
 from imagegen.model_registry import ReplicateModel
 from imagegen.prompt_annotations import strip_prompt_annotations
 
-
 TERMINAL_STATUSES = {"succeeded", "failed", "canceled"}
 PersistImages = Callable[..., list[StoredImage]]
 
@@ -145,9 +144,7 @@ def build_prediction_input(
     for parameter in model.parameters:
         if parameter.name == "prompt":
             prediction_input[parameter.name] = prompt
-        elif parameter.name == model.source_image_parameter:
-            continue
-        elif (
+        elif parameter.name == model.source_image_parameter or (
             use_custom_dimensions
             and custom_dimensions is not None
             and parameter.name == custom_dimensions.scale_parameter

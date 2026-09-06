@@ -15,7 +15,6 @@ from typing import Literal
 
 from imagegen.model_registry import ProviderId
 
-
 RequestStatus = Literal["queued", "running", "succeeded", "failed", "timeout"]
 REQUEST_STATUSES: set[str] = {"queued", "running", "succeeded", "failed", "timeout"}
 

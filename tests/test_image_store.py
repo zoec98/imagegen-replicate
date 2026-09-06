@@ -7,8 +7,8 @@ Behaviors protected:
 - Batch persistence creates the output directory and stores each output safely.
 """
 
-from ipaddress import ip_address
 from io import BytesIO
+from ipaddress import ip_address
 
 import httpx
 import pytest

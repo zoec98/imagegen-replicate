@@ -17,8 +17,8 @@ def _param(
     default: object = "",
     *,
     choices: tuple[object, ...] = (),
-    minimum: float | int | None = None,
-    maximum: float | int | None = None,
+    minimum: float | None = None,
+    maximum: float | None = None,
     order: int | None = None,
     semantic_type: ParameterSemanticType | None = None,
 ) -> ModelParameter:

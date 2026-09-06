@@ -6,7 +6,6 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-
 FRAGMENT_EXTENSION = ".txt"
 MAX_FRAGMENT_BYTES = 1024
 DEFAULT_PALETTE_NAMES = ("character", "dress", "place", "style")

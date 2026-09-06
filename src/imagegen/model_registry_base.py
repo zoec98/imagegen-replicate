@@ -7,9 +7,9 @@ share parameters, capabilities, or endpoint shapes across providers.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal, Mapping
-
+from typing import Literal
 
 ProviderId = Literal["replicate", "falai"]
 ParameterType = Literal["array", "boolean", "integer", "number", "select", "string"]

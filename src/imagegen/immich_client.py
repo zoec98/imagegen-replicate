@@ -11,7 +11,6 @@ from urllib.parse import quote
 
 import httpx
 
-
 IMMICH_GALLERY_PAGE_SIZE = 20
 
 
@@ -425,7 +424,4 @@ def _timestamp(seconds: float) -> str:
 
 
 def _device_asset_id(image_path: Path, stat: object) -> str:
-    return (
-        f"imagegen:{image_path.name}:"
-        f"{getattr(stat, 'st_size')}:{getattr(stat, 'st_mtime_ns')}"
-    )
+    return f"imagegen:{image_path.name}:{stat.st_size}:{stat.st_mtime_ns}"

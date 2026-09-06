@@ -16,18 +16,18 @@ from io import BytesIO
 import httpx
 import pytest
 from PIL import Image
+from route_helpers import extract_csrf_token
 
 from imagegen.app import create_app
 from imagegen.mask_store import (
-    MASK_PNG_ABSOLUTE_DECODED_LIMIT_BYTES,
     MASK_DATA_URL_PREFIX,
     MASK_JSON_FIXED_OVERHEAD_BYTES,
+    MASK_PNG_ABSOLUTE_DECODED_LIMIT_BYTES,
     MASK_PNG_BYTES_PER_PIXEL_LIMIT,
     MASK_PNG_FIXED_OVERHEAD_BYTES,
     mask_payload_limits,
 )
 from imagegen.metadata_embed import read_embedded_metadata, write_embedded_metadata
-from route_helpers import extract_csrf_token
 
 
 def test_image_route_serves_stored_file(app_config, app_factory):

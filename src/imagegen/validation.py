@@ -15,8 +15,8 @@ from imagegen.model_registry import (
     CustomDimensionsControl,
     GenerationTarget,
     ModelParameter,
-    ReplicateModel,
     ProviderModel,
+    ReplicateModel,
 )
 from imagegen.prompt_annotations import (
     PromptAnnotationError,
@@ -201,9 +201,7 @@ def _omit_blank_parameter(parameter: ModelParameter, value: Any) -> bool:
         return True
     # An optional select (one whose choices include "") should not be forwarded
     # to the provider when the user leaves it blank.
-    if parameter.type == "select" and value == "" and "" in parameter.choices:
-        return True
-    return False
+    return parameter.type == "select" and value == "" and "" in parameter.choices
 
 
 def _normalize_model_parameters(

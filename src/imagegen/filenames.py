@@ -6,7 +6,6 @@ from pathlib import Path
 
 from werkzeug.utils import secure_filename
 
-
 IMAGE_EXTENSIONS = {".jpeg", ".jpg", ".png", ".webp"}
 
 

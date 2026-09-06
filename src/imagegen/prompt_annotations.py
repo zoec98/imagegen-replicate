@@ -7,7 +7,6 @@ from dataclasses import dataclass
 
 from imagegen.palettes import is_valid_name
 
-
 ANNOTATION_START = re.compile(r"\(([A-Za-z][A-Za-z0-9_-]*):")
 
 

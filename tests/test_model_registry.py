@@ -19,7 +19,6 @@ from imagegen.model_registry import (
     resolve_model_ref,
 )
 
-
 VALID_MODES = {"text-to-image", "image-edit"}
 VALID_PARAMETER_TYPES = {"array", "boolean", "integer", "number", "select", "string"}
 
@@ -57,9 +56,12 @@ def test_every_model_parameter_has_useful_shape():
             if parameter.type == "select":
                 assert parameter.choices
                 assert parameter.default in parameter.choices
-            if parameter.type in {"integer", "number"}:
-                if parameter.minimum is not None and parameter.maximum is not None:
-                    assert parameter.minimum <= parameter.maximum
+            if (
+                parameter.type in {"integer", "number"}
+                and parameter.minimum is not None
+                and parameter.maximum is not None
+            ):
+                assert parameter.minimum <= parameter.maximum
 
 
 def test_fixed_inputs_are_not_user_parameters():

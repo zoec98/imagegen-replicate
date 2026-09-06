@@ -6,7 +6,6 @@ import hashlib
 from collections.abc import Iterable
 from pathlib import Path
 
-
 PACKAGE_ROOT = Path(__file__).resolve().parent
 APP_VERSION_FILES = (
     PACKAGE_ROOT / "templates" / "index.html",

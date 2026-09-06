@@ -14,7 +14,6 @@ from typing import Any
 
 from flask import Response, jsonify, request, session
 
-
 CSRF_TOKEN_BYTES = 32
 CSRF_SESSION_KEY = "csrf_token"
 CSRF_CLIENT_IP_SESSION_KEY = "csrf_client_ip"

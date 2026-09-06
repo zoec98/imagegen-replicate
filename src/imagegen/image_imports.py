@@ -11,7 +11,6 @@ from uuid import uuid4
 import httpx
 from PIL import Image, UnidentifiedImageError
 
-
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
 FORMAT_EXTENSIONS = {

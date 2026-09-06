@@ -23,7 +23,7 @@ def _generation_year(created_at: str) -> int:
         msg = "created_at is required to synthesize copyright metadata."
         raise ValueError(msg)
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value)
     except ValueError as error:
         msg = f"created_at must be an ISO timestamp, got {created_at!r}."
         raise ValueError(msg) from error

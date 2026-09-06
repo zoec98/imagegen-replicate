@@ -12,7 +12,6 @@ from imagegen.mask_store import MaskPayloadError, decode_mask_payload
 from imagegen.metadata_embed import read_embedded_metadata, write_embedded_metadata
 from imagegen.source_images import validate_source_image_filename
 
-
 MIN_CROP_SIZE = 10
 MAX_BLUR_RADIUS = 50
 

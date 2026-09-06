@@ -6,9 +6,10 @@ Behaviors protected:
 - Crop preserves existing embedded application metadata exactly.
 """
 
-import pytest
 from base64 import b64encode
 from io import BytesIO
+
+import pytest
 from PIL import Image
 
 from imagegen.image_edits import ImageEditError, blur_image, crop_image

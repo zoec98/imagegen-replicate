@@ -9,7 +9,6 @@ Behaviors protected:
 
 from route_helpers import extract_csrf_token
 
-
 EXPECTED_CSP = (
     "default-src 'self'; "
     "script-src 'self'; "

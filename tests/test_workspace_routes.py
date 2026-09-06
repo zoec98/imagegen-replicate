@@ -9,15 +9,16 @@ Behaviors protected:
 from dataclasses import replace
 from urllib.parse import parse_qs, urlparse
 
-from imagegen.metadata import EmbeddedImageMetadataProvider
-from imagegen.model_registry import MODEL_REGISTRY
-from imagegen.routes import _workspace_context
 from route_helpers import (
     extract_app_checksum,
     extract_attribute,
     extract_model_registry,
     extract_palette_data,
 )
+
+from imagegen.metadata import EmbeddedImageMetadataProvider
+from imagegen.model_registry import MODEL_REGISTRY
+from imagegen.routes import _workspace_context
 
 
 def test_index_renders_prompt_form(app_factory):

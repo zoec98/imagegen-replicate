@@ -23,7 +23,6 @@ from imagegen.model_registry import GenerationTarget, ProviderModel
 from imagegen.prompt_annotations import strip_prompt_annotations
 from imagegen.provider_requests import build_provider_request
 
-
 PersistImages = Callable[..., list[StoredImage]]
 
 

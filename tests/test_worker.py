@@ -10,8 +10,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Event
 
-from imagegen.generation_provider import ReplicateGenerationProvider
 from imagegen.generation_log import SQLiteGenerationLog
+from imagegen.generation_provider import ReplicateGenerationProvider
 from imagegen.generation_types import GenerationProviderTimeout, GenerationResult
 from imagegen.image_store import StoredImage
 from imagegen.replicate_client import ReplicateResult

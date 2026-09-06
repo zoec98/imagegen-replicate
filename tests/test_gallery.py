@@ -6,8 +6,8 @@ Behaviors protected:
 - Empty and purge operations stay confined to eligible files in the trash directory.
 """
 
-from datetime import datetime, timedelta, timezone
 import os
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -114,7 +114,7 @@ def test_purge_old_trash_deletes_only_old_supported_files(tmp_path):
     os.utime(old_image, (100, 100))
     os.utime(fresh_image, (300, 300))
     os.utime(old_text, (100, 100))
-    cutoff = datetime.fromtimestamp(200, tz=timezone.utc)
+    cutoff = datetime.fromtimestamp(200, tz=UTC)
 
     deleted = purge_old_trash(trash_dir, cutoff=cutoff)
 
@@ -133,7 +133,7 @@ def test_purge_old_trash_accepts_timezone_aware_cutoff(tmp_path):
 
     deleted = purge_old_trash(
         trash_dir,
-        cutoff=datetime.fromtimestamp(100, tz=timezone.utc) + timedelta(seconds=1),
+        cutoff=datetime.fromtimestamp(100, tz=UTC) + timedelta(seconds=1),
     )
 
     assert [path.name for path in deleted] == ["old.png"]

@@ -14,7 +14,6 @@ from typing import Any
 
 from PIL import Image, PngImagePlugin, UnidentifiedImageError
 
-
 IMAGE_DESCRIPTION_TAG = 270
 SOFTWARE_TAG = 305
 DATETIME_TAG = 306
@@ -169,7 +168,7 @@ def _exif_datetime(created_at: str | None) -> str | None:
     if not created_at:
         return None
     try:
-        parsed = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(created_at)
     except ValueError:
         return None
     return parsed.strftime("%Y:%m:%d %H:%M:%S")

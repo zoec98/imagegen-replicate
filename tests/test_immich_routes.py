@@ -10,6 +10,7 @@ from dataclasses import replace
 from io import BytesIO
 
 from PIL import Image
+from route_helpers import extract_csrf_token
 
 from imagegen.immich_client import (
     IMMICH_GALLERY_PAGE_SIZE,
@@ -20,7 +21,6 @@ from imagegen.immich_client import (
     ImmichUploadResult,
 )
 from imagegen.metadata_embed import read_embedded_metadata, write_embedded_metadata
-from route_helpers import extract_csrf_token
 
 
 def test_api_images_exposes_immich_upload_url_only_when_configured(

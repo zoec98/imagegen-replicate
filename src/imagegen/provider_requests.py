@@ -39,9 +39,7 @@ def build_provider_request(
     for parameter in target.parameters:
         if parameter.name == "prompt":
             provider_request[parameter.name] = prompt
-        elif parameter.name == source_image_parameter:
-            continue
-        elif (
+        elif parameter.name == source_image_parameter or (
             use_custom_dimensions
             and custom_dimensions is not None
             and parameter.name == custom_dimensions.scale_parameter

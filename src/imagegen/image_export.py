@@ -7,7 +7,6 @@ from uuid import uuid4
 
 from PIL import Image, UnidentifiedImageError
 
-
 EXPORT_FORMATS = {"JPEG", "PNG", "WEBP"}
 EXPORT_SUFFIXES = {".jpeg", ".jpg", ".png", ".webp"}
 

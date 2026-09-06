@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -78,7 +78,7 @@ def refresh_trash_count(
     retention_days: int | None,
 ) -> int:
     if retention_days is not None:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+        cutoff = datetime.now(UTC) - timedelta(days=retention_days)
         purge_old_trash(trash_dir, cutoff=cutoff)
     return count_trash_images(trash_dir)
 

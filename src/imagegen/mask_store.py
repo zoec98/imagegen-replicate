@@ -12,7 +12,6 @@ from PIL import Image, UnidentifiedImageError
 
 from imagegen.gallery import mask_filename
 
-
 MASK_PNG_BYTES_PER_PIXEL_LIMIT = 4
 MASK_PNG_FIXED_OVERHEAD_BYTES = 1024 * 1024
 MASK_PNG_ABSOLUTE_DECODED_LIMIT_BYTES = 256 * 1024 * 1024

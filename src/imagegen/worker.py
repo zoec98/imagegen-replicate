@@ -14,11 +14,11 @@ from pathlib import Path
 from typing import Protocol
 
 from imagegen.config import AppConfig
+from imagegen.generation_log import GenerationLog
 from imagegen.generation_provider import (
     GenerationProvider,
     default_generation_providers,
 )
-from imagegen.generation_log import GenerationLog
 from imagegen.generation_types import GenerationProviderTimeout
 from imagegen.request_store import GenerationRequest, RequestStore
 
@@ -90,7 +90,7 @@ def run_generation_request(
                 error=str(error),
             )
         return
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001
         store.update(request_record.request_id, status="failed", error=str(error))
         if generation_log is not None:
             generation_log.mark_finished(

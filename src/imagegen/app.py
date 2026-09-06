@@ -13,8 +13,8 @@ from flask import Flask
 
 from imagegen.api_routes import register_api_routes
 from imagegen.config import AppConfig, load_config
-from imagegen.generation_provider import default_generation_providers
 from imagegen.generation_log import SQLiteGenerationLog
+from imagegen.generation_provider import default_generation_providers
 from imagegen.image_export import clean_tmp_exports
 from imagegen.metadata import EmbeddedImageMetadataProvider
 from imagegen.palettes import initialize_default_palettes

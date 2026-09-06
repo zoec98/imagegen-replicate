@@ -20,7 +20,6 @@ from imagegen.model_registry import (
     ReplicateModel,
 )
 
-
 FLASK_SECRET_SETTING = "IMAGEGEN_FLASK_SECRET_KEY"
 INSECURE_FLASK_SECRET_KEY = "dev-secret-change-me"
 FLASK_SECRET_BYTES = 32

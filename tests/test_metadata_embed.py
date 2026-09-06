@@ -15,12 +15,12 @@ from imagegen.metadata_embed import (
     ARTIST_TAG,
     COPYRIGHT_TAG,
     DATETIME_ORIGINAL_TAG,
-    EmbeddedMetadataError,
     IMAGE_DESCRIPTION_TAG,
     PNG_METADATA_KEY,
     SOFTWARE_TAG,
     XP_AUTHOR_TAG,
     XP_COMMENT_TAG,
+    EmbeddedMetadataError,
     read_embedded_metadata,
     write_embedded_metadata,
 )

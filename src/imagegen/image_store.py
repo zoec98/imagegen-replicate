@@ -20,7 +20,6 @@ from imagegen.metadata_embed import write_embedded_metadata
 from imagegen.metadata_policy import synthesize_copyright
 from imagegen.model_registry import ProviderId
 
-
 SOFTWARE_NAME = "https://github.com/zoec98/imagegen-replicate"
 
 
