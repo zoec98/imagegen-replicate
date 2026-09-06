@@ -160,6 +160,7 @@ def _workspace_context(
         if selected_provider_model is not None
         else None
     )
+    display_model = target if target is not None else app_config.model
     return {
         "images": list_gallery_images(
             app_config.output_dir,
@@ -167,7 +168,7 @@ def _workspace_context(
             metadata_url=metadata_url,
             metadata_provider=metadata_provider,
         ),
-        "model": app_config.model,
+        "model": display_model,
         "selected_provider": selected_provider,
         "selected_provider_model": selected_provider_model,
         "has_generation_provider": app_config.has_generation_provider,

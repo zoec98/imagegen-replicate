@@ -119,6 +119,7 @@ def test_schema_help_does_not_require_credentials(capsys):
 
 def test_schema_command_loads_key_from_repo_dotenv(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("WIRO_API_KEY", raising=False)
     (tmp_path / ".env").write_text("WIRO_API_KEY=from-dotenv\n", encoding="utf-8")
     calls = []
 

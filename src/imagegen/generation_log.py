@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Protocol, cast
 
 from imagegen.image_store import StoredImage
-from imagegen.model_registry import ProviderId
+from imagegen.model_registry import PROVIDER_IDS, ProviderId
 from imagegen.request_store import GenerationRequest, RequestStatus
 
 
@@ -508,7 +508,7 @@ def _request_status(value: object) -> RequestStatus:
 
 def _provider_id(value: object) -> ProviderId:
     provider = str(value)
-    if provider in {"replicate", "falai"}:
+    if provider in PROVIDER_IDS:
         return cast(ProviderId, provider)
     msg = f"Unknown generation provider: {provider}."
     raise RuntimeError(msg)

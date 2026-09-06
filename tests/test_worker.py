@@ -11,11 +11,15 @@ from pathlib import Path
 from threading import Event
 
 from imagegen.generation_log import SQLiteGenerationLog
-from imagegen.generation_provider import ReplicateGenerationProvider
+from imagegen.generation_provider import (
+    ReplicateGenerationProvider,
+    WiroGenerationProvider,
+)
 from imagegen.generation_types import GenerationProviderTimeout, GenerationResult
 from imagegen.image_store import StoredImage
 from imagegen.replicate_client import ReplicateResult
 from imagegen.request_store import RequestStore
+from imagegen.wiro_client import WiroRequestTimeout
 from imagegen.worker import ThreadedGenerationWorker, run_generation_request
 
 
@@ -276,6 +280,71 @@ def test_run_generation_request_uses_request_model(app_config):
     run_generation_request(store, record, app_config, {"replicate": provider})
 
     assert record.status == "succeeded"
+
+
+def test_wiro_generation_provider_dispatches_selected_model_and_sources(app_config):
+    source_path = app_config.output_dir / "source.png"
+    source_path.parent.mkdir(parents=True)
+    source_path.write_bytes(b"image")
+    config = app_config
+    store = RequestStore()
+    record = store.create(
+        provider="wiro",
+        model_alias="seedream5-lite-uncensored",
+        prompt="edit this",
+        parameters={"watermark": "false"},
+        source_images=["source.png"],
+        edit_mode=True,
+    )
+
+    def fake_generate(
+        prompt,
+        provider_config,
+        *,
+        model,
+        target,
+        parameters,
+        source_image_paths,
+    ):
+        assert prompt == "edit this"
+        assert provider_config.wiro_api_key == ""
+        assert model.alias == "seedream5-lite-uncensored"
+        assert target.provider_model == "bytedance/seedream-v5-lite-uncensored"
+        assert parameters == {"watermark": "false"}
+        assert source_image_paths == [source_path]
+        return GenerationResult(
+            prediction_id="wiro-task-1",
+            output_urls=["https://example.test/wiro.jpg"],
+            stored_images=[],
+            logs="done",
+        )
+
+    provider = WiroGenerationProvider(generate=fake_generate)
+    run_generation_request(store, record, config, {"wiro": provider})
+
+    assert store.get(record.request_id).status == "succeeded"
+    assert record.prediction_id == "wiro-task-1"
+
+
+def test_wiro_generation_provider_timeout_keeps_task_id_in_worker_error(app_config):
+    store = RequestStore()
+    record = store.create(
+        provider="wiro",
+        model_alias="seedream5-lite-uncensored",
+        prompt="a cookie",
+        parameters={},
+    )
+
+    def fake_generate(*args, **kwargs):
+        raise WiroRequestTimeout(
+            "Wiro task wiro-task-timeout timed out.", task_id="wiro-task-timeout"
+        )
+
+    provider = WiroGenerationProvider(generate=fake_generate)
+    run_generation_request(store, record, app_config, {"wiro": provider})
+
+    assert record.status == "timeout"
+    assert record.error == "Wiro task wiro-task-timeout timed out."
 
 
 def test_threaded_worker_start_returns_before_generation_completes(app_config):

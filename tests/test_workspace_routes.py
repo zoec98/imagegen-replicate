@@ -280,6 +280,40 @@ def test_index_exposes_provider_scoped_models_when_falai_is_enabled(
     }
 
 
+def test_index_exposes_wiro_models_when_wiro_is_enabled(app_config, app_factory):
+    app = app_factory(
+        IMAGEGEN_APP_CONFIG=replace(
+            app_config,
+            wiro_api_key="wiro-key",
+            enabled_providers=("wiro",),
+            selected_provider="wiro",
+            model_alias="seedream5-lite-uncensored",
+        )
+    )
+
+    response = app.test_client().get("/")
+    registry = extract_model_registry(response)
+
+    assert b'<option value="wiro" selected>Wiro</option>' in response.data
+    assert b"wiro-key" not in response.data
+    assert {model["alias"] for model in registry if model["provider"] == "wiro"} == {
+        "seedream5-pro-uncensored",
+        "seedream5-lite-uncensored",
+    }
+    lite = next(
+        model
+        for model in registry
+        if model["provider"] == "wiro" and model["alias"] == "seedream5-lite-uncensored"
+    )
+    assert lite["pricing"]
+    assert {parameter["name"] for parameter in lite["parameters"]} >= {
+        "resolution",
+        "aspectRatio",
+        "maxImages",
+        "watermark",
+    }
+
+
 def test_index_renders_no_provider_state(app_config, app_factory):
     app = app_factory(
         IMAGEGEN_APP_CONFIG=replace(

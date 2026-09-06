@@ -225,6 +225,28 @@ def test_create_request_persists_provider_for_falai_rows(tmp_path):
     assert request.model == "fal-ai/bytedance/seedream/v4.5/edit"
 
 
+def test_create_request_persists_provider_for_wiro_rows(tmp_path):
+    log = SQLiteGenerationLog(tmp_path / "imagegen.sqlite3")
+    log.initialize()
+    record = RequestStore().create(
+        provider="wiro",
+        prompt="a cookie",
+        parameters={"watermark": "false"},
+        model_alias="seedream5-lite-uncensored",
+    )
+
+    log.create_request(
+        record,
+        model_alias="seedream5-lite-uncensored",
+        model="bytedance/seedream-v5-lite-uncensored",
+        replicate_input={"prompt": "a cookie", "watermark": "false"},
+    )
+
+    request = log.get_logged_request(record.request_id)
+    assert request is not None
+    assert request.provider == "wiro"
+
+
 def test_lifecycle_updates_status_and_elapsed_time(tmp_path):
     log = SQLiteGenerationLog(tmp_path / "imagegen.sqlite3")
     log.initialize()

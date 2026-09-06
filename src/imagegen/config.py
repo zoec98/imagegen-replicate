@@ -17,7 +17,10 @@ from imagegen.model_registry import (
     DEFAULT_MODEL_ALIAS,
     MODEL_REGISTRY,
     ProviderId,
+    ProviderModel,
     ReplicateModel,
+    default_model_for_provider,
+    resolve_model,
 )
 
 FLASK_SECRET_SETTING = "IMAGEGEN_FLASK_SECRET_KEY"
@@ -42,6 +45,11 @@ ENV_SETTINGS: tuple[EnvSetting, ...] = (
         name="FAL_KEY",
         default="",
         comment="fal.ai API key. Leave empty until you are ready to call fal.ai.",
+    ),
+    EnvSetting(
+        name="WIRO_API_KEY",
+        default="",
+        comment="Wiro API key. Leave empty until you are ready to call Wiro.",
     ),
     EnvSetting(
         name="IMAGEGEN_DATA_DIR",
@@ -118,11 +126,12 @@ class AppConfig:
     immich_upload_album_id: str
     immich_api_key: str
     model_alias: str
-    model: ReplicateModel
+    model: ReplicateModel | ProviderModel
     flask_secret_key: str
     replicate_poll_seconds: float
     replicate_timeout_seconds: float
     trashcan_hold_limit_days: int | None
+    wiro_api_key: str = ""
 
     @property
     def has_generation_provider(self) -> bool:
@@ -197,11 +206,6 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
     load_dotenv(env_file, override=False)
 
     model_alias = os.getenv("IMAGEGEN_MODEL", DEFAULT_MODEL_ALIAS).strip()
-    model = MODEL_REGISTRY.get(model_alias)
-    if model is None:
-        choices = ", ".join(sorted(MODEL_REGISTRY))
-        msg = f"Unknown IMAGEGEN_MODEL {model_alias!r}. Expected one of: {choices}."
-        raise ValueError(msg)
 
     data_dir = Path(os.getenv("IMAGEGEN_DATA_DIR", "data")).expanduser()
     if not data_dir.is_absolute():
@@ -209,16 +213,20 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
 
     replicate_api_token = os.getenv("REPLICATE_API_TOKEN", "").strip()
     fal_key = os.getenv("FAL_KEY", "").strip()
+    wiro_api_key = os.getenv("WIRO_API_KEY", "").strip()
     enabled_providers = _enabled_providers(
         replicate_api_token=replicate_api_token,
         fal_key=fal_key,
+        wiro_api_key=wiro_api_key,
     )
+    selected_provider = _selected_provider(enabled_providers)
+    model, model_alias = _configured_model(model_alias, selected_provider)
 
     return AppConfig(
         replicate_api_token=replicate_api_token,
         fal_key=fal_key,
         enabled_providers=enabled_providers,
-        selected_provider=_selected_provider(enabled_providers),
+        selected_provider=selected_provider,
         data_dir=data_dir,
         author=os.getenv("AUTHOR", "Noname Changeme Nescio").strip(),
         immich_url=os.getenv("IMMICH_URL", "").strip().rstrip("/"),
@@ -239,6 +247,7 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
             "TRASHCAN_HOLD_LIMIT_DAYS",
             7,
         ),
+        wiro_api_key=wiro_api_key,
     )
 
 
@@ -357,13 +366,37 @@ def _enabled_providers(
     *,
     replicate_api_token: str,
     fal_key: str,
+    wiro_api_key: str,
 ) -> tuple[ProviderId, ...]:
     providers: list[ProviderId] = []
     if replicate_api_token:
         providers.append("replicate")
     if fal_key:
         providers.append("falai")
+    if wiro_api_key:
+        providers.append("wiro")
     return tuple(providers)
+
+
+def _configured_model(
+    model_alias: str,
+    selected_provider: ProviderId | None,
+) -> tuple[ReplicateModel | ProviderModel, str]:
+    if selected_provider == "wiro" and model_alias == DEFAULT_MODEL_ALIAS:
+        model = default_model_for_provider("wiro")
+        if model is None:
+            raise ValueError("Wiro has no configured models.")
+        return model, model.alias
+    if model_alias in MODEL_REGISTRY:
+        return MODEL_REGISTRY[model_alias], model_alias
+    try:
+        model = resolve_model("wiro", model_alias)
+    except ValueError as error:
+        choices = ", ".join(sorted(MODEL_REGISTRY))
+        raise ValueError(
+            f"Unknown IMAGEGEN_MODEL {model_alias!r}. Expected one of: {choices}."
+        ) from error
+    return model, model.alias
 
 
 def _immich_upload_album_id() -> str:

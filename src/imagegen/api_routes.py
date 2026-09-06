@@ -39,6 +39,7 @@ from imagegen.immich_client import (
 )
 from imagegen.mask_store import MaskPayloadError, save_mask_payload
 from imagegen.model_registry import (
+    PROVIDER_IDS,
     GenerationTarget,
     ProviderId,
     ProviderModel,
@@ -621,7 +622,7 @@ def _selected_provider(payload: dict[str, object], *, app_config) -> ProviderId:
     if not isinstance(raw_provider, str) or not raw_provider.strip():
         raise ValidationError("provider must be a valid provider id.")
     provider = raw_provider.strip()
-    if provider not in {"replicate", "falai"}:
+    if provider not in PROVIDER_IDS:
         choices = ", ".join(app_config.enabled_providers)
         raise ValidationError(
             f"Unknown provider: {provider}. Expected one of: {choices}."

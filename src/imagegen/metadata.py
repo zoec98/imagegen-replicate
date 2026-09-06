@@ -7,7 +7,12 @@ from pathlib import Path
 from typing import Protocol
 
 from imagegen.metadata_embed import read_embedded_metadata
-from imagegen.model_registry import ProviderId, RegistryLookupError, resolve_model
+from imagegen.model_registry import (
+    PROVIDER_IDS,
+    ProviderId,
+    RegistryLookupError,
+    resolve_model,
+)
 
 
 @dataclass(frozen=True)
@@ -99,13 +104,13 @@ def _metadata_string(metadata: dict[str, object], key: str) -> str | None:
 
 def _metadata_provider(metadata: dict[str, object]) -> ProviderId | None:
     value = metadata.get("provider")
-    if value in {"replicate", "falai"}:
+    if value in PROVIDER_IDS:
         return value
     model_alias = _metadata_string(metadata, "model_alias")
     provider_model = _metadata_string(metadata, "model")
     if model_alias is None or provider_model is None:
         return None
-    for provider in ("replicate", "falai"):
+    for provider in PROVIDER_IDS:
         try:
             model = resolve_model(provider, model_alias)
         except RegistryLookupError:

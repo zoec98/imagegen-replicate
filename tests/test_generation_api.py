@@ -266,6 +266,47 @@ def test_api_generate_logs_falai_edit_requests_to_linked_endpoint(
     assert request_log.request_sent["image_urls"] == ["source.png"]
 
 
+def test_api_generate_logs_wiro_edit_requests_when_wiro_is_enabled(
+    app_config,
+    app_factory,
+):
+    app_config = replace(
+        app_config,
+        wiro_api_key="wiro-key",
+        enabled_providers=("wiro",),
+        selected_provider="wiro",
+        model_alias="seedream5-lite-uncensored",
+    )
+    app_config.output_dir.mkdir(parents=True)
+    (app_config.output_dir / "source.png").write_bytes(b"image")
+    client = app_factory(IMAGEGEN_APP_CONFIG=app_config).test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={
+            "provider": "wiro",
+            "model": "seedream5-lite-uncensored",
+            "prompt": "edit this",
+            "edit_mode": True,
+            "source_images": ["source.png"],
+        },
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 202
+    request_log = client.application.config[
+        "IMAGEGEN_GENERATION_LOG"
+    ].get_logged_request(response.json["request_id"])
+    assert request_log is not None
+    assert request_log.provider == "wiro"
+    assert request_log.model == "bytedance/seedream-v5-lite-uncensored"
+    assert request_log.request_sent["inputImage"] == ["source.png"]
+    assert request_log.request_sent["watermark"] == "false"
+
+
 def test_api_generate_rejects_falai_edit_mode_without_linked_endpoint(
     app_config,
     app_factory,

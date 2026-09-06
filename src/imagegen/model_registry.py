@@ -25,6 +25,7 @@ __all__ = [
     "DEFAULT_MODEL_ALIAS",
     "MODEL_REGISTRY",
     "PROVIDERS",
+    "PROVIDER_IDS",
     "PROVIDER_REGISTRIES",
     "CustomDimensionsControl",
     "GenerationTarget",
@@ -50,6 +51,7 @@ PROVIDERS: tuple[ProviderInfo, ...] = (
     ProviderInfo(id="falai", display_name="fal.ai"),
     ProviderInfo(id="wiro", display_name="Wiro"),
 )
+PROVIDER_IDS: tuple[ProviderId, ...] = tuple(provider.id for provider in PROVIDERS)
 
 
 class RegistryLookupError(ValueError):
@@ -140,7 +142,7 @@ def _provider_registry(provider: ProviderId) -> dict[str, ProviderModel]:
 
 
 def _provider_id(value: str) -> ProviderId:
-    if value in {"replicate", "falai", "wiro"}:
+    if value in PROVIDER_IDS:
         return value
     raise RegistryLookupError(f"Unknown provider `{value}`.")
 

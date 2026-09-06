@@ -117,7 +117,7 @@
             </div>
           </div>
           {% if not has_generation_provider %}
-            <p class="provider-empty" role="status">No image generation provider is configured. Set REPLICATE_API_TOKEN or FAL_KEY.</p>
+            <p class="provider-empty" role="status">No image generation provider is configured. Set REPLICATE_API_TOKEN, FAL_KEY, or WIRO_API_KEY.</p>
           {% endif %}
           <textarea id="prompt" name="prompt" rows="9">{{ prompt }}</textarea>
           {% if palettes %}

@@ -89,6 +89,24 @@ def test_embedded_metadata_provider_derives_edit_source_images(tmp_path):
     assert metadata.to_json()["source_images"] == ["source-a.jpg", "source-b.jpg"]
 
 
+def test_embedded_metadata_provider_recognizes_wiro_model(tmp_path):
+    image_path = tmp_path / "sample.jpg"
+    Image.new("RGB", (8, 8), (255, 0, 0)).save(image_path, "JPEG")
+    write_embedded_metadata(
+        image_path,
+        {
+            "provider": "wiro",
+            "model_alias": "seedream5-lite-uncensored",
+            "model": "bytedance/seedream-v5-lite-uncensored",
+            "prompt": "a red house",
+        },
+    )
+
+    metadata = EmbeddedImageMetadataProvider().get(image_path)
+
+    assert metadata.provider == "wiro"
+
+
 def test_embedded_metadata_provider_ignores_json_sidecar_metadata(tmp_path):
     image_path = tmp_path / "sample.png"
     image_path.write_bytes(b"image-bytes")

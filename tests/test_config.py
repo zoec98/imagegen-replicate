@@ -23,6 +23,7 @@ def test_ensure_env_file_creates_expected_defaults(tmp_path):
     content = env_path.read_text(encoding="utf-8")
     assert "REPLICATE_API_TOKEN=" in content
     assert "FAL_KEY=" in content
+    assert "WIRO_API_KEY=" in content
     assert "IMAGEGEN_DATA_DIR=data" in content
     assert "AUTHOR=Noname Changeme Nescio" in content
     assert "IMAGEGEN_OUTPUT_DIR" not in content
@@ -107,6 +108,7 @@ def test_write_env_example_uses_non_secret_defaults(tmp_path):
     content = example_path.read_text(encoding="utf-8")
     assert "REPLICATE_API_TOKEN=" in content
     assert "FAL_KEY=" in content
+    assert "WIRO_API_KEY=" in content
     assert "IMAGEGEN_DATA_DIR=data" in content
     assert "AUTHOR=Noname Changeme Nescio" in content
     assert "IMAGEGEN_OUTPUT_DIR" not in content
@@ -124,6 +126,7 @@ def test_write_env_example_uses_non_secret_defaults(tmp_path):
 def test_load_config_reads_env_file(tmp_path, monkeypatch):
     monkeypatch.delenv("REPLICATE_API_TOKEN", raising=False)
     monkeypatch.delenv("FAL_KEY", raising=False)
+    monkeypatch.delenv("WIRO_API_KEY", raising=False)
     monkeypatch.delenv("IMAGEGEN_DATA_DIR", raising=False)
     monkeypatch.delenv("AUTHOR", raising=False)
     monkeypatch.delenv("IMAGEGEN_MODEL", raising=False)
@@ -139,6 +142,7 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     env_path.write_text(
         "REPLICATE_API_TOKEN=test-token\n"
         "FAL_KEY=fal-test-key\n"
+        "WIRO_API_KEY=wiro-test-key\n"
         "IMAGEGEN_DATA_DIR=custom-data\n"
         "AUTHOR=Zoé Cordelier\n"
         "IMMICH_URL=https://immich.example.test/\n"
@@ -155,7 +159,8 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
 
     assert config.replicate_api_token == "test-token"
     assert config.fal_key == "fal-test-key"
-    assert config.enabled_providers == ("replicate", "falai")
+    assert config.wiro_api_key == "wiro-test-key"
+    assert config.enabled_providers == ("replicate", "falai", "wiro")
     assert config.selected_provider == "replicate"
     assert config.has_generation_provider is True
     assert config.data_dir == tmp_path / "custom-data"
@@ -290,6 +295,7 @@ def test_load_config_does_not_override_existing_environment(tmp_path, monkeypatc
 def test_load_config_starts_with_no_generation_provider(tmp_path, monkeypatch):
     monkeypatch.delenv("REPLICATE_API_TOKEN", raising=False)
     monkeypatch.delenv("FAL_KEY", raising=False)
+    monkeypatch.delenv("WIRO_API_KEY", raising=False)
     env_path = tmp_path / ".env"
     env_path.write_text("", encoding="utf-8")
 
@@ -297,6 +303,7 @@ def test_load_config_starts_with_no_generation_provider(tmp_path, monkeypatch):
 
     assert config.replicate_api_token == ""
     assert config.fal_key == ""
+    assert config.wiro_api_key == ""
     assert config.enabled_providers == ()
     assert config.selected_provider is None
     assert config.has_generation_provider is False
@@ -304,6 +311,7 @@ def test_load_config_starts_with_no_generation_provider(tmp_path, monkeypatch):
 
 def test_load_config_reports_replicate_enabled_from_token(tmp_path, monkeypatch):
     monkeypatch.delenv("FAL_KEY", raising=False)
+    monkeypatch.delenv("WIRO_API_KEY", raising=False)
     monkeypatch.setenv("REPLICATE_API_TOKEN", "replicate-token")
     env_path = tmp_path / ".env"
 
@@ -315,6 +323,7 @@ def test_load_config_reports_replicate_enabled_from_token(tmp_path, monkeypatch)
 
 def test_load_config_reports_falai_enabled_from_key(tmp_path, monkeypatch):
     monkeypatch.delenv("REPLICATE_API_TOKEN", raising=False)
+    monkeypatch.delenv("WIRO_API_KEY", raising=False)
     monkeypatch.setenv("FAL_KEY", "fal-key")
     env_path = tmp_path / ".env"
 
@@ -324,14 +333,33 @@ def test_load_config_reports_falai_enabled_from_key(tmp_path, monkeypatch):
     assert config.selected_provider == "falai"
 
 
+def test_load_config_reports_wiro_enabled_and_selected_when_only_key_is_set(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.delenv("REPLICATE_API_TOKEN", raising=False)
+    monkeypatch.delenv("FAL_KEY", raising=False)
+    monkeypatch.setenv("WIRO_API_KEY", "wiro-key")
+    monkeypatch.delenv("IMAGEGEN_MODEL", raising=False)
+
+    config = load_config(tmp_path / ".env")
+
+    assert config.enabled_providers == ("wiro",)
+    assert config.selected_provider == "wiro"
+    assert config.model_alias == "seedream5-lite-uncensored"
+    assert config.model.alias == "seedream5-lite-uncensored"
+    assert config.wiro_api_key == "wiro-key"
+
+
 def test_load_config_provider_default_prefers_replicate(tmp_path, monkeypatch):
     monkeypatch.setenv("REPLICATE_API_TOKEN", "replicate-token")
     monkeypatch.setenv("FAL_KEY", "fal-key")
+    monkeypatch.setenv("WIRO_API_KEY", "wiro-key")
     env_path = tmp_path / ".env"
 
     config = load_config(env_path)
 
-    assert config.enabled_providers == ("replicate", "falai")
+    assert config.enabled_providers == ("replicate", "falai", "wiro")
     assert config.selected_provider == "replicate"
 
 

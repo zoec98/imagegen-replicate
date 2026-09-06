@@ -12,6 +12,7 @@ from imagegen.cli import (
 )
 from imagegen.generation_log import SQLiteGenerationLog
 from imagegen.generation_types import GenerationResult
+from imagegen.model_registry import resolve_model
 from imagegen.request_store import RequestStore
 
 
@@ -190,6 +191,50 @@ def test_cli_generation_runs_synchronously_through_existing_provider_service(
     log = SQLiteGenerationLog(app_config.generation_log_path)
     assert log.get_request(record.request_id)["model_alias"] == "seedream45"
     assert log.get_result(record.request_id)["status"] == "succeeded"
+
+
+def test_cli_generation_runs_wiro_when_wiro_is_enabled(app_config):
+    model = resolve_model("wiro", "seedream5-lite-uncensored")
+    config = replace(
+        app_config,
+        wiro_api_key="wiro-key",
+        enabled_providers=("wiro",),
+        selected_provider="wiro",
+        model_alias=model.alias,
+        model=model,
+    )
+    request = parse_cli_request(
+        [
+            "--provider",
+            "wiro",
+            "--model",
+            model.alias,
+            "--prompt",
+            "a red fox",
+        ]
+    )
+    assert isinstance(request, CliRequest)
+
+    class FakeProvider:
+        def generate(self, request_record, provider_config):
+            assert provider_config.wiro_api_key == "wiro-key"
+            assert request_record.provider == "wiro"
+            assert request_record.model_alias == model.alias
+            return GenerationResult(
+                prediction_id="wiro-task-1",
+                output_urls=["https://example.test/fox.jpg"],
+                stored_images=[],
+                logs="",
+            )
+
+    record = run_cli_generation(
+        request,
+        app_config=config,
+        providers={"wiro": FakeProvider()},
+    )
+
+    assert record.status == "succeeded"
+    assert record.prediction_id == "wiro-task-1"
 
 
 def test_cli_generation_reuses_existing_parameter_validation(app_config):
