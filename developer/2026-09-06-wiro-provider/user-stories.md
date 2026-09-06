@@ -23,6 +23,8 @@ normal gallery, metadata, and generation-history behavior.
 - The API-key-only project created for this epic issued both a
   `WIRO_API_KEY` and `WIRO_API_SECRET`, despite Wiro's public documentation
   describing API-key-only projects as requiring only the key.
+- Authenticated model-detail requests using only `WIRO_API_KEY` succeeded for
+  both uncensored models; `WIRO_API_SECRET` was not required.
 
 ## Decisions
 
@@ -31,14 +33,11 @@ normal gallery, metadata, and generation-history behavior.
   `seedream5-pro-uncensored` and `seedream5-lite-uncensored`.
 - Treat each uncensored deployment as a distinct provider model. Do not expose
   a generic safety switch or silently substitute a regular endpoint.
-- Include both models only after authenticated schema discovery confirms they
-  are available to the configured Wiro project. Pro remains independently
-  usable if Lite is not available to that project.
+- Include both models; authenticated schema discovery confirmed that each is
+  available to the configured Wiro project.
 - Use the server-side Wiro project configured for API-key-only authentication
-  and send only `WIRO_API_KEY` as `x-api-key` unless an authenticated schema or
-  run request proves the secret is required.
-- Do not add `WIRO_API_SECRET` to application configuration for this epic when
-  key-only authentication succeeds.
+  and send only `WIRO_API_KEY` as `x-api-key`.
+- Do not add `WIRO_API_SECRET` to application configuration for this epic.
 - Use the already-installed `httpx` dependency. Do not add a Wiro SDK.
 - Submit asynchronously and poll the existing task with Wiro's Task Detail API.
   Do not use WebSockets, callbacks, or automatic cross-provider failover.
@@ -56,8 +55,7 @@ provider's Seedream schema.
 
 - The command accepts one model reference in `owner/model` form.
 - The command reads `WIRO_API_KEY` without printing or persisting it.
-- The command does not read or require `WIRO_API_SECRET` when key-only
-  authentication succeeds.
+- The command does not read or require `WIRO_API_SECRET`.
 - The command calls Wiro's model-detail API and does not start a generation.
 - Output identifies the requested model, provider documentation/runtime URLs,
   model availability, input parameters, required fields, defaults, choices,
@@ -67,9 +65,9 @@ provider's Seedream schema.
   maximum number of source images.
 - Missing credentials, unknown models, malformed responses, and network errors
   fail with an actionable non-zero result.
-- The command is run for both uncensored Seedream 5 models before tickets are
-  finalized; any difference from the public model pages is recorded rather
-  than guessed around.
+- The command reproduces the authenticated discovery findings recorded in
+  `schema-discovery.md`; any later difference is reported rather than guessed
+  around.
 
 ## Story 2: Configure and discover Wiro
 
@@ -171,8 +169,7 @@ mistaking playground behavior for API behavior.
 - Mocked automated tests cover provider discovery, request construction, task
   polling, success, failure, timeout, output normalization, and edit uploads.
 - A manual paid smoke test covers text generation and one-image editing for
-  both Pro and Lite after implementation; unavailable Lite access is documented
-  and does not block verification of Pro.
+  both Pro and Lite after implementation.
 - Full project checks required by `AGENTS.md` pass before the epic is complete.
 
 ## Out of scope

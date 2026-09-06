@@ -11,11 +11,12 @@ downloads, and error reporting.
 
 ### Credentials and transport
 
-- Keep `WIRO_API_KEY` and the account-issued `WIRO_API_SECRET` server-side in
-  the ignored `.env` file.
+- Keep `WIRO_API_KEY` server-side in the ignored `.env` file.
+- Keep the unused account-issued `WIRO_API_SECRET` outside application
+  configuration; it is not needed by this API-key-only integration.
 - Send it only to the fixed HTTPS Wiro API origin in the `x-api-key` header.
-- Do not load or transmit `WIRO_API_SECRET` when API-key-only authentication
-  succeeds.
+- Do not load or transmit `WIRO_API_SECRET`; authenticated model-detail calls
+  confirmed that the API-key-only project does not require it.
 - Never accept a Wiro base URL, callback URL, or authentication header from the
   browser or model metadata.
 - Never serialize the key or request headers into logs, errors, SQLite history,
@@ -60,11 +61,6 @@ downloads, and error reporting.
 
 ## Open verification items
 
-- Confirm both model references and their availability with the authenticated
-  Wiro model-detail API.
-- Confirm that the API-key-only project accepts `x-api-key` without the issued
-  `WIRO_API_SECRET`; treat the dashboard/documentation mismatch as unresolved
-  until that call succeeds.
 - Confirm the exact source-image multipart representation and maximum counts.
 - Confirm pricing, terminal task states, success exit representation, output
   object shape, and API error envelopes.
