@@ -130,3 +130,19 @@ must therefore use `multipart/form-data` with one repeated `inputImage` part
 per source file. The `{id}Url` companion field is for URL-based input and is
 not sent for these local uploads. Other model parameters remain ordinary form
 fields. Text-only requests continue to use JSON.
+
+## Response envelopes and terminal state
+
+The successful live responses used the common Wiro envelope with
+`result: true`, `errors: []`, and the operation-specific payload. A successful
+Run response includes a string `taskid`. Task Detail responses include a
+`tasklist` array; the client follows the task id until the task reaches
+`status: "task_postprocess_end"` and accepts the result only when `pexit` is
+the string `"0"`.
+
+The tested failure envelope is `result: false` with `errors` containing one or
+more objects such as `{"message": "..."}`. HTTP 401/403, 429, and other 4xx
+responses are reported separately before the error messages are surfaced.
+When a task id exists, failures retain that id in durable request state. Output
+items use an HTTPS `url`; the existing image-store validation remains the only
+download boundary.

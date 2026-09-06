@@ -74,6 +74,44 @@ endpoints while the UI treats them as one user-facing model.
 When fal.ai exposes `enable_safety_checker`, application policy is to send it as
 `false` whenever the parameter is provided.
 
+## Wiro
+
+Read Wiro authentication from:
+
+```bash
+WIRO_API_KEY
+```
+
+Use an API-key-only Wiro project. Do not configure or send `WIRO_API_SECRET`.
+Run `scripts/get_schema_wiro owner/model` before adding or updating a Wiro
+registry entry. The command calls Wiro's authenticated Tool Detail endpoint
+without starting a generation.
+
+The 2026-09-06 Tool Detail retrieval and authorized text probes cover exactly
+these provider model identities:
+
+- `bytedance/seedream-v5-pro-uncensored`
+- `bytedance/seedream-v5-lite-uncensored`
+
+Pro has `resolution` (`1k`/`2k`), `aspectRatio`, `outputFormat` (`jpeg`/`png`),
+and string-valued `watermark` (`false`/`true`), with a maximum of 10
+`inputImage` sources for editing. Lite has `resolution` (`auto`/`2k`/`3k`),
+`aspectRatio`, integer `maxImages` (1–15), and the same string-valued
+`watermark`, with a maximum of 14 edit sources and a source-plus-output limit
+of 15. The application defaults output to JPEG and watermark to `false`.
+
+Wiro pricing is provider-reported: Pro is `$0.045` at 1K and `$0.09` at 2K;
+Lite is `$0.035` per output. The exact `Uncensored` endpoint is part of each
+model identity. The Tool Detail contract does not expose a generic safety flag
+or safety-tolerance parameter, so the registry does not invent one and does
+not promise that the model bypasses account, legal, or provider-policy limits.
+
+For editing, selected local files are sent as repeated `inputImage` parts in a
+multipart request. Text-only requests use JSON. Persisted metadata contains
+local source filenames, never upload URLs, headers, credentials, or signed
+URLs. See the authenticated response record in
+`developer/2026-09-06-wiro-provider/schema-discovery.md`.
+
 ## Schema Extraction
 
 For provider schemas, extract useful registry information from schema input and

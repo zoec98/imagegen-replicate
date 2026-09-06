@@ -2,7 +2,7 @@
 
 (Successor to https://github.com/zoec98/imagegen; feature parity or better than the previous version)
 
-`imagegen` is a Flask web application for preparing image generation and image edit requests, sending them to Replicate, and keeping the generated images available in a local gallery.
+`imagegen` is a Flask web application for preparing image generation and image edit requests, sending them to configured image providers, and keeping the generated images available in a local gallery.
 
 Developer and agent contribution guidance lives in [AGENTS.md](AGENTS.md).
 
@@ -18,10 +18,11 @@ On Linux you have those tools available as part of your Linux distribution.
 
 You will also need an account on an image model provider.
 
-- `https://replicate.com` (recommended) and/or 
-- https://fal.ai (not recommended).
+- `https://replicate.com` (recommended),
+- `https://fal.ai` (not recommended), and/or
+- `https://wiro.ai` (API-key-only projects).
 
-You will need to generate an API key on either or both image model providers.
+You will need to generate an API key on at least one image model provider.
 
 ## Installation
 
@@ -58,7 +59,16 @@ REPLICATE_API_TOKEN=...
 
 # API Token for calls to "fal.ai"
 FAL_KEY=
+
+# API key for calls to Wiro. Use an API-key-only Wiro project.
+WIRO_API_KEY=
 ```
+
+Wiro uses only `WIRO_API_KEY`; the account's API secret is not required by
+this application. When the key is configured, the Wiro provider exposes the
+`Seedream 5 Pro Uncensored` and `Seedream 5 Lite Uncensored` models. Pro accepts
+up to 10 edit sources. Lite accepts up to 14 sources, with sources plus
+requested outputs capped at 15.
 
 Also set the `AUTHOR` key:
 
@@ -187,6 +197,7 @@ Select a model by its alias or by its display name:
 ```bash
 imagegen --provider replicate --model seedream45 --prompt "a red fox"
 imagegen --provider falai --model "Seedream 4.5" --file prompts/fox.txt
+imagegen --provider wiro --model seedream5-lite-uncensored --prompt "a red fox"
 ```
 
 `--prompt` and `--file` are mutually exclusive. Prompt files are read as UTF-8
@@ -371,6 +382,7 @@ Developer scripts live in [scripts/](scripts):
 - `scripts/run-dev.cmd`
 - `scripts/get_schema_replicate bytedance/seedream-4.5`
 - `scripts/get_schema_falai https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image/api`
+- `scripts/get_schema_wiro bytedance/seedream-v5-pro-uncensored`
 
 See [AGENTS.md](AGENTS.md) for project structure, testing expectations, Replicate integration rules, UI guidance,
 and guardrails.
