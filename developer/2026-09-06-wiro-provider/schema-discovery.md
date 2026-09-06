@@ -92,6 +92,8 @@ outputs, and safe diagnostic fields.
 - Output item keys included `name`, `contenttype`, `size`, `url`, and Wiro
   file/account fields. `url` is an HTTPS CDN URL and must be treated as
   untrusted input before download.
+- This probe deliberately requested PNG to capture the alternate output shape;
+  the application registry default remains `outputFormat=jpeg`.
 
 ### Lite
 

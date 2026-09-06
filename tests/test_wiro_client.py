@@ -81,9 +81,9 @@ def test_wiro_text_request_submits_once_polls_same_task_and_persists_outputs(tmp
                             "debugoutput": "Request ended.",
                             "outputs": [
                                 {
-                                    "name": "0.png",
-                                    "contenttype": "image/png",
-                                    "url": "https://cdn1.wiro.ai/output.png",
+                                    "name": "0.jpg",
+                                    "contenttype": "image/jpeg",
+                                    "url": "https://cdn1.wiro.ai/output.jpg",
                                 }
                             ],
                         }
@@ -98,9 +98,9 @@ def test_wiro_text_request_submits_once_polls_same_task_and_persists_outputs(tmp
         persisted.append({"urls": list(urls), **kwargs})
         return [
             StoredImage(
-                path=tmp_path / "seedream5-pro-uncensored-wiro-123-01.png",
+                path=tmp_path / "seedream5-pro-uncensored-wiro-123-01.jpg",
                 source_url=urls[0],
-                content_type="image/png",
+                content_type="image/jpeg",
                 size_bytes=123,
                 created_at="2026-09-06T12:00:00+00:00",
             )
@@ -111,7 +111,7 @@ def test_wiro_text_request_submits_once_polls_same_task_and_persists_outputs(tmp
         app_config(tmp_path),
         model=model,
         target=target,
-        parameters={"resolution": "1k", "outputFormat": "png"},
+        parameters={"resolution": "1k"},
         client=client,
         sleep=lambda _: None,
         clock=lambda: 0.0,
@@ -119,7 +119,7 @@ def test_wiro_text_request_submits_once_polls_same_task_and_persists_outputs(tmp
     )
 
     assert result.prediction_id == "wiro-123"
-    assert result.output_urls == ["https://cdn1.wiro.ai/output.png"]
+    assert result.output_urls == ["https://cdn1.wiro.ai/output.jpg"]
     assert result.logs == "Request ended."
     assert len(client.calls) == 3
     assert client.calls[0]["url"] == (
@@ -130,7 +130,7 @@ def test_wiro_text_request_submits_once_polls_same_task_and_persists_outputs(tmp
         "prompt": "a cookie tasty",
         "resolution": "1k",
         "aspectRatio": "1:1",
-        "outputFormat": "png",
+        "outputFormat": "jpeg",
         "watermark": "false",
     }
     assert client.calls[1]["json"] == {"taskid": "wiro-123"}

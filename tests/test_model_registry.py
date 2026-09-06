@@ -258,6 +258,7 @@ def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
         "watermark",
     ]
     assert pro.text_target.parameters[1].choices == ("1k", "2k")
+    assert pro.text_target.parameters[3].default == "jpeg"
     assert pro.text_target.parameters[-1].choices == ("false", "true")
     assert {price.price for price in pro.text_target.pricing} == {"$0.045", "$0.09"}
     assert all(price.source == "provider-api" for price in pro.text_target.pricing)
