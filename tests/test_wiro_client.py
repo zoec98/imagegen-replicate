@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from types import SimpleNamespace
 
+import httpx
 import pytest
 
 from imagegen.image_store import StoredImage
@@ -386,6 +387,56 @@ def test_wiro_edit_uploads_repeated_input_image_parts_and_closes_files(tmp_path)
         "source-two.jpg",
     ]
     assert str(tmp_path) not in str(persisted[0]["prediction_input"])
+
+
+def test_wiro_edit_serializes_multipart_with_httpx_client(tmp_path):
+    model = resolve_model("wiro", "seedream5-lite-uncensored")
+    target = resolve_generation_target(
+        "wiro", "seedream5-lite-uncensored", edit_mode=True
+    )
+    source_path = tmp_path / "source.png"
+    source_path.write_bytes(b"image")
+    responses = iter(
+        [
+            {"result": True, "errors": [], "taskid": "wiro-httpx-edit"},
+            {
+                "result": True,
+                "errors": [],
+                "tasklist": [
+                    {
+                        "status": "task_postprocess_end",
+                        "pexit": "0",
+                        "outputs": [
+                            {"url": "https://cdn1.wiro.ai/httpx-edit.jpg"}
+                        ],
+                    }
+                ],
+            },
+        ]
+    )
+    request_bodies = []
+
+    def handle(request):
+        request_bodies.append(request.content)
+        return httpx.Response(200, json=next(responses))
+
+    with httpx.Client(transport=httpx.MockTransport(handle)) as client:
+        result = generate_image_urls(
+            "edit this",
+            app_config(tmp_path),
+            model=model,
+            target=target,
+            client=client,
+            source_image_paths=[source_path],
+            sleep=lambda _: None,
+            clock=lambda: 0.0,
+            persist_images=lambda urls, **kwargs: [],
+        )
+
+    assert result.prediction_id == "wiro-httpx-edit"
+    assert b'name="inputImage"' in request_bodies[0]
+    assert b'filename="source.png"' in request_bodies[0]
+    assert b'name="prompt"' in request_bodies[0]
 
 
 def test_wiro_edit_closes_uploads_when_submission_fails(tmp_path):

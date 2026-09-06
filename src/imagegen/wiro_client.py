@@ -215,7 +215,7 @@ def _submit_multipart_task(
             client,
             f"{WIRO_API_ROOT}/Run/{target.provider_model}",
             api_key=api_key,
-            data=[(name, _form_value(value)) for name, value in payload.items()],
+            data={name: _form_value(value) for name, value in payload.items()},
             files=files,
             timeout=timeout,
             operation="run",
