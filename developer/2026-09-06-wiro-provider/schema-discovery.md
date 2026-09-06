@@ -9,9 +9,9 @@ only `WIRO_API_KEY` in the `x-api-key` header. Both requests returned HTTP 200
 with `result: true`; the account-issued `WIRO_API_SECRET` was not used.
 
 The model-detail response describes inputs, capabilities, and pricing, but does
-not provide the completed Task Detail output schema. Task completion and output
-normalization therefore remain verification items for implementation tests and
-the paid API smoke test.
+not provide the completed Task Detail output schema. Two explicitly authorized
+text-generation spike probes (one per model) filled that gap. No edit request
+was made.
 
 ## Seedream 5 Pro Uncensored
 
@@ -60,3 +60,62 @@ the paid API smoke test.
   proves that JSON booleans are accepted.
 - Do not infer a safety parameter. The uncensored behavior is selected by the
   exact model endpoint.
+
+## Text-generation spike response shapes
+
+Date: 2026-09-06. Prompt: `A choclate cookie.` Each model was run exactly once
+with its documented text-generation inputs, and each returned task was polled
+without resubmission. The probe task ids are retained as safe support
+references; credentials, socket tokens, access keys, signed URLs, and image
+content are intentionally not recorded.
+
+Both probes returned HTTP 200 envelopes with these top-level keys:
+
+```text
+errors, result, tasklist, total
+```
+
+Both reached `task_postprocess_end` with `pexit: "0"`, one image output, and a
+successful `totalcost`. The completed task object included the task lifecycle
+timestamps, submitted `parameters`, `status`, `pexit`, `debugoutput`,
+`dynamicprice`, model identity, `outputs`, `totalcost`, and the provider's
+internal accounting fields. The client only needs the task id, status, pexit,
+outputs, and safe diagnostic fields.
+
+### Pro
+
+- Probe task: `3066517`.
+- Inputs: `resolution=1k`, `aspectRatio=1:1`, `outputFormat=png`,
+  `watermark=false`.
+- Final cost: `$0.045`.
+- Output content type: `image/png`; URL host: `cdn1.wiro.ai`.
+- Output item keys included `name`, `contenttype`, `size`, `url`, and Wiro
+  file/account fields. `url` is an HTTPS CDN URL and must be treated as
+  untrusted input before download.
+
+### Lite
+
+- Probe task: `3066542`.
+- Inputs: `resolution=auto`, `aspectRatio=auto`, `maxImages=1`,
+  `watermark=false`.
+- Final cost: `$0.035`.
+- Output content type: `image/jpeg`; URL host: `api.wiro.ai` under the
+  provider's `/v1/File/` route.
+- Provider debug output said that an `auto` resolution defaulted to 2K and an
+  `auto` aspect ratio defaulted to 16:9 for this run. The registry should keep
+  the provider's `auto` choices and must not substitute a local fixed size.
+- The Task Detail parameters echoed `maxImages` as the string `"1"`, so the
+  client should accept provider JSON type coercion in responses while sending
+  the registry-validated request value.
+
+The observed Task Detail output item has these keys and value types:
+
+```text
+id:str, name:str, contenttype:str, parentid:str, uuid:str, size:str,
+addedtime:str, modifiedtime:str, accesskey:str, foldercount:str,
+filecount:str, ispublic:int, expiretime:null, url:str
+```
+
+`accesskey` and `url` are response credentials/remote locations; neither may
+be written to application metadata or logs beyond the existing safe download
+boundary.

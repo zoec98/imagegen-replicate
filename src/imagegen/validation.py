@@ -72,6 +72,12 @@ def validate_generation_payload(
         model=model,
         target=target,
     )
+    _validate_source_image_total(
+        source_images,
+        parameters,
+        model=model,
+        target=target,
+    )
     return ValidatedGenerationRequest(
         prompt=prompt,
         parameters=parameters,
@@ -348,3 +354,37 @@ def _source_image_max(
     if target is not None and target.source_images is not None:
         return target.source_images.max_count
     return None
+
+
+def _source_image_total(
+    model: ProviderModel | ReplicateModel,
+    target: GenerationTarget | None,
+):
+    if target is not None and target.source_images is not None:
+        return target.source_images
+    if isinstance(model, ProviderModel) and model.edit_target is not None:
+        return model.edit_target.source_images
+    return None
+
+
+def _validate_source_image_total(
+    source_images: list[str],
+    parameters: dict[str, object],
+    *,
+    model: ProviderModel | ReplicateModel,
+    target: GenerationTarget | None,
+) -> None:
+    binding = _source_image_total(model, target)
+    if not source_images or binding is None or binding.max_total is None:
+        return
+    output_parameter = binding.output_count_parameter
+    if output_parameter is None:
+        return
+    output_count = parameters.get(output_parameter)
+    if (
+        isinstance(output_count, int)
+        and len(source_images) + output_count > binding.max_total
+    ):
+        raise ValidationError(
+            f"source images plus {output_parameter} cannot exceed {binding.max_total}."
+        )

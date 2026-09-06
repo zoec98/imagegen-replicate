@@ -10,7 +10,7 @@ from dataclasses import replace
 
 import pytest
 
-from imagegen.model_registry import MODEL_REGISTRY
+from imagegen.model_registry import MODEL_REGISTRY, resolve_model
 from imagegen.validation import (
     ValidationError,
     validate_generation_payload,
@@ -270,6 +270,41 @@ def test_validate_model_parameters_rejects_image_input_for_mvp():
         validate_model_parameters(
             {"image_input": ["image.png"]},
             model=MODEL_REGISTRY["seedream45"],
+        )
+
+
+def test_validate_wiro_model_rejects_generic_input_image():
+    model = resolve_model("wiro", "seedream5-pro-uncensored")
+    target = model.edit_target
+    assert target is not None
+
+    with pytest.raises(
+        ValidationError,
+        match="inputImage must be submitted as source_images.",
+    ):
+        validate_model_parameters(
+            {"inputImage": ["image.png"]},
+            model=model,
+            target=target,
+        )
+
+
+def test_validate_wiro_lite_rejects_sources_plus_outputs_above_limit(tmp_path):
+    model = resolve_model("wiro", "seedream5-lite-uncensored")
+    for index in range(14):
+        (tmp_path / f"source-{index}.png").write_bytes(b"image")
+
+    with pytest.raises(ValidationError, match="source images plus maxImages"):
+        validate_generation_payload(
+            {
+                "prompt": "edit this",
+                "edit_mode": True,
+                "source_images": [f"source-{index}.png" for index in range(14)],
+                "parameters": {"maxImages": 2},
+            },
+            model=model,
+            target=model.edit_target,
+            output_dir=tmp_path,
         )
 
 

@@ -101,6 +101,7 @@ def test_provider_registry_lists_supported_providers():
     assert providers == {
         "replicate": "Replicate",
         "falai": "fal.ai",
+        "wiro": "Wiro",
     }
 
 
@@ -232,6 +233,45 @@ def test_generation_target_resolution_keeps_provider_parameters_distinct():
         "enable_safety_checker": False,
         "sync_mode": False,
     }
+
+
+def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
+    models = list_models_for_provider("wiro")
+    assert {model.alias for model in models} == {
+        "seedream5-pro-uncensored",
+        "seedream5-lite-uncensored",
+    }
+    assert all("Uncensored" in model.display_name for model in models)
+    assert {model.provider for model in models} == {"wiro"}
+
+    pro = resolve_model("wiro", "seedream5-pro-uncensored")
+    assert pro.text_target.provider_model == "bytedance/seedream-v5-pro-uncensored"
+    assert pro.edit_target is not None
+    assert pro.edit_target.source_images is not None
+    assert pro.edit_target.source_images.provider_field == "inputImage"
+    assert pro.edit_target.source_images.max_count == 10
+    assert [parameter.name for parameter in pro.text_target.parameters] == [
+        "prompt",
+        "resolution",
+        "aspectRatio",
+        "outputFormat",
+        "watermark",
+    ]
+    assert pro.text_target.parameters[1].choices == ("1k", "2k")
+    assert pro.text_target.parameters[-1].choices == ("false", "true")
+    assert {price.price for price in pro.text_target.pricing} == {"$0.045", "$0.09"}
+    assert all(price.source == "provider-api" for price in pro.text_target.pricing)
+
+    lite = resolve_model("wiro", "seedream5-lite-uncensored")
+    assert lite.text_target.provider_model == "bytedance/seedream-v5-lite-uncensored"
+    assert lite.edit_target is not None
+    assert lite.edit_target.source_images is not None
+    assert lite.edit_target.source_images.max_count == 14
+    assert lite.edit_target.source_images.max_total == 15
+    assert lite.edit_target.source_images.output_count_parameter == "maxImages"
+    assert resolve_model_ref("wiro:Seedream 5 Lite Uncensored").alias == (
+        "seedream5-lite-uncensored"
+    )
 
 
 def test_falai_edit_target_uses_linked_endpoint_not_selector_duplicate():

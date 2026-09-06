@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-ProviderId = Literal["replicate", "falai"]
+ProviderId = Literal["replicate", "falai", "wiro"]
 ParameterType = Literal["array", "boolean", "integer", "number", "select", "string"]
 ModelMode = Literal["text-to-image", "image-edit"]
 ParameterSemanticType = Literal["seed"]
@@ -55,6 +55,8 @@ class ModelParameter:
 class SourceImageBinding:
     provider_field: str
     max_count: int
+    max_total: int | None = None
+    output_count_parameter: str | None = None
 
 
 @dataclass(frozen=True)

@@ -19,6 +19,7 @@ from imagegen.model_registry_replicate import (
     DEFAULT_MODEL_ALIAS,
     MODEL_REGISTRY,
 )
+from imagegen.model_registry_wiro import MODEL_REGISTRY as WIRO_MODEL_REGISTRY
 
 __all__ = [
     "DEFAULT_MODEL_ALIAS",
@@ -47,6 +48,7 @@ __all__ = [
 PROVIDERS: tuple[ProviderInfo, ...] = (
     ProviderInfo(id="replicate", display_name="Replicate"),
     ProviderInfo(id="falai", display_name="fal.ai"),
+    ProviderInfo(id="wiro", display_name="Wiro"),
 )
 
 
@@ -138,7 +140,7 @@ def _provider_registry(provider: ProviderId) -> dict[str, ProviderModel]:
 
 
 def _provider_id(value: str) -> ProviderId:
-    if value in {"replicate", "falai"}:
+    if value in {"replicate", "falai", "wiro"}:
         return value
     raise RegistryLookupError(f"Unknown provider `{value}`.")
 
@@ -191,4 +193,5 @@ PROVIDER_REGISTRIES: dict[ProviderId, dict[str, ProviderModel]] = {
         for alias, model in MODEL_REGISTRY.items()
     },
     "falai": FALAI_MODEL_REGISTRY,
+    "wiro": WIRO_MODEL_REGISTRY,
 }
