@@ -40,6 +40,8 @@ Project scripts live in `scripts/`:
 - `scripts/get_schema_replicate owner/model`: fetch Replicate schema data.
 - `scripts/get_schema_falai text-api-url [edit-api-url]`: fetch fal.ai endpoint
   docs, schema, pricing, and optional linked edit endpoint information.
+- `scripts/get_schema_wiro owner/model`: fetch authenticated Wiro model detail,
+  inputs, capabilities, and pricing without starting a generation.
 
 ## Progressive Discovery
 
