@@ -3,15 +3,59 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Sequence
 
-from imagegen.model_registry import list_models_for_provider, list_providers
+from imagegen.model_registry import (
+    GenerationTarget,
+    ModelParameter,
+    ProviderModel,
+    RegistryLookupError,
+    list_models_for_provider,
+    list_providers,
+    resolve_generation_target,
+    resolve_model_ref,
+)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if any(option in arguments for option in ("--help", "-h")):
+        bootstrap = _bootstrap_parser()
+        try:
+            selected, _ = bootstrap.parse_known_args(arguments)
+        except SystemExit as error:
+            return int(error.code or 0)
+        if selected.provider and selected.model:
+            return _model_help(arguments, selected.provider, selected.model)
+
     parser = _global_parser()
     try:
         parser.parse_args(argv)
+    except SystemExit as error:
+        return int(error.code or 0)
+    parser.error("generation arguments are not implemented yet")
+    return 2
+
+
+def _bootstrap_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--provider")
+    parser.add_argument("--model")
+    return parser
+
+
+def _model_help(arguments: list[str], provider: str, model_ref: str) -> int:
+    try:
+        model = resolve_model_ref(model_ref, selected_provider=provider)
+        target = resolve_generation_target(provider, model.alias, edit_mode=False)
+    except RegistryLookupError as error:
+        print(f"imagegen: error: {error}", file=sys.stderr)
+        return 2
+
+    parser = _model_parser(provider, model, target)
+    try:
+        parser.parse_args(arguments)
     except SystemExit as error:
         return int(error.code or 0)
     parser.error("generation arguments are not implemented yet")
@@ -36,6 +80,74 @@ def _global_parser() -> argparse.ArgumentParser:
         help="print only generated image paths on success",
     )
     return parser
+
+
+def _model_parser(
+    provider: str,
+    model: ProviderModel,
+    target: GenerationTarget,
+) -> argparse.ArgumentParser:
+    model_alias = model.alias
+    parser = argparse.ArgumentParser(
+        prog="imagegen",
+        description=(
+            f"Generate with {provider} model {target.display_name} "
+            f"(alias: {model_alias})."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--provider", default=provider, help=argparse.SUPPRESS)
+    parser.add_argument("--model", default=model_alias, help=argparse.SUPPRESS)
+    prompt = parser.add_mutually_exclusive_group()
+    prompt.add_argument("--prompt", metavar="TEXT")
+    prompt.add_argument("--file", metavar="FILENAME")
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="print only generated image paths on success",
+    )
+    source_parameter = (
+        model.edit_target.source_images.provider_field
+        if model.edit_target is not None and model.edit_target.source_images is not None
+        else None
+    )
+    for parameter in target.parameters:
+        if parameter.name in {"prompt", source_parameter} or parameter.name in target.fixed_inputs:
+            continue
+        _add_parameter_option(parser, parameter)
+    return parser
+
+
+def _add_parameter_option(
+    parser: argparse.ArgumentParser,
+    parameter: ModelParameter,
+) -> None:
+    option_names = [f"--{parameter.name}"]
+    hyphenated = f"--{parameter.name.replace('_', '-') }"
+    if hyphenated not in option_names:
+        option_names.append(hyphenated)
+    help_text = parameter.description
+    if parameter.default not in ("", ()):
+        help_text += f" (default: {parameter.default})"
+    if parameter.choices:
+        help_text += f" (choices: {', '.join(map(str, parameter.choices))})"
+    if parameter.minimum is not None or parameter.maximum is not None:
+        help_text += (
+            f" (range: {parameter.minimum!s} to {parameter.maximum!s})"
+        )
+    kwargs = {"default": None, "help": help_text}
+    if parameter.type == "boolean":
+        kwargs["action"] = argparse.BooleanOptionalAction
+    else:
+        kwargs["type"] = {
+            "integer": int,
+            "number": float,
+            "select": str,
+            "string": str,
+        }.get(parameter.type)
+        if parameter.choices:
+            kwargs["choices"] = parameter.choices
+    parser.add_argument(*option_names, **kwargs)
 
 
 def _global_help_epilog() -> str:
