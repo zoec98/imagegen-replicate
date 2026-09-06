@@ -1,3 +1,6 @@
+import json
+from dataclasses import replace
+
 import pytest
 
 from imagegen import main
@@ -9,6 +12,7 @@ from imagegen.cli import (
 )
 from imagegen.generation_log import SQLiteGenerationLog
 from imagegen.generation_types import GenerationResult
+from imagegen.request_store import RequestStore
 
 
 def test_help_lists_providers_and_models_without_loading_configuration(
@@ -232,3 +236,124 @@ def test_cli_generation_returns_failed_terminal_request(app_config):
 
     assert record.status == "failed"
     assert record.error == "provider is unavailable"
+
+
+def test_successful_json_output_contains_project_relative_image_paths(
+    tmp_path,
+    monkeypatch,
+    capsys,
+    app_config,
+):
+    monkeypatch.chdir(tmp_path)
+    config = replace(app_config, data_dir=tmp_path / "outputs")
+    store = RequestStore()
+    record = store.create(
+        provider="replicate",
+        model_alias="seedream45",
+        prompt="a red fox",
+        parameters={},
+    )
+    store.update(
+        record.request_id,
+        status="succeeded",
+        prediction_id="prediction-1",
+        output_urls=["https://example.test/fox.png"],
+        images=["seedream45-prediction-1-01.png"],
+    )
+    monkeypatch.setattr("imagegen.cli.load_config", lambda: config)
+    monkeypatch.setattr("imagegen.cli.run_cli_generation", lambda request, **_: record)
+
+    exit_code = main(
+        [
+            "--provider",
+            "replicate",
+            "--model",
+            "seedream45",
+            "--prompt",
+            "a red fox",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert json.loads(captured.out)["images"] == [
+        "outputs/images/seedream45-prediction-1-01.png"
+    ]
+    assert captured.err == ""
+
+
+def test_quiet_output_contains_only_project_relative_image_paths(
+    tmp_path,
+    monkeypatch,
+    capsys,
+    app_config,
+):
+    monkeypatch.chdir(tmp_path)
+    config = replace(app_config, data_dir=tmp_path / "outputs")
+    store = RequestStore()
+    record = store.create(
+        provider="replicate",
+        model_alias="seedream45",
+        prompt="a red fox",
+        parameters={},
+    )
+    store.update(
+        record.request_id,
+        status="succeeded",
+        images=["one.png", "two.jpg"],
+    )
+    monkeypatch.setattr("imagegen.cli.load_config", lambda: config)
+    monkeypatch.setattr("imagegen.cli.run_cli_generation", lambda request, **_: record)
+
+    exit_code = main(
+        [
+            "--provider",
+            "replicate",
+            "--model",
+            "seedream45",
+            "--prompt",
+            "a red fox",
+            "--quiet",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert captured.out == "outputs/images/one.png\noutputs/images/two.jpg\n"
+    assert captured.err == ""
+
+
+def test_failed_generation_writes_error_to_stderr_and_returns_one(
+    tmp_path,
+    monkeypatch,
+    capsys,
+    app_config,
+):
+    monkeypatch.chdir(tmp_path)
+    config = replace(app_config, data_dir=tmp_path / "outputs")
+    record = RequestStore().create(
+        provider="replicate",
+        model_alias="seedream45",
+        prompt="a red fox",
+        parameters={},
+    )
+    record.error = "provider is unavailable"
+    record.status = "failed"
+    monkeypatch.setattr("imagegen.cli.load_config", lambda: config)
+    monkeypatch.setattr("imagegen.cli.run_cli_generation", lambda request, **_: record)
+
+    exit_code = main(
+        [
+            "--provider",
+            "replicate",
+            "--model",
+            "seedream45",
+            "--prompt",
+            "a red fox",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert captured.out == ""
+    assert captured.err == "provider is unavailable\n"

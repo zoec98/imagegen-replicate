@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sqlite3
 import sys
 from collections.abc import Mapping, Sequence
@@ -72,14 +73,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     if isinstance(request, int):
         return request
     try:
-        record = run_cli_generation(request)
+        config = load_config()
+        record = run_cli_generation(request, app_config=config)
     except CliArgumentError as error:
         print(f"imagegen: error: {error}", file=sys.stderr)
         return 2
     except (CliRuntimeError, OSError, ValueError, sqlite3.Error) as error:
         print(f"imagegen: error: {error}", file=sys.stderr)
         return 1
-    return _emit_result(record, quiet=request.quiet)
+    return _emit_result(
+        record,
+        quiet=request.quiet,
+        output_dir=config.output_dir,
+    )
 
 
 def parse_cli_request(arguments: Sequence[str]) -> CliRequest | int:
@@ -191,18 +197,36 @@ def run_cli_generation(
     return store.get(record.request_id) or record
 
 
-def _emit_result(record: GenerationRequest, *, quiet: bool) -> int:
+def _emit_result(
+    record: GenerationRequest,
+    *,
+    quiet: bool,
+    output_dir: Path,
+) -> int:
     if record.status != "succeeded":
         print(
             record.error or f"generation ended with status {record.status}",
             file=sys.stderr,
         )
         return 1
+    images = [_relative_image_path(output_dir, filename) for filename in record.images]
     if quiet:
-        print("\n".join(record.images))
+        if images:
+            print("\n".join(images))
     else:
-        print(json.dumps(record.to_json(), sort_keys=True))
+        payload = record.to_json()
+        payload["images"] = images
+        print(json.dumps(payload, sort_keys=True))
     return 0
+
+
+def _relative_image_path(output_dir: Path, filename: str) -> str:
+    image_path = (output_dir / filename).resolve()
+    project_root = Path.cwd().resolve()
+    try:
+        return image_path.relative_to(project_root).as_posix()
+    except ValueError:
+        return os.path.relpath(image_path, project_root)
 
 
 def _bootstrap_parser() -> argparse.ArgumentParser:
