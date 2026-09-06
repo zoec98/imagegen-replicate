@@ -270,6 +270,14 @@ def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
     assert lite.edit_target.source_images.max_count == 14
     assert lite.edit_target.source_images.max_total == 15
     assert lite.edit_target.source_images.output_count_parameter == "maxImages"
+    assert (
+        next(
+            parameter
+            for parameter in lite.text_target.parameters
+            if parameter.name == "watermark"
+        ).default
+        == "false"
+    )
     assert resolve_model_ref("wiro:Seedream 5 Lite Uncensored").alias == (
         "seedream5-lite-uncensored"
     )

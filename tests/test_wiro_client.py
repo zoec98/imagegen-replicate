@@ -24,8 +24,9 @@ class FakeResponse:
 
 
 class FakeHTTPClient:
-    def __init__(self, responses):
+    def __init__(self, responses, *, post_error=None):
         self.responses = list(responses)
+        self.post_error = post_error
         self.calls = []
 
     def post(self, url, *, headers, json=None, data=None, files=None, timeout=None):
@@ -39,6 +40,8 @@ class FakeHTTPClient:
                 "timeout": timeout,
             }
         )
+        if self.post_error is not None:
+            raise self.post_error
         return self.responses.pop(0)
 
 
@@ -308,3 +311,124 @@ def test_wiro_rejects_malformed_task_detail_response(tmp_path):
             sleep=lambda _: None,
             clock=lambda: 0.0,
         )
+
+
+def test_wiro_edit_uploads_repeated_input_image_parts_and_closes_files(tmp_path):
+    model = resolve_model("wiro", "seedream5-pro-uncensored")
+    target = resolve_generation_target(
+        "wiro", "seedream5-pro-uncensored", edit_mode=True
+    )
+    source_paths = [
+        tmp_path / "source-one.png",
+        tmp_path / "source-two.jpg",
+    ]
+    for path in source_paths:
+        path.write_bytes(b"image")
+    client = FakeHTTPClient(
+        [
+            FakeResponse(200, {"result": True, "errors": [], "taskid": "wiro-edit"}),
+            FakeResponse(
+                200,
+                {
+                    "result": True,
+                    "errors": [],
+                    "tasklist": [
+                        {
+                            "status": "task_postprocess_end",
+                            "pexit": "0",
+                            "outputs": [
+                                {
+                                    "url": "https://cdn1.wiro.ai/edit.jpg",
+                                    "contenttype": "image/jpeg",
+                                }
+                            ],
+                        }
+                    ],
+                },
+            ),
+        ]
+    )
+    persisted = []
+
+    generate_image_urls(
+        "edit this (palette: warm tasty)",
+        app_config(tmp_path),
+        model=model,
+        target=target,
+        client=client,
+        source_image_paths=source_paths,
+        sleep=lambda _: None,
+        clock=lambda: 0.0,
+        persist_images=lambda urls, **kwargs: persisted.append(kwargs) or [],
+    )
+
+    run_call = client.calls[0]
+    assert run_call["json"] is None
+    assert dict(run_call["data"]) == {
+        "prompt": "edit this tasty",
+        "resolution": "1k",
+        "aspectRatio": "1:1",
+        "outputFormat": "jpeg",
+        "watermark": "false",
+    }
+    assert [part[0] for part in run_call["files"]] == ["inputImage", "inputImage"]
+    assert [part[1][0] for part in run_call["files"]] == [
+        "source-one.png",
+        "source-two.jpg",
+    ]
+    assert [part[1][2] for part in run_call["files"]] == [
+        "image/png",
+        "image/jpeg",
+    ]
+    assert all(part[1][1].closed for part in run_call["files"])
+    assert persisted[0]["prediction_input"]["inputImage"] == [
+        "source-one.png",
+        "source-two.jpg",
+    ]
+    assert str(tmp_path) not in str(persisted[0]["prediction_input"])
+
+
+def test_wiro_edit_closes_uploads_when_submission_fails(tmp_path):
+    model = resolve_model("wiro", "seedream5-lite-uncensored")
+    target = resolve_generation_target(
+        "wiro", "seedream5-lite-uncensored", edit_mode=True
+    )
+    source_path = tmp_path / "source.png"
+    source_path.write_bytes(b"image")
+    client = FakeHTTPClient(
+        [FakeResponse(422, {"result": False, "errors": [{"message": "invalid"}]})]
+    )
+
+    with pytest.raises(WiroRequestError, match="HTTP 422"):
+        generate_image_urls(
+            "edit this",
+            app_config(tmp_path),
+            model=model,
+            target=target,
+            client=client,
+            source_image_paths=[source_path],
+        )
+
+    assert all(part[1][1].closed for part in client.calls[0]["files"])
+
+
+def test_wiro_edit_closes_uploads_on_network_failure(tmp_path):
+    model = resolve_model("wiro", "seedream5-lite-uncensored")
+    target = resolve_generation_target(
+        "wiro", "seedream5-lite-uncensored", edit_mode=True
+    )
+    source_path = tmp_path / "source.png"
+    source_path.write_bytes(b"image")
+    client = FakeHTTPClient([], post_error=OSError("offline"))
+
+    with pytest.raises(WiroRequestError, match="request failed"):
+        generate_image_urls(
+            "edit this",
+            app_config(tmp_path),
+            model=model,
+            target=target,
+            client=client,
+            source_image_paths=[source_path],
+        )
+
+    assert all(part[1][1].closed for part in client.calls[0]["files"])

@@ -121,3 +121,12 @@ filecount:str, ispublic:int, expiretime:null, url:str
 `accesskey` and `url` are response credentials/remote locations; neither may
 be written to application metadata or logs beyond the existing safe download
 boundary.
+
+## Edit multipart contract
+
+The current Wiro API documentation describes `inputImage` as a
+`combinefileinput` parameter. When local files are supplied, the Run request
+must therefore use `multipart/form-data` with one repeated `inputImage` part
+per source file. The `{id}Url` companion field is for URL-based input and is
+not sent for these local uploads. Other model parameters remain ordinary form
+fields. Text-only requests continue to use JSON.
