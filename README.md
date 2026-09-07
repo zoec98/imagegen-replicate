@@ -65,10 +65,19 @@ WIRO_API_KEY=
 ```
 
 Wiro uses only `WIRO_API_KEY`; the account's API secret is not required by
-this application. When the key is configured, the Wiro provider exposes the
-`Seedream 5 Pro Uncensored` and `Seedream 5 Lite Uncensored` models. Pro accepts
-up to 10 edit sources. Lite accepts up to 14 sources, with sources plus
-requested outputs capped at 15.
+this application. The complete provider/model list is below.
+
+## Providers and models
+
+Model aliases are scoped to their provider. Models marked `edit` accept
+existing gallery images as sources; `text` models are text-to-image only. A
+provider appears in the UI only when its credentials are configured.
+
+| Provider | Registered models |
+| --- | --- |
+| Replicate | `flux-flex` — Flux 2 Flex (edit)<br>`gpt-image-15` — GPT Image 1.5 (edit)<br>`gpt-image-2` — GPT Image 2 (edit)<br>`grok-imagine` — Grok Imagine (edit)<br>`imagen-4` — Imagen 4 (text)<br>`imagen-4-fast` — Imagen 4 Fast (text)<br>`imagen-4-ultra` — Imagen 4 Ultra (text)<br>`nano-banana-2` — Nano Banana 2 (edit)<br>`nano-banana-pro` — Nano Banana Pro (edit)<br>`qwen-2512` — Qwen Image 2512 (edit)<br>`seedream45` — Seedream 4.5 (edit)<br>`seedream5` — Seedream 5 Lite (edit)<br>`seedream5-pro` — Seedream 5 Pro (edit)<br>`wan-27-pro` — Wan 2.7 Image Pro (edit) |
+| fal.ai | `bria-fibo` — Bria Fibo (edit)<br>`ernie-image` — Ernie Image (text)<br>`ernie-image-turbo` — Ernie Image Turbo (text)<br>`flux-2` — Flux 2 (edit)<br>`flux-2-pro` — Flux 2 Pro (edit)<br>`flux-2-realism` — Flux 2 Realism (text)<br>`gpt-image-2` — GPT Image 2 (edit)<br>`gpt-image15` — GPT Image 1.5 (edit)<br>`grok` — Grok Imagine Image (edit)<br>`hidream-dev` — HiDream I1 Dev (text)<br>`hidream-fast` — HiDream I1 Fast (text)<br>`hidream-full` — HiDream I1 Full (text)<br>`krea-2-large` — Krea 2 Large (text)<br>`krea-2-medium` — Krea 2 Medium (text)<br>`krea-2-turbo` — Krea 2 Turbo (edit)<br>`nano-banana-2` — Nano Banana 2 (edit)<br>`seedream` — Seedream 4 (edit)<br>`seedream45` — Seedream 4.5 (edit)<br>`seedream5` — Seedream 5 Lite (edit)<br>`seedream5-pro` — Seedream 5 Pro (edit)<br>`zit` — Z-Image Turbo (edit) |
+| Wiro | `flux-2-flex` — Flux 2 Flex (edit)<br>`gpt-image-15` — GPT Image 1.5 (edit)<br>`gpt-image-2` — GPT Image 2 (edit)<br>`grok-imagine` — Grok Imagine Image (edit)<br>`hidream-dev` — HiDream I1 Dev (text)<br>`hidream-fast` — HiDream I1 Fast (text)<br>`nano-banana-2` — Nano Banana 2 (edit)<br>`nano-banana-pro` — Nano Banana Pro (edit)<br>`seedream45-uncensored` — Seedream 4.5 Uncensored (edit)<br>`seedream5-lite-uncensored` — Seedream 5 Lite Uncensored (edit)<br>`seedream5-pro-uncensored` — Seedream 5 Pro Uncensored (edit)<br>`z-image-turbo` — Z-Image Turbo (text) |
 
 Also set the `AUTHOR` key:
 
