@@ -1,4 +1,4 @@
-"""Configured Wiro Seedream 5 uncensored model contracts."""
+"""Configured Wiro image model contracts."""
 
 from __future__ import annotations
 
@@ -12,6 +12,20 @@ from imagegen.model_registry_base import (
 )
 
 ASPECT_RATIOS = ("1:1", "2:3", "3:2", "3:4", "4:3", "16:9", "9:16", "21:9")
+SEEDREAM45_ASPECT_RATIOS = (
+    "auto",
+    "1:1",
+    "2:3",
+    "3:2",
+    "3:4",
+    "4:3",
+    "4:5",
+    "5:4",
+    "16:9",
+    "9:16",
+    "21:9",
+    "9:21",
+)
 WATERMARK_CHOICES = ("false", "true")
 
 
@@ -108,7 +122,12 @@ def _pro_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
     )
 
 
-def _lite_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
+def _lite_parameters(
+    *,
+    edit: bool,
+    resolution_choices: tuple[object, ...] = ("auto", "2k", "3k"),
+    aspect_ratios: tuple[object, ...] = ("auto", *ASPECT_RATIOS),
+) -> tuple[ModelParameter, ...]:
     source = (
         (
             _parameter(
@@ -136,7 +155,7 @@ def _lite_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
             "Output resolution.",
             "select",
             "auto",
-            choices=("auto", "2k", "3k"),
+            choices=resolution_choices,
             order=3 if edit else 2,
         ),
         _parameter(
@@ -144,7 +163,7 @@ def _lite_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
             "Output aspect ratio.",
             "select",
             "auto",
-            choices=("auto", *ASPECT_RATIOS),
+            choices=aspect_ratios,
             order=4 if edit else 3,
         ),
         _parameter(
@@ -242,6 +261,7 @@ def _provider_model(
 
 PROVIDER_MODEL = "bytedance/seedream-v5-pro-uncensored"
 LITE_PROVIDER_MODEL = "bytedance/seedream-v5-lite-uncensored"
+SEEDREAM45_PROVIDER_MODEL = "bytedance/seedream-v4-5-uncensored"
 
 MODEL_REGISTRY: dict[str, ProviderModel] = {
     "seedream5-pro-uncensored": _provider_model(
@@ -259,5 +279,21 @@ MODEL_REGISTRY: dict[str, ProviderModel] = {
         text_parameters=_lite_parameters(edit=False),
         edit_parameters=_lite_parameters(edit=True),
         pricing=(_pricing("$0.035", "per output"),),
+    ),
+    "seedream45-uncensored": _provider_model(
+        alias="seedream45-uncensored",
+        display_name="Seedream 4.5 Uncensored",
+        provider_model=SEEDREAM45_PROVIDER_MODEL,
+        text_parameters=_lite_parameters(
+            edit=False,
+            resolution_choices=("auto", "2k", "4k"),
+            aspect_ratios=SEEDREAM45_ASPECT_RATIOS,
+        ),
+        edit_parameters=_lite_parameters(
+            edit=True,
+            resolution_choices=("auto", "2k", "4k"),
+            aspect_ratios=SEEDREAM45_ASPECT_RATIOS,
+        ),
+        pricing=(_pricing("$0.04", "per output"),),
     ),
 }

@@ -87,11 +87,12 @@ Run `scripts/get_schema_wiro owner/model` before adding or updating a Wiro
 registry entry. The command calls Wiro's authenticated Tool Detail endpoint
 without starting a generation.
 
-The 2026-09-06 Tool Detail retrieval and authorized text probes cover exactly
-these provider model identities:
+The Tool Detail retrievals and authorized text probes cover exactly these
+provider model identities:
 
 - `bytedance/seedream-v5-pro-uncensored`
 - `bytedance/seedream-v5-lite-uncensored`
+- `bytedance/seedream-v4-5-uncensored`
 
 Pro has `resolution` (`1k`/`2k`), `aspectRatio`, `outputFormat` (`jpeg`/`png`),
 and string-valued `watermark` (`false`/`true`), with a maximum of 10
@@ -101,10 +102,16 @@ and string-valued `watermark` (`false`/`true`), with a maximum of 10
 of 15. The application defaults output to JPEG and watermark to `false`.
 
 Wiro pricing is provider-reported: Pro is `$0.045` at 1K and `$0.09` at 2K;
-Lite is `$0.035` per output. The exact `Uncensored` endpoint is part of each
-model identity. The Tool Detail contract does not expose a generic safety flag
-or safety-tolerance parameter, so the registry does not invent one and does
-not promise that the model bypasses account, legal, or provider-policy limits.
+Lite is `$0.035` per output; Seedream 4.5 Uncensored is `$0.04` per output.
+Seedream 4.5 supports `resolution` (`auto`/`2k`/`4k`), `aspectRatio`
+(`auto`, `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `16:9`, `9:16`,
+`21:9`, `9:21`), integer `maxImages` (1–15), and string-valued `watermark`
+(`false`/`true`). It accepts up to 14 edit sources, with source images plus
+outputs limited to 15. Its Tool Detail response contains no output-format or
+safety control; the application therefore keeps `watermark` at `false` and
+does not invent a JPEG or safety input for this endpoint. The exact
+`Uncensored` endpoint is part of each model identity. These endpoints do not
+promise bypass of account, legal, or provider-policy limits.
 
 For editing, selected local files are sent as repeated `inputImage` parts in a
 multipart request. Text-only requests use JSON. Persisted metadata contains

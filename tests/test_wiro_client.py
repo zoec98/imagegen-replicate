@@ -146,6 +146,53 @@ def test_wiro_text_request_submits_once_polls_same_task_and_persists_outputs(tmp
     assert persisted[0]["prediction_input"]["prompt"] == "a cookie tasty"
 
 
+def test_wiro_seedream45_text_request_uses_provider_defaults(tmp_path):
+    model = resolve_model("wiro", "seedream45-uncensored")
+    target = resolve_generation_target("wiro", "seedream45-uncensored", edit_mode=False)
+    client = FakeHTTPClient(
+        [
+            FakeResponse(200, {"result": True, "errors": [], "taskid": "wiro-45"}),
+            FakeResponse(
+                200,
+                {
+                    "result": True,
+                    "errors": [],
+                    "tasklist": [
+                        {
+                            "status": "task_postprocess_end",
+                            "pexit": "0",
+                            "outputs": [{"url": "https://cdn1.wiro.ai/seedream45.jpg"}],
+                        }
+                    ],
+                },
+            ),
+        ]
+    )
+
+    generate_image_urls(
+        "a cookie",
+        app_config(tmp_path),
+        model=model,
+        target=target,
+        parameters={"resolution": "4k", "aspectRatio": "16:9", "maxImages": 2},
+        client=client,
+        sleep=lambda _: None,
+        clock=lambda: 0.0,
+        persist_images=lambda urls, **kwargs: [],
+    )
+
+    assert client.calls[0]["url"] == (
+        "https://api.wiro.ai/v1/Run/bytedance/seedream-v4-5-uncensored"
+    )
+    assert client.calls[0]["json"] == {
+        "prompt": "a cookie",
+        "resolution": "4k",
+        "aspectRatio": "16:9",
+        "maxImages": 2,
+        "watermark": "false",
+    }
+
+
 def test_wiro_failed_task_keeps_task_id_without_accepting_outputs(tmp_path):
     model = resolve_model("wiro", "seedream5-lite-uncensored")
     target = resolve_generation_target(
@@ -389,6 +436,60 @@ def test_wiro_edit_uploads_repeated_input_image_parts_and_closes_files(tmp_path)
     assert str(tmp_path) not in str(persisted[0]["prediction_input"])
 
 
+def test_wiro_seedream45_edit_uploads_sources_and_limits_outputs(tmp_path):
+    model = resolve_model("wiro", "seedream45-uncensored")
+    target = resolve_generation_target("wiro", "seedream45-uncensored", edit_mode=True)
+    source_path = tmp_path / "source.png"
+    source_path.write_bytes(b"image")
+    client = FakeHTTPClient(
+        [
+            FakeResponse(200, {"result": True, "errors": [], "taskid": "wiro-45-edit"}),
+            FakeResponse(
+                200,
+                {
+                    "result": True,
+                    "errors": [],
+                    "tasklist": [
+                        {
+                            "status": "task_postprocess_end",
+                            "pexit": "0",
+                            "outputs": [
+                                {"url": "https://cdn1.wiro.ai/seedream45-edit.jpg"}
+                            ],
+                        }
+                    ],
+                },
+            ),
+        ]
+    )
+
+    generate_image_urls(
+        "edit this",
+        app_config(tmp_path),
+        model=model,
+        target=target,
+        parameters={"maxImages": 2},
+        source_image_paths=[source_path],
+        client=client,
+        sleep=lambda _: None,
+        clock=lambda: 0.0,
+        persist_images=lambda urls, **kwargs: [],
+    )
+
+    run_call = client.calls[0]
+    assert dict(run_call["data"]) == {
+        "prompt": "edit this",
+        "resolution": "auto",
+        "aspectRatio": "auto",
+        "maxImages": "2",
+        "watermark": "false",
+    }
+    assert [part[0] for part in run_call["files"]] == ["inputImage"]
+    assert run_call["files"][0][1][0] == "source.png"
+    assert run_call["files"][0][1][2] == "image/png"
+    assert run_call["files"][0][1][1].closed
+
+
 def test_wiro_edit_serializes_multipart_with_httpx_client(tmp_path):
     model = resolve_model("wiro", "seedream5-lite-uncensored")
     target = resolve_generation_target(
@@ -406,9 +507,7 @@ def test_wiro_edit_serializes_multipart_with_httpx_client(tmp_path):
                     {
                         "status": "task_postprocess_end",
                         "pexit": "0",
-                        "outputs": [
-                            {"url": "https://cdn1.wiro.ai/httpx-edit.jpg"}
-                        ],
+                        "outputs": [{"url": "https://cdn1.wiro.ai/httpx-edit.jpg"}],
                     }
                 ],
             },

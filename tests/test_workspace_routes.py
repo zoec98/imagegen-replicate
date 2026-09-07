@@ -299,6 +299,7 @@ def test_index_exposes_wiro_models_when_wiro_is_enabled(app_config, app_factory)
     assert {model["alias"] for model in registry if model["provider"] == "wiro"} == {
         "seedream5-pro-uncensored",
         "seedream5-lite-uncensored",
+        "seedream45-uncensored",
     }
     lite = next(
         model

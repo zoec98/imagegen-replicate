@@ -240,6 +240,7 @@ def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
     assert {model.alias for model in models} == {
         "seedream5-pro-uncensored",
         "seedream5-lite-uncensored",
+        "seedream45-uncensored",
     }
     assert all("Uncensored" in model.display_name for model in models)
     assert {model.provider for model in models} == {"wiro"}
@@ -281,6 +282,48 @@ def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
     assert resolve_model_ref("wiro:Seedream 5 Lite Uncensored").alias == (
         "seedream5-lite-uncensored"
     )
+
+
+def test_wiro_registry_contains_seedream45_uncensored_contract():
+    model = resolve_model("wiro", "seedream45-uncensored")
+
+    assert model.display_name == "Seedream 4.5 Uncensored"
+    assert model.text_target.provider_model == "bytedance/seedream-v4-5-uncensored"
+    assert model.text_target.mode == "text-to-image"
+    assert model.edit_target is not None
+    assert model.edit_target.mode == "image-edit"
+    assert model.edit_target.source_images is not None
+    assert model.edit_target.source_images.provider_field == "inputImage"
+    assert model.edit_target.source_images.max_count == 14
+    assert model.edit_target.source_images.max_total == 15
+    assert model.edit_target.source_images.output_count_parameter == "maxImages"
+
+    parameters = {
+        parameter.name: parameter for parameter in model.text_target.parameters
+    }
+    assert parameters["resolution"].default == "auto"
+    assert parameters["resolution"].choices == ("auto", "2k", "4k")
+    assert parameters["aspectRatio"].choices == (
+        "auto",
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "16:9",
+        "9:16",
+        "21:9",
+        "9:21",
+    )
+    assert parameters["aspectRatio"].default == "auto"
+    assert parameters["maxImages"].default == 1
+    assert parameters["maxImages"].minimum == 1
+    assert parameters["maxImages"].maximum == 15
+    assert parameters["watermark"].default == "false"
+    assert parameters["watermark"].choices == ("false", "true")
+    assert {price.price for price in model.text_target.pricing} == {"$0.04"}
 
 
 def test_falai_edit_target_uses_linked_endpoint_not_selector_duplicate():
