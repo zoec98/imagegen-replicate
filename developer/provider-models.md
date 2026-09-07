@@ -161,6 +161,21 @@ fixed `safetyTolerance: 5` and does not expose that control. Wiro reports
 cp-pixel pricing from `$0.06/MP`; this is variable provider billing, not a
 flat per-image price.
 
+The `openai/gpt-image-1-5` contract supports text generation and editing with
+up to 16 `inputImage` sources. It exposes `size` (`auto`, `1:1`, `3:2`, `2:3`),
+`quality` (`low`, `medium`, `high`), `background` (`auto`, `transparent`,
+`opaque`), `outputFormat` (`png`, `jpeg`, `webp`), `outputCompression` (0–100),
+and `samples` (1–10). Edit requests additionally expose `inputFidelity`
+(`high`/`low`). The `openai/gpt-image-2` contract has the same output controls
+but uses `resolution` (`1k`, `2k`, `4k`) and `ratio` (`1:1`, `3:2`, `2:3`,
+`4:3`, `3:4`, `16:9`, `9:16`). Both default output to JPEG and use fixed
+`moderation: "low"`; that safety control is not user-configurable. Wiro
+reports price matrices ranging from `$0.009–$0.200` for GPT Image 1.5 and
+`$0.003–$0.712` for GPT Image 2, so the registry displays ranges rather than
+flat per-run prices. The optional `inputImageMask` file field is deliberately
+unsupported because the current trusted upload contract has only one source
+file channel; ordinary multi-image edits remain supported.
+
 ## Schema Extraction
 
 For provider schemas, extract useful registry information from schema input and

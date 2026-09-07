@@ -380,6 +380,47 @@ def test_validate_wiro_flux_rejects_safety_override():
         )
 
 
+def test_validate_wiro_gpt_rejects_fixed_moderation_and_mask_parameter():
+    model = resolve_model("wiro", "gpt-image-15")
+
+    with pytest.raises(
+        ValidationError,
+        match="moderation is fixed by the server.",
+    ):
+        validate_model_parameters(
+            {"moderation": "auto"},
+            model=model,
+            target=model.text_target,
+        )
+
+    with pytest.raises(ValidationError, match="Unknown parameter: inputImageMask"):
+        validate_model_parameters(
+            {"inputImageMask": "mask.png"},
+            model=model,
+            target=model.edit_target,
+        )
+
+
+def test_validate_wiro_gpt_edit_accepts_sixteen_sources_and_rejects_seventeenth(
+    tmp_path,
+):
+    model = resolve_model("wiro", "gpt-image-2")
+    for index in range(17):
+        (tmp_path / f"source-{index}.png").write_bytes(b"image")
+
+    with pytest.raises(ValidationError, match="cannot contain more than 16 files"):
+        validate_generation_payload(
+            {
+                "prompt": "edit this",
+                "edit_mode": True,
+                "source_images": [f"source-{index}.png" for index in range(17)],
+            },
+            model=model,
+            target=model.edit_target,
+            output_dir=tmp_path,
+        )
+
+
 def test_validate_wiro_lite_rejects_sources_plus_outputs_above_limit(tmp_path):
     model = resolve_model("wiro", "seedream5-lite-uncensored")
     for index in range(14):

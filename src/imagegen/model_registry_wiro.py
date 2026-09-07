@@ -638,6 +638,121 @@ def _flux_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
     )
 
 
+def _gpt_parameters(
+    *,
+    edit: bool,
+    size_name: str,
+    size_choices: tuple[object, ...],
+    size_default: object,
+    background_choices: tuple[object, ...],
+    ratio_choices: tuple[object, ...] = (),
+    ratio_default: object = "",
+) -> tuple[ModelParameter, ...]:
+    source = (
+        (
+            _parameter(
+                "inputImage",
+                "Source image files for image-to-image generation.",
+                "array",
+                "",
+                order=2,
+            ),
+        )
+        if edit
+        else ()
+    )
+    fidelity = (
+        (
+            _parameter(
+                "inputFidelity",
+                "How closely to preserve source-image details.",
+                "select",
+                "high",
+                choices=("high", "low"),
+                order=9,
+            ),
+        )
+        if edit
+        else ()
+    )
+    ratio = (
+        (
+            _parameter(
+                "ratio",
+                "Output aspect ratio.",
+                "select",
+                ratio_default,
+                choices=ratio_choices,
+                order=4 if edit else 3,
+            ),
+        )
+        if ratio_choices
+        else ()
+    )
+    return (
+        _parameter(
+            "prompt",
+            "Text prompt for image generation or editing.",
+            "string",
+            "",
+            order=1,
+        ),
+        *source,
+        _parameter(
+            size_name,
+            "Output size or resolution.",
+            "select",
+            size_default,
+            choices=size_choices,
+            order=3 if edit else 2,
+        ),
+        *ratio,
+        _parameter(
+            "quality",
+            "Output quality tier.",
+            "select",
+            "low",
+            choices=("low", "medium", "high"),
+            order=(5 if edit else 4) if ratio_choices else (4 if edit else 3),
+        ),
+        _parameter(
+            "background",
+            "Output background mode.",
+            "select",
+            "auto",
+            choices=background_choices,
+            order=(6 if edit else 5) if ratio_choices else (5 if edit else 4),
+        ),
+        _parameter(
+            "outputFormat",
+            "Output image format.",
+            "select",
+            "jpeg",
+            choices=("png", "jpeg", "webp"),
+            order=(7 if edit else 6) if ratio_choices else (6 if edit else 5),
+        ),
+        _parameter(
+            "outputCompression",
+            "Output compression level.",
+            "integer",
+            100,
+            minimum=0,
+            maximum=100,
+            order=(8 if edit else 7) if ratio_choices else (7 if edit else 6),
+        ),
+        _parameter(
+            "samples",
+            "Number of images to generate.",
+            "integer",
+            1,
+            minimum=1,
+            maximum=10,
+            order=(9 if edit else 8) if ratio_choices else (8 if edit else 7),
+        ),
+        *fidelity,
+    )
+
+
 PROVIDER_MODEL = "bytedance/seedream-v5-pro-uncensored"
 LITE_PROVIDER_MODEL = "bytedance/seedream-v5-lite-uncensored"
 SEEDREAM45_PROVIDER_MODEL = "bytedance/seedream-v4-5-uncensored"
@@ -648,6 +763,8 @@ GROK_PROVIDER_MODEL = "xai/grok-imagine-image"
 NANO_BANANA_2_PROVIDER_MODEL = "google/nano-banana-2"
 NANO_BANANA_PRO_PROVIDER_MODEL = "google/nano-banana-pro"
 FLUX_FLEX_PROVIDER_MODEL = "black-forest-labs/flux-2-flex"
+GPT_IMAGE_15_PROVIDER_MODEL = "openai/gpt-image-1-5"
+GPT_IMAGE_2_PROVIDER_MODEL = "openai/gpt-image-2"
 
 MODEL_REGISTRY: dict[str, ProviderModel] = {
     "seedream5-pro-uncensored": _provider_model(
@@ -821,5 +938,69 @@ MODEL_REGISTRY: dict[str, ProviderModel] = {
         ),
         source_binding=SourceImageBinding(provider_field="inputImage", max_count=8),
         fixed_inputs={"safetyTolerance": 5},
+    ),
+    "gpt-image-15": _provider_model(
+        alias="gpt-image-15",
+        display_name="GPT Image 1.5",
+        provider_model=GPT_IMAGE_15_PROVIDER_MODEL,
+        text_parameters=_gpt_parameters(
+            edit=False,
+            size_name="size",
+            size_choices=("auto", "1:1", "3:2", "2:3"),
+            size_default="auto",
+            background_choices=("auto", "transparent", "opaque"),
+        ),
+        edit_parameters=_gpt_parameters(
+            edit=True,
+            size_name="size",
+            size_choices=("auto", "1:1", "3:2", "2:3"),
+            size_default="auto",
+            background_choices=("auto", "transparent", "opaque"),
+        ),
+        pricing=(
+            _pricing(
+                "$0.009–$0.200",
+                "price range",
+                description="Wiro Tool Detail per-run price matrix; provider billing remains authoritative.",
+                pricing_type="provider-variable",
+                metric="run",
+            ),
+        ),
+        source_binding=SourceImageBinding(provider_field="inputImage", max_count=16),
+        fixed_inputs={"moderation": "low"},
+    ),
+    "gpt-image-2": _provider_model(
+        alias="gpt-image-2",
+        display_name="GPT Image 2",
+        provider_model=GPT_IMAGE_2_PROVIDER_MODEL,
+        text_parameters=_gpt_parameters(
+            edit=False,
+            size_name="resolution",
+            size_choices=("1k", "2k", "4k"),
+            size_default="1k",
+            background_choices=("auto", "opaque"),
+            ratio_choices=("1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16"),
+            ratio_default="1:1",
+        ),
+        edit_parameters=_gpt_parameters(
+            edit=True,
+            size_name="resolution",
+            size_choices=("1k", "2k", "4k"),
+            size_default="1k",
+            background_choices=("auto", "opaque"),
+            ratio_choices=("1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16"),
+            ratio_default="1:1",
+        ),
+        pricing=(
+            _pricing(
+                "$0.003–$0.712",
+                "price range",
+                description="Wiro Tool Detail per-run price matrix; provider billing remains authoritative.",
+                pricing_type="provider-variable",
+                metric="run",
+            ),
+        ),
+        source_binding=SourceImageBinding(provider_field="inputImage", max_count=16),
+        fixed_inputs={"moderation": "low"},
     ),
 }

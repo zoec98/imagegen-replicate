@@ -783,6 +783,77 @@ def test_wiro_flux_flex_sends_fixed_safety_jpeg_and_dimensions(tmp_path):
             assert run_call["json"] == expected
 
 
+def test_wiro_gpt_variants_send_fixed_moderation_and_edit_sources(tmp_path):
+    source_path = tmp_path / "source.png"
+    source_path.write_bytes(b"image")
+    expected = {
+        "gpt-image-15": (
+            "openai/gpt-image-1-5",
+            {"size": "3:2", "quality": "medium", "inputFidelity": "low"},
+        ),
+        "gpt-image-2": (
+            "openai/gpt-image-2",
+            {"resolution": "2k", "ratio": "16:9", "quality": "high"},
+        ),
+    }
+
+    for alias, (provider_model, overrides) in expected.items():
+        model = resolve_model("wiro", alias)
+        for edit_mode in (False, True):
+            target = resolve_generation_target("wiro", alias, edit_mode=edit_mode)
+            client = FakeHTTPClient(
+                [
+                    FakeResponse(
+                        200,
+                        {
+                            "result": True,
+                            "errors": [],
+                            "taskid": f"wiro-{alias}-{edit_mode}",
+                        },
+                    ),
+                    FakeResponse(
+                        200,
+                        {
+                            "result": True,
+                            "errors": [],
+                            "tasklist": [
+                                {
+                                    "status": "task_postprocess_end",
+                                    "pexit": "0",
+                                    "outputs": [
+                                        {"url": "https://cdn1.wiro.ai/gpt.jpg"}
+                                    ],
+                                }
+                            ],
+                        },
+                    ),
+                ]
+            )
+
+            generate_image_urls(
+                "edit this" if edit_mode else "a cookie",
+                app_config(tmp_path),
+                model=model,
+                target=target,
+                parameters=overrides,
+                source_image_paths=[source_path] if edit_mode else None,
+                client=client,
+                sleep=lambda _: None,
+                clock=lambda: 0.0,
+                persist_images=lambda urls, **kwargs: [],
+            )
+
+            run_call = client.calls[0]
+            if edit_mode:
+                assert dict(run_call["data"])["moderation"] == "low"
+                assert [part[0] for part in run_call["files"]] == ["inputImage"]
+                assert dict(run_call["data"])["outputFormat"] == "jpeg"
+            else:
+                assert run_call["json"]["moderation"] == "low"
+                assert run_call["json"]["outputFormat"] == "jpeg"
+            assert run_call["url"] == f"https://api.wiro.ai/v1/Run/{provider_model}"
+
+
 def test_wiro_edit_serializes_multipart_with_httpx_client(tmp_path):
     model = resolve_model("wiro", "seedream5-lite-uncensored")
     target = resolve_generation_target(

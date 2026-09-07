@@ -248,6 +248,8 @@ def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
         "nano-banana-2",
         "nano-banana-pro",
         "flux-2-flex",
+        "gpt-image-15",
+        "gpt-image-2",
     }
     assert all(
         "Uncensored" in model.display_name
@@ -506,6 +508,71 @@ def test_wiro_registry_contains_flux_flex_contract():
     assert parameters["outputFormat"].default == "jpeg"
     assert parameters["outputFormat"].choices == ("jpeg", "png")
     assert {price.price for price in model.text_target.pricing} == {"$0.06/MP"}
+
+
+def test_wiro_registry_contains_gpt_image_variants_with_fixed_moderation():
+    expected = {
+        "gpt-image-15": (
+            "openai/gpt-image-1-5",
+            ("auto", "1:1", "3:2", "2:3"),
+            "auto",
+            ("auto", "transparent", "opaque"),
+            "$0.009–$0.200",
+        ),
+        "gpt-image-2": (
+            "openai/gpt-image-2",
+            ("1k", "2k", "4k"),
+            "1k",
+            ("auto", "opaque"),
+            "$0.003–$0.712",
+        ),
+    }
+
+    for alias, (
+        provider_model,
+        size_choices,
+        size_default,
+        background_choices,
+        price,
+    ) in expected.items():
+        model = resolve_model("wiro", alias)
+        assert model.text_target.provider_model == provider_model
+        assert model.edit_target is not None
+        assert model.edit_target.source_images is not None
+        assert model.edit_target.source_images.provider_field == "inputImage"
+        assert model.edit_target.source_images.max_count == 16
+        assert model.text_target.fixed_inputs == {"moderation": "low"}
+        assert model.edit_target.fixed_inputs == {"moderation": "low"}
+        parameters = {
+            parameter.name: parameter for parameter in model.text_target.parameters
+        }
+        assert "inputImageMask" not in parameters
+        assert parameters["quality"].choices == ("low", "medium", "high")
+        assert parameters["quality"].default == "low"
+        size_name = "size" if alias == "gpt-image-15" else "resolution"
+        assert parameters[size_name].choices == size_choices
+        assert parameters[size_name].default == size_default
+        assert parameters["background"].choices == background_choices
+        if alias == "gpt-image-2":
+            assert parameters["ratio"].default == "1:1"
+            assert parameters["ratio"].choices == (
+                "1:1",
+                "3:2",
+                "2:3",
+                "4:3",
+                "3:4",
+                "16:9",
+                "9:16",
+            )
+        assert parameters["outputFormat"].default == "jpeg"
+        assert parameters["outputFormat"].choices == ("png", "jpeg", "webp")
+        assert parameters["outputCompression"].minimum == 0
+        assert parameters["outputCompression"].maximum == 100
+        assert parameters["samples"].minimum == 1
+        assert parameters["samples"].maximum == 10
+        assert {price_entry.price for price_entry in model.text_target.pricing} == {
+            price
+        }
 
 
 def test_falai_edit_target_uses_linked_endpoint_not_selector_duplicate():
