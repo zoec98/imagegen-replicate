@@ -598,6 +598,72 @@ def test_wiro_hidream_text_variants_use_provider_contract(tmp_path):
         }
 
 
+def test_wiro_grok_text_and_edit_requests_use_one_source_contract(tmp_path):
+    source_path = tmp_path / "source.jpg"
+    source_path.write_bytes(b"image")
+
+    for edit_mode in (False, True):
+        model = resolve_model("wiro", "grok-imagine")
+        target = resolve_generation_target("wiro", "grok-imagine", edit_mode=edit_mode)
+        client = FakeHTTPClient(
+            [
+                FakeResponse(
+                    200,
+                    {
+                        "result": True,
+                        "errors": [],
+                        "taskid": f"wiro-grok-{edit_mode}",
+                    },
+                ),
+                FakeResponse(
+                    200,
+                    {
+                        "result": True,
+                        "errors": [],
+                        "tasklist": [
+                            {
+                                "status": "task_postprocess_end",
+                                "pexit": "0",
+                                "outputs": [{"url": "https://cdn1.wiro.ai/grok.jpg"}],
+                            }
+                        ],
+                    },
+                ),
+            ]
+        )
+
+        generate_image_urls(
+            "edit this" if edit_mode else "a cookie",
+            app_config(tmp_path),
+            model=model,
+            target=target,
+            parameters={"samples": 2, "aspectRatio": "1:1", "resolution": "2k"},
+            source_image_paths=[source_path] if edit_mode else None,
+            client=client,
+            sleep=lambda _: None,
+            clock=lambda: 0.0,
+            persist_images=lambda urls, **kwargs: [],
+        )
+
+        run_call = client.calls[0]
+        if edit_mode:
+            assert dict(run_call["data"]) == {
+                "prompt": "edit this",
+                "samples": "2",
+                "aspectRatio": "1:1",
+                "resolution": "2k",
+            }
+            assert [part[0] for part in run_call["files"]] == ["inputImage"]
+            assert run_call["files"][0][1][0] == "source.jpg"
+        else:
+            assert run_call["json"] == {
+                "prompt": "a cookie",
+                "samples": 2,
+                "aspectRatio": "1:1",
+                "resolution": "2k",
+            }
+
+
 def test_wiro_edit_serializes_multipart_with_httpx_client(tmp_path):
     model = resolve_model("wiro", "seedream5-lite-uncensored")
     target = resolve_generation_target(

@@ -244,6 +244,7 @@ def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
         "z-image-turbo",
         "hidream-dev",
         "hidream-fast",
+        "grok-imagine",
     }
     assert all(
         "Uncensored" in model.display_name
@@ -397,6 +398,43 @@ def test_wiro_registry_contains_hidream_text_variants():
         assert parameters["width"].default == 1024
         assert parameters["height"].default == 1024
         assert model.text_target.pricing == ()
+
+
+def test_wiro_registry_contains_grok_imagine_contract():
+    model = resolve_model("wiro", "grok-imagine")
+
+    assert model.display_name == "Grok Imagine Image"
+    assert model.text_target.provider_model == "xai/grok-imagine-image"
+    assert model.edit_target is not None
+    assert model.edit_target.source_images is not None
+    assert model.edit_target.source_images.provider_field == "inputImage"
+    assert model.edit_target.source_images.max_count == 1
+    assert model.edit_target.source_images.max_total is None
+    parameters = {
+        parameter.name: parameter for parameter in model.text_target.parameters
+    }
+    assert parameters["samples"].default == 1
+    assert parameters["samples"].minimum == 1
+    assert parameters["samples"].maximum == 10
+    assert parameters["aspectRatio"].default == "16:9"
+    assert parameters["aspectRatio"].choices == (
+        "16:9",
+        "9:16",
+        "1:1",
+        "4:3",
+        "3:4",
+        "3:2",
+        "2:3",
+        "2:1",
+        "1:2",
+        "19.5:9",
+        "9:19.5",
+        "20:9",
+        "9:20",
+    )
+    assert parameters["resolution"].choices == ("1k", "2k")
+    assert parameters["resolution"].default == "1k"
+    assert {price.price for price in model.text_target.pricing} == {"$0.02"}
 
 
 def test_falai_edit_target_uses_linked_endpoint_not_selector_duplicate():

@@ -27,6 +27,21 @@ SEEDREAM45_ASPECT_RATIOS = (
     "21:9",
     "9:21",
 )
+GROK_ASPECT_RATIOS = (
+    "16:9",
+    "9:16",
+    "1:1",
+    "4:3",
+    "3:4",
+    "3:2",
+    "2:3",
+    "2:1",
+    "1:2",
+    "19.5:9",
+    "9:19.5",
+    "20:9",
+    "9:20",
+)
 WATERMARK_CHOICES = ("false", "true")
 
 
@@ -197,6 +212,7 @@ def _target(
     parameters: tuple[ModelParameter, ...],
     edit: bool,
     pricing: tuple[ModelPricing, ...],
+    source_binding: SourceImageBinding | None,
 ) -> GenerationTarget:
     return GenerationTarget(
         provider="wiro",
@@ -209,23 +225,7 @@ def _target(
         parameters=parameters,
         fixed_inputs={},
         pricing=pricing,
-        source_images=(
-            SourceImageBinding(
-                provider_field="inputImage",
-                max_count=10,
-            )
-            if edit and alias == "seedream5-pro-uncensored"
-            else (
-                SourceImageBinding(
-                    provider_field="inputImage",
-                    max_count=14,
-                    max_total=15,
-                    output_count_parameter="maxImages",
-                )
-                if edit
-                else None
-            )
-        ),
+        source_images=source_binding if edit else None,
         output_shape="image-urls",
     )
 
@@ -238,7 +238,19 @@ def _provider_model(
     text_parameters: tuple[ModelParameter, ...],
     edit_parameters: tuple[ModelParameter, ...],
     pricing: tuple[ModelPricing, ...],
+    source_binding: SourceImageBinding | None = None,
 ) -> ProviderModel:
+    if source_binding is None:
+        source_binding = (
+            SourceImageBinding(provider_field="inputImage", max_count=10)
+            if alias == "seedream5-pro-uncensored"
+            else SourceImageBinding(
+                provider_field="inputImage",
+                max_count=14,
+                max_total=15,
+                output_count_parameter="maxImages",
+            )
+        )
     return ProviderModel(
         provider="wiro",
         alias=alias,
@@ -250,6 +262,7 @@ def _provider_model(
             parameters=text_parameters,
             edit=False,
             pricing=pricing,
+            source_binding=source_binding,
         ),
         edit_target=_target(
             alias=alias,
@@ -258,6 +271,7 @@ def _provider_model(
             parameters=edit_parameters,
             edit=True,
             pricing=pricing,
+            source_binding=source_binding,
         ),
     )
 
@@ -281,6 +295,7 @@ def _text_only_provider_model(
             parameters=parameters,
             edit=False,
             pricing=pricing,
+            source_binding=None,
         ),
     )
 
@@ -424,12 +439,64 @@ def _hidream_parameters(*, steps: int, flow_shift: float) -> tuple[ModelParamete
     )
 
 
+def _grok_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
+    source = (
+        (
+            _parameter(
+                "inputImage",
+                "Source image file for image-to-image generation.",
+                "array",
+                "",
+                order=2,
+            ),
+        )
+        if edit
+        else ()
+    )
+    return (
+        _parameter(
+            "prompt",
+            "Text prompt for image generation or editing.",
+            "string",
+            "",
+            order=1,
+        ),
+        *source,
+        _parameter(
+            "samples",
+            "Number of images to generate.",
+            "integer",
+            1,
+            minimum=1,
+            maximum=10,
+            order=3 if edit else 2,
+        ),
+        _parameter(
+            "aspectRatio",
+            "Output aspect ratio.",
+            "select",
+            "16:9",
+            choices=GROK_ASPECT_RATIOS,
+            order=4 if edit else 3,
+        ),
+        _parameter(
+            "resolution",
+            "Output resolution tier.",
+            "select",
+            "1k",
+            choices=("1k", "2k"),
+            order=5 if edit else 4,
+        ),
+    )
+
+
 PROVIDER_MODEL = "bytedance/seedream-v5-pro-uncensored"
 LITE_PROVIDER_MODEL = "bytedance/seedream-v5-lite-uncensored"
 SEEDREAM45_PROVIDER_MODEL = "bytedance/seedream-v4-5-uncensored"
 Z_IMAGE_PROVIDER_MODEL = "tongyi-mai/z-image-turbo"
 HIDREAM_DEV_PROVIDER_MODEL = "hidreamai/hidream-i1-dev"
 HIDREAM_FAST_PROVIDER_MODEL = "hidreamai/hidream-i1-fast"
+GROK_PROVIDER_MODEL = "xai/grok-imagine-image"
 
 MODEL_REGISTRY: dict[str, ProviderModel] = {
     "seedream5-pro-uncensored": _provider_model(
@@ -484,5 +551,14 @@ MODEL_REGISTRY: dict[str, ProviderModel] = {
         provider_model=HIDREAM_FAST_PROVIDER_MODEL,
         parameters=_hidream_parameters(steps=20, flow_shift=3.0),
         pricing=(),
+    ),
+    "grok-imagine": _provider_model(
+        alias="grok-imagine",
+        display_name="Grok Imagine Image",
+        provider_model=GROK_PROVIDER_MODEL,
+        text_parameters=_grok_parameters(edit=False),
+        edit_parameters=_grok_parameters(edit=True),
+        pricing=(_pricing("$0.02", "per output"),),
+        source_binding=SourceImageBinding(provider_field="inputImage", max_count=1),
     ),
 }

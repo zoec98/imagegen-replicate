@@ -135,6 +135,14 @@ from 0–2048 with 1024 defaults. Tool Detail reported no dynamic price for
 either endpoint, so the registry does not invent one. Neither endpoint
 supports editing.
 
+The `xai/grok-imagine-image` contract supports text generation and editing with
+one `inputImage` source. It exposes `samples` (1–10, default 1),
+`aspectRatio` (`16:9`, `9:16`, `1:1`, `4:3`, `3:4`, `3:2`, `2:3`, `2:1`,
+`1:2`, `19.5:9`, `9:19.5`, `20:9`, `9:20`, default `16:9`), and `resolution`
+(`1k`/`2k`, default `1k`). Tool Detail reports a 10-second runtime and `$0.02`
+per output. The Wiro V2 endpoint is a report-only alternate and is not
+registered.
+
 ## Schema Extraction
 
 For provider schemas, extract useful registry information from schema input and

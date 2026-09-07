@@ -303,6 +303,7 @@ def test_index_exposes_wiro_models_when_wiro_is_enabled(app_config, app_factory)
         "z-image-turbo",
         "hidream-dev",
         "hidream-fast",
+        "grok-imagine",
     }
     lite = next(
         model

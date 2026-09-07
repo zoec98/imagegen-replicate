@@ -308,6 +308,24 @@ def test_validate_wiro_z_image_rejects_edit_mode(tmp_path):
         )
 
 
+def test_validate_wiro_grok_edit_accepts_only_one_source(tmp_path):
+    model = resolve_model("wiro", "grok-imagine")
+    (tmp_path / "source-one.png").write_bytes(b"image")
+    (tmp_path / "source-two.png").write_bytes(b"image")
+
+    with pytest.raises(ValidationError, match="cannot contain more than 1 files"):
+        validate_generation_payload(
+            {
+                "prompt": "edit this",
+                "edit_mode": True,
+                "source_images": ["source-one.png", "source-two.png"],
+            },
+            model=model,
+            target=model.edit_target,
+            output_dir=tmp_path,
+        )
+
+
 def test_validate_wiro_lite_rejects_sources_plus_outputs_above_limit(tmp_path):
     model = resolve_model("wiro", "seedream5-lite-uncensored")
     for index in range(14):
