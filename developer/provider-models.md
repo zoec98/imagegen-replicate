@@ -151,6 +151,16 @@ The application sends fixed `safetySetting: "OFF"` and does not expose that
 provider control. Operator-facing price guidance is `$0.045–$0.151` for Nano
 Banana 2 and `$0.14–$0.24` for Pro; provider billing remains authoritative.
 
+The `black-forest-labs/flux-2-flex` contract supports text generation and
+editing with up to eight `inputImage` sources. Width and height default to
+1024, accept `0` to match the input image, and otherwise must be 64–2048 in
+multiples of 16. It also exposes integer `seed` (0–9,999,999, default 123),
+`guidance` (1.5–10, default 4.5), `steps` (1–50, default 50), and
+`outputFormat` (`jpeg`/`png`, default `jpeg`). The application always sends
+fixed `safetyTolerance: 5` and does not expose that control. Wiro reports
+cp-pixel pricing from `$0.06/MP`; this is variable provider billing, not a
+flat per-image price.
+
 ## Schema Extraction
 
 For provider schemas, extract useful registry information from schema input and

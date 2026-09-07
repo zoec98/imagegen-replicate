@@ -306,6 +306,7 @@ def test_index_exposes_wiro_models_when_wiro_is_enabled(app_config, app_factory)
         "grok-imagine",
         "nano-banana-2",
         "nano-banana-pro",
+        "flux-2-flex",
     }
     lite = next(
         model

@@ -722,6 +722,67 @@ def test_wiro_nano_variants_send_fixed_safety_and_support_edit_sources(tmp_path)
         assert [part[0] for part in run_call["files"]] == ["inputImage"]
 
 
+def test_wiro_flux_flex_sends_fixed_safety_jpeg_and_dimensions(tmp_path):
+    source_path = tmp_path / "source.jpg"
+    source_path.write_bytes(b"image")
+
+    for edit_mode in (False, True):
+        model = resolve_model("wiro", "flux-2-flex")
+        target = resolve_generation_target("wiro", "flux-2-flex", edit_mode=edit_mode)
+        client = FakeHTTPClient(
+            [
+                FakeResponse(
+                    200,
+                    {"result": True, "errors": [], "taskid": f"wiro-flux-{edit_mode}"},
+                ),
+                FakeResponse(
+                    200,
+                    {
+                        "result": True,
+                        "errors": [],
+                        "tasklist": [
+                            {
+                                "status": "task_postprocess_end",
+                                "pexit": "0",
+                                "outputs": [{"url": "https://cdn1.wiro.ai/flux.jpg"}],
+                            }
+                        ],
+                    },
+                ),
+            ]
+        )
+
+        generate_image_urls(
+            "edit this" if edit_mode else "a cookie",
+            app_config(tmp_path),
+            model=model,
+            target=target,
+            parameters={"width": 1280, "height": 768, "seed": 42, "guidance": 5.0},
+            source_image_paths=[source_path] if edit_mode else None,
+            client=client,
+            sleep=lambda _: None,
+            clock=lambda: 0.0,
+            persist_images=lambda urls, **kwargs: [],
+        )
+
+        run_call = client.calls[0]
+        expected = {
+            "prompt": "edit this" if edit_mode else "a cookie",
+            "width": "1280" if edit_mode else 1280,
+            "height": "768" if edit_mode else 768,
+            "seed": "42" if edit_mode else 42,
+            "guidance": "5.0" if edit_mode else 5.0,
+            "steps": "50" if edit_mode else 50,
+            "outputFormat": "jpeg",
+            "safetyTolerance": "5" if edit_mode else 5,
+        }
+        if edit_mode:
+            assert dict(run_call["data"]) == expected
+            assert [part[0] for part in run_call["files"]] == ["inputImage"]
+        else:
+            assert run_call["json"] == expected
+
+
 def test_wiro_edit_serializes_multipart_with_httpx_client(tmp_path):
     model = resolve_model("wiro", "seedream5-lite-uncensored")
     target = resolve_generation_target(

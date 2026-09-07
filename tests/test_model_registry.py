@@ -247,6 +247,7 @@ def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
         "grok-imagine",
         "nano-banana-2",
         "nano-banana-pro",
+        "flux-2-flex",
     }
     assert all(
         "Uncensored" in model.display_name
@@ -479,6 +480,32 @@ def test_wiro_registry_contains_nano_banana_variants_with_fixed_safety():
         assert {price_entry.price for price_entry in model.text_target.pricing} == {
             price
         }
+
+
+def test_wiro_registry_contains_flux_flex_contract():
+    model = resolve_model("wiro", "flux-2-flex")
+
+    assert model.display_name == "Flux 2 Flex"
+    assert model.text_target.provider_model == "black-forest-labs/flux-2-flex"
+    assert model.edit_target is not None
+    assert model.edit_target.source_images is not None
+    assert model.edit_target.source_images.provider_field == "inputImage"
+    assert model.edit_target.source_images.max_count == 8
+    assert model.text_target.fixed_inputs == {"safetyTolerance": 5}
+    assert model.edit_target.fixed_inputs == {"safetyTolerance": 5}
+    parameters = {
+        parameter.name: parameter for parameter in model.text_target.parameters
+    }
+    assert "safetyTolerance" not in parameters
+    for name in ("width", "height"):
+        assert parameters[name].default == 1024
+        assert parameters[name].minimum == 0
+        assert parameters[name].maximum == 2048
+        assert parameters[name].minimum_nonzero == 64
+        assert parameters[name].multiple_of == 16
+    assert parameters["outputFormat"].default == "jpeg"
+    assert parameters["outputFormat"].choices == ("jpeg", "png")
+    assert {price.price for price in model.text_target.pricing} == {"$0.06/MP"}
 
 
 def test_falai_edit_target_uses_linked_endpoint_not_selector_duplicate():

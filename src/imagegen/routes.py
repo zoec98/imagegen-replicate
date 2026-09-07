@@ -337,6 +337,8 @@ def _parameter_json(parameter: ModelParameter) -> dict[str, object]:
         "choices": list(parameter.choices),
         "minimum": parameter.minimum,
         "maximum": parameter.maximum,
+        "minimum_nonzero": parameter.minimum_nonzero,
+        "multiple_of": parameter.multiple_of,
         "order": parameter.order,
         "semantic_type": parameter.semantic_type,
     }

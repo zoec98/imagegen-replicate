@@ -280,6 +280,7 @@ def _validate_integer(parameter: ModelParameter, value: Any) -> int:
         raise ValidationError(f"{parameter.name} must be at least {parameter.minimum}.")
     if parameter.maximum is not None and parsed > parameter.maximum:
         raise ValidationError(f"{parameter.name} must be at most {parameter.maximum}.")
+    _validate_numeric_constraints(parameter, parsed)
     return parsed
 
 
@@ -300,7 +301,27 @@ def _validate_number(parameter: ModelParameter, value: Any) -> float:
         raise ValidationError(f"{parameter.name} must be at least {parameter.minimum}.")
     if parameter.maximum is not None and parsed > parameter.maximum:
         raise ValidationError(f"{parameter.name} must be at most {parameter.maximum}.")
+    _validate_numeric_constraints(parameter, parsed)
     return parsed
+
+
+def _validate_numeric_constraints(parameter: ModelParameter, value: float) -> None:
+    if (
+        parameter.minimum_nonzero is not None
+        and value != 0
+        and value < parameter.minimum_nonzero
+    ):
+        raise ValidationError(
+            f"{parameter.name} must be 0 or at least {parameter.minimum_nonzero}."
+        )
+    if (
+        parameter.multiple_of is not None
+        and value != 0
+        and value % parameter.multiple_of
+    ):
+        raise ValidationError(
+            f"{parameter.name} must be a multiple of {parameter.multiple_of} or 0."
+        )
 
 
 def _model_parameters(

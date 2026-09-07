@@ -47,6 +47,8 @@ class ModelParameter:
     choices: tuple[object, ...] = ()
     minimum: float | int | None = None
     maximum: float | int | None = None
+    minimum_nonzero: float | int | None = None
+    multiple_of: float | int | None = None
     order: int | None = None
     semantic_type: ParameterSemanticType | None = None
 

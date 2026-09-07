@@ -340,6 +340,46 @@ def test_validate_wiro_nano_rejects_safety_override():
         )
 
 
+def test_validate_wiro_flux_dimensions_allow_zero_or_aligned_nonzero():
+    model = resolve_model("wiro", "flux-2-flex")
+
+    assert (
+        validate_model_parameters(
+            {"width": 0, "height": 64},
+            model=model,
+            target=model.text_target,
+        )["width"]
+        == 0
+    )
+
+    with pytest.raises(ValidationError, match="width must be 0 or at least 64"):
+        validate_model_parameters(
+            {"width": 32},
+            model=model,
+            target=model.text_target,
+        )
+    with pytest.raises(ValidationError, match="width must be a multiple of 16"):
+        validate_model_parameters(
+            {"width": 65},
+            model=model,
+            target=model.text_target,
+        )
+
+
+def test_validate_wiro_flux_rejects_safety_override():
+    model = resolve_model("wiro", "flux-2-flex")
+
+    with pytest.raises(
+        ValidationError,
+        match="safetyTolerance is fixed by the server.",
+    ):
+        validate_model_parameters(
+            {"safetyTolerance": 0},
+            model=model,
+            target=model.text_target,
+        )
+
+
 def test_validate_wiro_lite_rejects_sources_plus_outputs_above_limit(tmp_path):
     model = resolve_model("wiro", "seedream5-lite-uncensored")
     for index in range(14):

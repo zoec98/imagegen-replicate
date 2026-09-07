@@ -54,6 +54,8 @@ def _parameter(
     choices: tuple[object, ...] = (),
     minimum: float | None = None,
     maximum: float | None = None,
+    minimum_nonzero: float | None = None,
+    multiple_of: float | None = None,
     semantic_type: ParameterSemanticType | None = None,
     order: int,
 ) -> ModelParameter:
@@ -65,18 +67,27 @@ def _parameter(
         choices=choices,
         minimum=minimum,
         maximum=maximum,
+        minimum_nonzero=minimum_nonzero,
+        multiple_of=multiple_of,
         semantic_type=semantic_type,
         order=order,
     )
 
 
-def _pricing(price: str, title: str) -> ModelPricing:
+def _pricing(
+    price: str,
+    title: str,
+    *,
+    description: str = "Wiro Tool Detail price.",
+    pricing_type: str = "per-unit",
+    metric: str = "image",
+) -> ModelPricing:
     return ModelPricing(
         price=price,
         title=title,
-        description="Wiro Tool Detail price.",
-        type="per-unit",
-        metric="image",
+        description=description,
+        type=pricing_type,
+        metric=metric,
         metric_count=1,
         source="provider-api",
     )
@@ -543,6 +554,90 @@ def _nano_parameters(
     )
 
 
+def _flux_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
+    source = (
+        (
+            _parameter(
+                "inputImage",
+                "Source image files for image-to-image generation.",
+                "array",
+                "",
+                order=2,
+            ),
+        )
+        if edit
+        else ()
+    )
+    return (
+        _parameter(
+            "prompt",
+            "Text prompt for image generation or editing.",
+            "string",
+            "",
+            order=1,
+        ),
+        *source,
+        _parameter(
+            "width",
+            "Output width in pixels; 0 matches the input image.",
+            "integer",
+            1024,
+            minimum=0,
+            maximum=2048,
+            minimum_nonzero=64,
+            multiple_of=16,
+            order=3 if edit else 2,
+        ),
+        _parameter(
+            "height",
+            "Output height in pixels; 0 matches the input image.",
+            "integer",
+            1024,
+            minimum=0,
+            maximum=2048,
+            minimum_nonzero=64,
+            multiple_of=16,
+            order=4 if edit else 3,
+        ),
+        _parameter(
+            "seed",
+            "Seed for reproducible generation.",
+            "integer",
+            123,
+            minimum=0,
+            maximum=9_999_999,
+            semantic_type="seed",
+            order=5 if edit else 4,
+        ),
+        _parameter(
+            "guidance",
+            "Prompt guidance strength.",
+            "number",
+            4.5,
+            minimum=1.5,
+            maximum=10,
+            order=6 if edit else 5,
+        ),
+        _parameter(
+            "steps",
+            "Number of inference steps.",
+            "integer",
+            50,
+            minimum=1,
+            maximum=50,
+            order=7 if edit else 6,
+        ),
+        _parameter(
+            "outputFormat",
+            "Output image format.",
+            "select",
+            "jpeg",
+            choices=("jpeg", "png"),
+            order=8 if edit else 7,
+        ),
+    )
+
+
 PROVIDER_MODEL = "bytedance/seedream-v5-pro-uncensored"
 LITE_PROVIDER_MODEL = "bytedance/seedream-v5-lite-uncensored"
 SEEDREAM45_PROVIDER_MODEL = "bytedance/seedream-v4-5-uncensored"
@@ -552,6 +647,7 @@ HIDREAM_FAST_PROVIDER_MODEL = "hidreamai/hidream-i1-fast"
 GROK_PROVIDER_MODEL = "xai/grok-imagine-image"
 NANO_BANANA_2_PROVIDER_MODEL = "google/nano-banana-2"
 NANO_BANANA_PRO_PROVIDER_MODEL = "google/nano-banana-pro"
+FLUX_FLEX_PROVIDER_MODEL = "black-forest-labs/flux-2-flex"
 
 MODEL_REGISTRY: dict[str, ProviderModel] = {
     "seedream5-pro-uncensored": _provider_model(
@@ -707,5 +803,23 @@ MODEL_REGISTRY: dict[str, ProviderModel] = {
         pricing=(_pricing("$0.14-$0.24", "price range"),),
         source_binding=SourceImageBinding(provider_field="inputImage", max_count=14),
         fixed_inputs={"safetySetting": "OFF"},
+    ),
+    "flux-2-flex": _provider_model(
+        alias="flux-2-flex",
+        display_name="Flux 2 Flex",
+        provider_model=FLUX_FLEX_PROVIDER_MODEL,
+        text_parameters=_flux_parameters(edit=False),
+        edit_parameters=_flux_parameters(edit=True),
+        pricing=(
+            _pricing(
+                "$0.06/MP",
+                "from",
+                description="Provider pricing varies with input and output megapixels.",
+                pricing_type="provider-variable",
+                metric="megapixel",
+            ),
+        ),
+        source_binding=SourceImageBinding(provider_field="inputImage", max_count=8),
+        fixed_inputs={"safetyTolerance": 5},
     ),
 }
