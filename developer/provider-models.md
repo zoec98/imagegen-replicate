@@ -125,6 +125,16 @@ The additional text-only `tongyi-mai/z-image-turbo` contract exposes `steps`
 `1080P`, default `480P`), and `aspectRatio` (`16:9`, `9:16`, `1:1`, default
 `1:1`). It costs `$0.006` per run and does not support editing.
 
+The text-only `hidreamai/hidream-i1-dev` and `hidreamai/hidream-i1-fast`
+contracts share prompt, `negativePrompt`, `scale`, `flowShift`, `samples`,
+string-valued `seed`, `width`, and `height` inputs. Dev defaults to 30 steps,
+flow shift 6.0, and a 40-second runtime; Fast defaults to 20 steps, flow shift
+3.0, and a 25-second runtime. Steps range from 1–500, scale from 0–20, flow
+shift from 1–10, samples from 1–8, seed from 0–9,999,999,999, and dimensions
+from 0–2048 with 1024 defaults. Tool Detail reported no dynamic price for
+either endpoint, so the registry does not invent one. Neither endpoint
+supports editing.
+
 ## Schema Extraction
 
 For provider schemas, extract useful registry information from schema input and

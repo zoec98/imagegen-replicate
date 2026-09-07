@@ -242,11 +242,18 @@ def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
         "seedream5-lite-uncensored",
         "seedream45-uncensored",
         "z-image-turbo",
+        "hidream-dev",
+        "hidream-fast",
     }
     assert all(
         "Uncensored" in model.display_name
         for model in models
-        if model.alias != "z-image-turbo"
+        if model.alias
+        in {
+            "seedream5-pro-uncensored",
+            "seedream5-lite-uncensored",
+            "seedream45-uncensored",
+        }
     )
     assert {model.provider for model in models} == {"wiro"}
 
@@ -357,6 +364,39 @@ def test_wiro_registry_contains_z_image_turbo_text_contract():
     assert parameters["aspectRatio"].choices == ("16:9", "9:16", "1:1")
     assert parameters["aspectRatio"].default == "1:1"
     assert {price.price for price in model.text_target.pricing} == {"$0.006"}
+
+
+def test_wiro_registry_contains_hidream_text_variants():
+    expected = {
+        "hidream-dev": ("hidreamai/hidream-i1-dev", 30, 6.0),
+        "hidream-fast": ("hidreamai/hidream-i1-fast", 20, 3.0),
+    }
+
+    for alias, (provider_model, steps, flow_shift) in expected.items():
+        model = resolve_model("wiro", alias)
+        assert model.edit_target is None
+        assert model.text_target.provider_model == provider_model
+        parameters = {
+            parameter.name: parameter for parameter in model.text_target.parameters
+        }
+        assert parameters["negativePrompt"].type == "string"
+        assert parameters["steps"].default == steps
+        assert parameters["steps"].minimum == 1
+        assert parameters["steps"].maximum == 500
+        assert parameters["scale"].default == 0
+        assert parameters["scale"].minimum == 0
+        assert parameters["scale"].maximum == 20
+        assert parameters["flowShift"].default == flow_shift
+        assert parameters["flowShift"].minimum == 1
+        assert parameters["flowShift"].maximum == 10
+        assert parameters["samples"].default == 1
+        assert parameters["samples"].minimum == 1
+        assert parameters["samples"].maximum == 8
+        assert parameters["seed"].default == "0"
+        assert parameters["seed"].semantic_type == "seed"
+        assert parameters["width"].default == 1024
+        assert parameters["height"].default == 1024
+        assert model.text_target.pricing == ()
 
 
 def test_falai_edit_target_uses_linked_endpoint_not_selector_duplicate():

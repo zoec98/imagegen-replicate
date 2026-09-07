@@ -341,10 +341,95 @@ def _z_image_parameters() -> tuple[ModelParameter, ...]:
     )
 
 
+def _hidream_parameters(*, steps: int, flow_shift: float) -> tuple[ModelParameter, ...]:
+    return (
+        _parameter(
+            "prompt",
+            "Text prompt for image generation.",
+            "string",
+            "",
+            order=1,
+        ),
+        _parameter(
+            "negativePrompt",
+            "Negative prompt.",
+            "string",
+            "",
+            order=2,
+        ),
+        _parameter(
+            "steps",
+            "Number of inference steps.",
+            "integer",
+            steps,
+            minimum=1,
+            maximum=500,
+            order=3,
+        ),
+        _parameter(
+            "scale",
+            "Guidance scale.",
+            "number",
+            0,
+            minimum=0,
+            maximum=20,
+            order=4,
+        ),
+        _parameter(
+            "flowShift",
+            "Flow shift.",
+            "number",
+            flow_shift,
+            minimum=1,
+            maximum=10,
+            order=5,
+        ),
+        _parameter(
+            "samples",
+            "Number of images to generate.",
+            "integer",
+            1,
+            minimum=1,
+            maximum=8,
+            order=6,
+        ),
+        _parameter(
+            "seed",
+            "Seed for reproducible generation.",
+            "string",
+            "0",
+            minimum=0,
+            maximum=9_999_999_999,
+            semantic_type="seed",
+            order=7,
+        ),
+        _parameter(
+            "width",
+            "Output width in pixels.",
+            "integer",
+            1024,
+            minimum=0,
+            maximum=2048,
+            order=8,
+        ),
+        _parameter(
+            "height",
+            "Output height in pixels.",
+            "integer",
+            1024,
+            minimum=0,
+            maximum=2048,
+            order=9,
+        ),
+    )
+
+
 PROVIDER_MODEL = "bytedance/seedream-v5-pro-uncensored"
 LITE_PROVIDER_MODEL = "bytedance/seedream-v5-lite-uncensored"
 SEEDREAM45_PROVIDER_MODEL = "bytedance/seedream-v4-5-uncensored"
 Z_IMAGE_PROVIDER_MODEL = "tongyi-mai/z-image-turbo"
+HIDREAM_DEV_PROVIDER_MODEL = "hidreamai/hidream-i1-dev"
+HIDREAM_FAST_PROVIDER_MODEL = "hidreamai/hidream-i1-fast"
 
 MODEL_REGISTRY: dict[str, ProviderModel] = {
     "seedream5-pro-uncensored": _provider_model(
@@ -385,5 +470,19 @@ MODEL_REGISTRY: dict[str, ProviderModel] = {
         provider_model=Z_IMAGE_PROVIDER_MODEL,
         parameters=_z_image_parameters(),
         pricing=(_pricing("$0.006", "per run"),),
+    ),
+    "hidream-dev": _text_only_provider_model(
+        alias="hidream-dev",
+        display_name="HiDream I1 Dev",
+        provider_model=HIDREAM_DEV_PROVIDER_MODEL,
+        parameters=_hidream_parameters(steps=30, flow_shift=6.0),
+        pricing=(),
+    ),
+    "hidream-fast": _text_only_provider_model(
+        alias="hidream-fast",
+        display_name="HiDream I1 Fast",
+        provider_model=HIDREAM_FAST_PROVIDER_MODEL,
+        parameters=_hidream_parameters(steps=20, flow_shift=3.0),
+        pricing=(),
     ),
 }

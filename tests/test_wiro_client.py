@@ -538,6 +538,66 @@ def test_wiro_z_image_text_request_uses_provider_contract(tmp_path):
     }
 
 
+def test_wiro_hidream_text_variants_use_provider_contract(tmp_path):
+    expected = {
+        "hidream-dev": ("hidreamai/hidream-i1-dev", 30, 6.0),
+        "hidream-fast": ("hidreamai/hidream-i1-fast", 20, 3.0),
+    }
+
+    for alias, (provider_model, steps, flow_shift) in expected.items():
+        model = resolve_model("wiro", alias)
+        target = resolve_generation_target("wiro", alias, edit_mode=False)
+        client = FakeHTTPClient(
+            [
+                FakeResponse(
+                    200,
+                    {"result": True, "errors": [], "taskid": f"wiro-{alias}"},
+                ),
+                FakeResponse(
+                    200,
+                    {
+                        "result": True,
+                        "errors": [],
+                        "tasklist": [
+                            {
+                                "status": "task_postprocess_end",
+                                "pexit": "0",
+                                "outputs": [
+                                    {"url": f"https://cdn1.wiro.ai/{alias}.jpg"}
+                                ],
+                            }
+                        ],
+                    },
+                ),
+            ]
+        )
+
+        generate_image_urls(
+            "a cookie",
+            app_config(tmp_path),
+            model=model,
+            target=target,
+            parameters={"negativePrompt": "blurry", "samples": 2, "seed": "42"},
+            client=client,
+            sleep=lambda _: None,
+            clock=lambda: 0.0,
+            persist_images=lambda urls, **kwargs: [],
+        )
+
+        assert client.calls[0]["url"] == f"https://api.wiro.ai/v1/Run/{provider_model}"
+        assert client.calls[0]["json"] == {
+            "prompt": "a cookie",
+            "negativePrompt": "blurry",
+            "steps": steps,
+            "scale": 0,
+            "flowShift": flow_shift,
+            "samples": 2,
+            "seed": "42",
+            "width": 1024,
+            "height": 1024,
+        }
+
+
 def test_wiro_edit_serializes_multipart_with_httpx_client(tmp_path):
     model = resolve_model("wiro", "seedream5-lite-uncensored")
     target = resolve_generation_target(
