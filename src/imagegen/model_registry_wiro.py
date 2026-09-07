@@ -6,6 +6,7 @@ from imagegen.model_registry_base import (
     GenerationTarget,
     ModelParameter,
     ModelPricing,
+    ParameterSemanticType,
     ParameterType,
     ProviderModel,
     SourceImageBinding,
@@ -38,6 +39,7 @@ def _parameter(
     choices: tuple[object, ...] = (),
     minimum: float | None = None,
     maximum: float | None = None,
+    semantic_type: ParameterSemanticType | None = None,
     order: int,
 ) -> ModelParameter:
     return ModelParameter(
@@ -48,6 +50,7 @@ def _parameter(
         choices=choices,
         minimum=minimum,
         maximum=maximum,
+        semantic_type=semantic_type,
         order=order,
     )
 
@@ -259,9 +262,89 @@ def _provider_model(
     )
 
 
+def _text_only_provider_model(
+    *,
+    alias: str,
+    display_name: str,
+    provider_model: str,
+    parameters: tuple[ModelParameter, ...],
+    pricing: tuple[ModelPricing, ...],
+) -> ProviderModel:
+    return ProviderModel(
+        provider="wiro",
+        alias=alias,
+        display_name=display_name,
+        text_target=_target(
+            alias=alias,
+            display_name=display_name,
+            provider_model=provider_model,
+            parameters=parameters,
+            edit=False,
+            pricing=pricing,
+        ),
+    )
+
+
+def _z_image_parameters() -> tuple[ModelParameter, ...]:
+    return (
+        _parameter(
+            "prompt",
+            "Text prompt for image generation.",
+            "string",
+            "",
+            order=1,
+        ),
+        _parameter(
+            "steps",
+            "Number of inference steps.",
+            "integer",
+            9,
+            minimum=1,
+            maximum=50,
+            order=2,
+        ),
+        _parameter(
+            "scale",
+            "Guidance scale.",
+            "number",
+            0.0,
+            minimum=0,
+            maximum=20,
+            order=3,
+        ),
+        _parameter(
+            "seed",
+            "Seed for reproducible generation.",
+            "string",
+            "0",
+            minimum=0,
+            maximum=9_999_999_999,
+            semantic_type="seed",
+            order=4,
+        ),
+        _parameter(
+            "resolution",
+            "Output resolution tier.",
+            "select",
+            "480P",
+            choices=("480P", "580P", "720P", "1080P"),
+            order=5,
+        ),
+        _parameter(
+            "aspectRatio",
+            "Output aspect ratio.",
+            "select",
+            "1:1",
+            choices=("16:9", "9:16", "1:1"),
+            order=6,
+        ),
+    )
+
+
 PROVIDER_MODEL = "bytedance/seedream-v5-pro-uncensored"
 LITE_PROVIDER_MODEL = "bytedance/seedream-v5-lite-uncensored"
 SEEDREAM45_PROVIDER_MODEL = "bytedance/seedream-v4-5-uncensored"
+Z_IMAGE_PROVIDER_MODEL = "tongyi-mai/z-image-turbo"
 
 MODEL_REGISTRY: dict[str, ProviderModel] = {
     "seedream5-pro-uncensored": _provider_model(
@@ -295,5 +378,12 @@ MODEL_REGISTRY: dict[str, ProviderModel] = {
             aspect_ratios=SEEDREAM45_ASPECT_RATIOS,
         ),
         pricing=(_pricing("$0.04", "per output"),),
+    ),
+    "z-image-turbo": _text_only_provider_model(
+        alias="z-image-turbo",
+        display_name="Z-Image Turbo",
+        provider_model=Z_IMAGE_PROVIDER_MODEL,
+        parameters=_z_image_parameters(),
+        pricing=(_pricing("$0.006", "per run"),),
     ),
 }

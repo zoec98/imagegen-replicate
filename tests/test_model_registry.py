@@ -241,8 +241,13 @@ def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
         "seedream5-pro-uncensored",
         "seedream5-lite-uncensored",
         "seedream45-uncensored",
+        "z-image-turbo",
     }
-    assert all("Uncensored" in model.display_name for model in models)
+    assert all(
+        "Uncensored" in model.display_name
+        for model in models
+        if model.alias != "z-image-turbo"
+    )
     assert {model.provider for model in models} == {"wiro"}
 
     pro = resolve_model("wiro", "seedream5-pro-uncensored")
@@ -324,6 +329,34 @@ def test_wiro_registry_contains_seedream45_uncensored_contract():
     assert parameters["watermark"].default == "false"
     assert parameters["watermark"].choices == ("false", "true")
     assert {price.price for price in model.text_target.pricing} == {"$0.04"}
+
+
+def test_wiro_registry_contains_z_image_turbo_text_contract():
+    model = resolve_model("wiro", "z-image-turbo")
+
+    assert model.display_name == "Z-Image Turbo"
+    assert model.text_target.provider_model == "tongyi-mai/z-image-turbo"
+    assert model.edit_target is None
+    parameters = {
+        parameter.name: parameter for parameter in model.text_target.parameters
+    }
+    assert parameters["prompt"].type == "string"
+    assert parameters["steps"].default == 9
+    assert parameters["steps"].minimum == 1
+    assert parameters["steps"].maximum == 50
+    assert parameters["scale"].default == 0.0
+    assert parameters["scale"].minimum == 0
+    assert parameters["scale"].maximum == 20
+    assert parameters["seed"].type == "string"
+    assert parameters["seed"].semantic_type == "seed"
+    assert parameters["seed"].default == "0"
+    assert parameters["seed"].minimum == 0
+    assert parameters["seed"].maximum == 9_999_999_999
+    assert parameters["resolution"].choices == ("480P", "580P", "720P", "1080P")
+    assert parameters["resolution"].default == "480P"
+    assert parameters["aspectRatio"].choices == ("16:9", "9:16", "1:1")
+    assert parameters["aspectRatio"].default == "1:1"
+    assert {price.price for price in model.text_target.pricing} == {"$0.006"}
 
 
 def test_falai_edit_target_uses_linked_endpoint_not_selector_duplicate():

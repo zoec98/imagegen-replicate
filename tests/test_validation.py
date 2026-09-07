@@ -289,6 +289,25 @@ def test_validate_wiro_model_rejects_generic_input_image():
         )
 
 
+def test_validate_wiro_z_image_rejects_edit_mode(tmp_path):
+    model = resolve_model("wiro", "z-image-turbo")
+    (tmp_path / "source.png").write_bytes(b"image")
+
+    with pytest.raises(
+        ValidationError,
+        match="This model does not accept edit requests.",
+    ):
+        validate_generation_payload(
+            {
+                "prompt": "edit this",
+                "edit_mode": True,
+                "source_images": ["source.png"],
+            },
+            model=model,
+            output_dir=tmp_path,
+        )
+
+
 def test_validate_wiro_lite_rejects_sources_plus_outputs_above_limit(tmp_path):
     model = resolve_model("wiro", "seedream5-lite-uncensored")
     for index in range(14):

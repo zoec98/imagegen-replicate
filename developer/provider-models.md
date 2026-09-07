@@ -119,6 +119,12 @@ local source filenames, never upload URLs, headers, credentials, or signed
 URLs. See the authenticated response record in
 `developer/2026-09-06-wiro-provider/schema-discovery.md`.
 
+The additional text-only `tongyi-mai/z-image-turbo` contract exposes `steps`
+(1–50, default 9), `scale` (0–20, default 0), string-valued `seed`
+(0–9,999,999,999, default `0`), `resolution` (`480P`, `580P`, `720P`,
+`1080P`, default `480P`), and `aspectRatio` (`16:9`, `9:16`, `1:1`, default
+`1:1`). It costs `$0.006` per run and does not support editing.
+
 ## Schema Extraction
 
 For provider schemas, extract useful registry information from schema input and

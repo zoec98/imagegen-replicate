@@ -490,6 +490,54 @@ def test_wiro_seedream45_edit_uploads_sources_and_limits_outputs(tmp_path):
     assert run_call["files"][0][1][1].closed
 
 
+def test_wiro_z_image_text_request_uses_provider_contract(tmp_path):
+    model = resolve_model("wiro", "z-image-turbo")
+    target = resolve_generation_target("wiro", "z-image-turbo", edit_mode=False)
+    client = FakeHTTPClient(
+        [
+            FakeResponse(200, {"result": True, "errors": [], "taskid": "wiro-z"}),
+            FakeResponse(
+                200,
+                {
+                    "result": True,
+                    "errors": [],
+                    "tasklist": [
+                        {
+                            "status": "task_postprocess_end",
+                            "pexit": "0",
+                            "outputs": [{"url": "https://cdn1.wiro.ai/z-image.jpg"}],
+                        }
+                    ],
+                },
+            ),
+        ]
+    )
+
+    generate_image_urls(
+        "a cookie",
+        app_config(tmp_path),
+        model=model,
+        target=target,
+        parameters={"steps": 12, "seed": "42", "resolution": "720P"},
+        client=client,
+        sleep=lambda _: None,
+        clock=lambda: 0.0,
+        persist_images=lambda urls, **kwargs: [],
+    )
+
+    assert client.calls[0]["url"] == (
+        "https://api.wiro.ai/v1/Run/tongyi-mai/z-image-turbo"
+    )
+    assert client.calls[0]["json"] == {
+        "prompt": "a cookie",
+        "steps": 12,
+        "scale": 0.0,
+        "seed": "42",
+        "resolution": "720P",
+        "aspectRatio": "1:1",
+    }
+
+
 def test_wiro_edit_serializes_multipart_with_httpx_client(tmp_path):
     model = resolve_model("wiro", "seedream5-lite-uncensored")
     target = resolve_generation_target(

@@ -300,6 +300,7 @@ def test_index_exposes_wiro_models_when_wiro_is_enabled(app_config, app_factory)
         "seedream5-pro-uncensored",
         "seedream5-lite-uncensored",
         "seedream45-uncensored",
+        "z-image-turbo",
     }
     lite = next(
         model
