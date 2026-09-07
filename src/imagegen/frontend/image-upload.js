@@ -23,6 +23,7 @@ export function setupImageUpload(root = document, services = {}) {
   let immichNextPage = null;
   let immichPreviousPage = null;
   let immichLoading = false;
+  let busy = false;
 
   function setStatus(text, category = "info") {
     if (!status) {
@@ -43,6 +44,7 @@ export function setupImageUpload(root = document, services = {}) {
   }
 
   function setBusy(isBusy) {
+    busy = isBusy;
     if (urlLoad) {
       urlLoad.disabled = isBusy;
       setBooleanAttribute(urlLoad, "aria-busy", isBusy);
@@ -67,10 +69,7 @@ export function setupImageUpload(root = document, services = {}) {
       return;
     }
     overlay.hidden = false;
-    setStatus(
-      "Add an image URL, choose one image file, or drop one image file.",
-      "empty",
-    );
+    setStatus("Add an image URL, choose image files, or drop image files.", "empty");
     urlInput?.focus();
     if (overlay.dataset.apiImmichAssetsUrl) {
       loadImmichPage(1).catch((error) => {
@@ -84,7 +83,9 @@ export function setupImageUpload(root = document, services = {}) {
       return;
     }
     overlay.hidden = true;
-    setBusy(false);
+    if (!busy) {
+      setBusy(false);
+    }
     dropTarget?.classList.remove("upload-drop-target-active");
   }
 
@@ -305,44 +306,70 @@ export function setupImageUpload(root = document, services = {}) {
     return Array.from(fileInput?.files || []);
   }
 
-  function validateDroppedImage(files) {
-    if (files.length === 0) {
-      return null;
-    }
-    if (files.length > 1) {
-      throw new Error("Drop one image file at a time.");
-    }
-    const file = files[0];
-    if (!file.type || !file.type.startsWith("image/")) {
-      throw new Error("Drop one image file with browser MIME type image/*.");
-    }
-    return file;
+  function uploadFileLabel(file) {
+    return file?.name || "unnamed file";
   }
 
-  async function importDroppedImage(file) {
-    const formData = new FormData();
-    formData.append("image", file);
+  function classifyUploadFiles(files) {
+    const accepted = [];
+    const failed = [];
+    files.forEach((file) => {
+      if (!file.type || !file.type.startsWith("image/")) {
+        failed.push(`${uploadFileLabel(file)} (not an image)`);
+        return;
+      }
+      accepted.push(file);
+    });
+    return { accepted, failed };
+  }
+
+  async function importUploadFiles(files, emptyMessage) {
+    if (files.length === 0) {
+      setStatus(emptyMessage, "empty");
+      return;
+    }
+    const { accepted, failed } = classifyUploadFiles(files);
+    const imported = [];
+    if (accepted.length === 0) {
+      setStatus(`No images uploaded; failed: ${failed.join(", ")}.`, "error");
+      return;
+    }
     setBusy(true);
-    setStatus("Uploading image.", "info");
     try {
-      const data = await postForm(
-        overlay?.dataset.apiUploadUrl,
-        formData,
-        "Image file could not be uploaded.",
-      );
-      await finishImport(data, "Image uploaded.");
+      for (const [index, file] of accepted.entries()) {
+        setStatus(`Uploading image ${index + 1} of ${accepted.length}.`, "info");
+        const formData = new FormData();
+        formData.append("image", file);
+        try {
+          const data = await postForm(
+            overlay?.dataset.apiUploadUrl,
+            formData,
+            "Image file could not be uploaded.",
+          );
+          imported.push(data?.image?.filename || uploadFileLabel(file));
+        } catch (error) {
+          failed.push(`${uploadFileLabel(file)}: ${error.message || "upload failed"}`);
+        }
+      }
+      if (imported.length) {
+        await refreshGallery();
+      }
+      if (failed.length) {
+        const uploaded = `${imported.length} image${imported.length === 1 ? "" : "s"} uploaded`;
+        setStatus(
+          `${imported.length ? uploaded : "No images uploaded"}; failed: ${failed.join(", ")}.`,
+          "error",
+        );
+      } else if (imported.length === 1) {
+        setStatus(`${imported[0]} imported.`, "success");
+      } else {
+        setStatus(`${imported.length} images uploaded.`, "success");
+      }
     } catch (error) {
-      setStatus(error.message || "Image file could not be uploaded.", "error");
+      setStatus(error.message || "Image files could not be uploaded.", "error");
     } finally {
       setBusy(false);
     }
-  }
-
-  function importUploadFile(file) {
-    importDroppedImage(file).catch((error) => {
-      setBusy(false);
-      setStatus(error.message || "Image file could not be uploaded.", "error");
-    });
   }
 
   uploadToggle?.addEventListener("click", () => {
@@ -382,19 +409,10 @@ export function setupImageUpload(root = document, services = {}) {
     if (dropTarget?.classList.contains("upload-drop-target-busy")) {
       return;
     }
-    let file;
-    try {
-      file = validateDroppedImage(selectedUploadFiles());
-    } catch (error) {
-      fileInput.value = "";
-      setStatus(error.message || "Selected file is not an image.", "error");
-      return;
-    }
-    if (!file) {
-      setStatus("Choose one image file.", "empty");
-      return;
-    }
-    importUploadFile(file);
+    importUploadFiles(selectedUploadFiles(), "Choose image files.").catch((error) => {
+      setBusy(false);
+      setStatus(error.message || "Image files could not be uploaded.", "error");
+    });
     fileInput.value = "";
   });
   dropTarget?.addEventListener("dragenter", (event) => {
@@ -420,18 +438,10 @@ export function setupImageUpload(root = document, services = {}) {
     if (dropTarget.classList.contains("upload-drop-target-busy")) {
       return;
     }
-    let file;
-    try {
-      file = validateDroppedImage(droppedFiles(event));
-    } catch (error) {
-      setStatus(error.message || "Dropped file is not an image.", "error");
-      return;
-    }
-    if (!file) {
-      setStatus("Drop one image file.", "empty");
-      return;
-    }
-    importUploadFile(file);
+    importUploadFiles(droppedFiles(event), "Drop image files.").catch((error) => {
+      setBusy(false);
+      setStatus(error.message || "Image files could not be uploaded.", "error");
+    });
   });
   immichPrev?.addEventListener("click", () => {
     if (!immichPreviousPage || immichLoading) {

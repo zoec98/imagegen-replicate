@@ -52,7 +52,7 @@ export function renderWorkspace({ modelRegistry = [], selectedProvider = "" } = 
       <input class="upload-url">
       <button class="upload-url-load" type="button"></button>
       <div class="upload-drop-target"></div>
-      <input class="upload-file-input" type="file">
+      <input class="upload-file-input" type="file" multiple>
       <button class="upload-file-choose" type="button"></button>
       <div class="upload-status"></div>
       <div class="upload-immich-browser">

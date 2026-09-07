@@ -59,7 +59,7 @@ describe("setupImageUpload", () => {
     expect(upload.isOpen()).toBe(true);
     expect(overlay.hidden).toBe(false);
     expect(document.querySelector(".upload-status").textContent).toBe(
-      "Add an image URL, choose one image file, or drop one image file.",
+      "Add an image URL, choose image files, or drop image files.",
     );
 
     document.querySelector(".upload-close").click();
@@ -102,5 +102,149 @@ describe("setupImageUpload", () => {
       );
       expect(document.querySelector(".upload-url").value).toBe("");
     });
+  });
+
+  it("uploads every file selected in one chooser interaction", async () => {
+    renderUploadWorkspace();
+    const refreshGallery = vi.fn().mockResolvedValue(undefined);
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ image: { filename: "first.png" } }))
+      .mockResolvedValueOnce(jsonResponse({ image: { filename: "second.png" } }));
+    vi.stubGlobal("fetch", fetcher);
+    setupImageUpload(document, { csrfToken: "csrf-token", refreshGallery });
+
+    const first = new File(["first"], "first.png", { type: "image/png" });
+    const second = new File(["second"], "second.png", { type: "image/png" });
+    const fileInput = document.querySelector(".upload-file-input");
+    Object.defineProperty(fileInput, "files", {
+      configurable: true,
+      value: [first, second],
+    });
+
+    fileInput.dispatchEvent(new Event("change"));
+
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+    expect(fetcher.mock.calls).toHaveLength(2);
+    expect(fetcher.mock.calls[0][0]).toBe("/api/images/import-upload");
+    expect(fetcher.mock.calls[1][0]).toBe("/api/images/import-upload");
+    await vi.waitFor(() => expect(refreshGallery).toHaveBeenCalledTimes(1));
+    expect(document.querySelector(".upload-status").textContent).toBe(
+      "2 images uploaded.",
+    );
+  });
+
+  it("continues a batch after one file fails", async () => {
+    renderUploadWorkspace();
+    const refreshGallery = vi.fn().mockResolvedValue(undefined);
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ image: { filename: "first.png" } }))
+      .mockRejectedValueOnce(new Error("Unsupported image format."))
+      .mockResolvedValueOnce(jsonResponse({ image: { filename: "third.png" } }));
+    vi.stubGlobal("fetch", fetcher);
+    setupImageUpload(document, { csrfToken: "csrf-token", refreshGallery });
+
+    const files = [
+      new File(["first"], "first.png", { type: "image/png" }),
+      new File(["second"], "second.png", { type: "image/png" }),
+      new File(["third"], "third.png", { type: "image/png" }),
+    ];
+    const fileInput = document.querySelector(".upload-file-input");
+    Object.defineProperty(fileInput, "files", {
+      configurable: true,
+      value: files,
+    });
+
+    fileInput.dispatchEvent(new Event("change"));
+
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(refreshGallery).toHaveBeenCalledTimes(1));
+    expect(document.querySelector(".upload-status").textContent).toContain(
+      "second.png: Unsupported image format.",
+    );
+    expect(document.querySelector(".upload-file-choose").disabled).toBe(false);
+  });
+
+  it("uploads every file dropped in one interaction", async () => {
+    renderUploadWorkspace();
+    const refreshGallery = vi.fn().mockResolvedValue(undefined);
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ image: { filename: "first.png" } }))
+      .mockResolvedValueOnce(jsonResponse({ image: { filename: "second.png" } }));
+    vi.stubGlobal("fetch", fetcher);
+    setupImageUpload(document, { csrfToken: "csrf-token", refreshGallery });
+
+    const files = [
+      new File(["first"], "first.png", { type: "image/png" }),
+      new File(["second"], "second.png", { type: "image/png" }),
+    ];
+    const event = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "dataTransfer", { value: { files } });
+
+    document.querySelector(".upload-drop-target").dispatchEvent(event);
+
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(refreshGallery).toHaveBeenCalledTimes(1));
+    expect(document.querySelector(".upload-status").textContent).toBe(
+      "2 images uploaded.",
+    );
+  });
+
+  it("keeps valid files when a dropped file has a non-image MIME type", async () => {
+    renderUploadWorkspace();
+    const refreshGallery = vi.fn().mockResolvedValue(undefined);
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ image: { filename: "valid.png" } }));
+    vi.stubGlobal("fetch", fetcher);
+    setupImageUpload(document, { csrfToken: "csrf-token", refreshGallery });
+
+    const files = [
+      new File(["valid"], "valid.png", { type: "image/png" }),
+      new File(["invalid"], "notes.txt", { type: "text/plain" }),
+    ];
+    const event = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "dataTransfer", { value: { files } });
+
+    document.querySelector(".upload-drop-target").dispatchEvent(event);
+
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(refreshGallery).toHaveBeenCalledTimes(1));
+    expect(document.querySelector(".upload-status").textContent).toContain(
+      "notes.txt (not an image)",
+    );
+  });
+
+  it("keeps controls busy when the overlay closes during a batch", async () => {
+    renderUploadWorkspace();
+    const refreshGallery = vi.fn().mockResolvedValue(undefined);
+    let resolveUpload;
+    const uploadResponse = new Promise((resolve) => {
+      resolveUpload = resolve;
+    });
+    const fetcher = vi.fn().mockReturnValue(uploadResponse);
+    vi.stubGlobal("fetch", fetcher);
+    setupImageUpload(document, { csrfToken: "csrf-token", refreshGallery });
+
+    const fileInput = document.querySelector(".upload-file-input");
+    Object.defineProperty(fileInput, "files", {
+      configurable: true,
+      value: [new File(["first"], "first.png", { type: "image/png" })],
+    });
+    fileInput.dispatchEvent(new Event("change"));
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+
+    document.querySelector(".upload-close").click();
+    document.querySelector(".upload-toggle").click();
+    fileInput.dispatchEvent(new Event("change"));
+
+    expect(document.querySelector(".upload-file-choose").disabled).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    resolveUpload(jsonResponse({ image: { filename: "first.png" } }));
+    await vi.waitFor(() => expect(refreshGallery).toHaveBeenCalledTimes(1));
+    expect(document.querySelector(".upload-file-choose").disabled).toBe(false);
   });
 });
