@@ -213,6 +213,7 @@ def _target(
     edit: bool,
     pricing: tuple[ModelPricing, ...],
     source_binding: SourceImageBinding | None,
+    fixed_inputs: dict[str, object],
 ) -> GenerationTarget:
     return GenerationTarget(
         provider="wiro",
@@ -223,7 +224,7 @@ def _target(
         runtime_url=f"https://api.wiro.ai/v1/Run/{provider_model}",
         mode="image-edit" if edit else "text-to-image",
         parameters=parameters,
-        fixed_inputs={},
+        fixed_inputs=fixed_inputs,
         pricing=pricing,
         source_images=source_binding if edit else None,
         output_shape="image-urls",
@@ -239,6 +240,7 @@ def _provider_model(
     edit_parameters: tuple[ModelParameter, ...],
     pricing: tuple[ModelPricing, ...],
     source_binding: SourceImageBinding | None = None,
+    fixed_inputs: dict[str, object] | None = None,
 ) -> ProviderModel:
     if source_binding is None:
         source_binding = (
@@ -251,6 +253,7 @@ def _provider_model(
                 output_count_parameter="maxImages",
             )
         )
+    fixed_inputs = fixed_inputs or {}
     return ProviderModel(
         provider="wiro",
         alias=alias,
@@ -263,6 +266,7 @@ def _provider_model(
             edit=False,
             pricing=pricing,
             source_binding=source_binding,
+            fixed_inputs=fixed_inputs,
         ),
         edit_target=_target(
             alias=alias,
@@ -272,6 +276,7 @@ def _provider_model(
             edit=True,
             pricing=pricing,
             source_binding=source_binding,
+            fixed_inputs=fixed_inputs,
         ),
     )
 
@@ -296,6 +301,7 @@ def _text_only_provider_model(
             edit=False,
             pricing=pricing,
             source_binding=None,
+            fixed_inputs={},
         ),
     )
 
@@ -490,6 +496,53 @@ def _grok_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
     )
 
 
+def _nano_parameters(
+    *,
+    edit: bool,
+    resolution_choices: tuple[object, ...],
+    aspect_ratios: tuple[object, ...],
+) -> tuple[ModelParameter, ...]:
+    source = (
+        (
+            _parameter(
+                "inputImage",
+                "Source image files for image-to-image generation.",
+                "array",
+                "",
+                order=2,
+            ),
+        )
+        if edit
+        else ()
+    )
+    return (
+        _parameter(
+            "prompt",
+            "Text prompt for image generation or editing.",
+            "string",
+            "",
+            order=1,
+        ),
+        *source,
+        _parameter(
+            "aspectRatio",
+            "Output aspect ratio.",
+            "select",
+            "1:1",
+            choices=aspect_ratios,
+            order=3 if edit else 2,
+        ),
+        _parameter(
+            "resolution",
+            "Output resolution tier.",
+            "select",
+            "1K",
+            choices=resolution_choices,
+            order=4 if edit else 3,
+        ),
+    )
+
+
 PROVIDER_MODEL = "bytedance/seedream-v5-pro-uncensored"
 LITE_PROVIDER_MODEL = "bytedance/seedream-v5-lite-uncensored"
 SEEDREAM45_PROVIDER_MODEL = "bytedance/seedream-v4-5-uncensored"
@@ -497,6 +550,8 @@ Z_IMAGE_PROVIDER_MODEL = "tongyi-mai/z-image-turbo"
 HIDREAM_DEV_PROVIDER_MODEL = "hidreamai/hidream-i1-dev"
 HIDREAM_FAST_PROVIDER_MODEL = "hidreamai/hidream-i1-fast"
 GROK_PROVIDER_MODEL = "xai/grok-imagine-image"
+NANO_BANANA_2_PROVIDER_MODEL = "google/nano-banana-2"
+NANO_BANANA_PRO_PROVIDER_MODEL = "google/nano-banana-pro"
 
 MODEL_REGISTRY: dict[str, ProviderModel] = {
     "seedream5-pro-uncensored": _provider_model(
@@ -560,5 +615,97 @@ MODEL_REGISTRY: dict[str, ProviderModel] = {
         edit_parameters=_grok_parameters(edit=True),
         pricing=(_pricing("$0.02", "per output"),),
         source_binding=SourceImageBinding(provider_field="inputImage", max_count=1),
+    ),
+    "nano-banana-2": _provider_model(
+        alias="nano-banana-2",
+        display_name="Nano Banana 2",
+        provider_model=NANO_BANANA_2_PROVIDER_MODEL,
+        text_parameters=_nano_parameters(
+            edit=False,
+            resolution_choices=("512", "1K", "2K", "4K"),
+            aspect_ratios=(
+                "Match Input Image",
+                "1:1",
+                "1:4",
+                "1:8",
+                "2:3",
+                "3:2",
+                "3:4",
+                "4:1",
+                "4:3",
+                "4:5",
+                "5:4",
+                "8:1",
+                "9:16",
+                "16:9",
+                "21:9",
+            ),
+        ),
+        edit_parameters=_nano_parameters(
+            edit=True,
+            resolution_choices=("512", "1K", "2K", "4K"),
+            aspect_ratios=(
+                "Match Input Image",
+                "1:1",
+                "1:4",
+                "1:8",
+                "2:3",
+                "3:2",
+                "3:4",
+                "4:1",
+                "4:3",
+                "4:5",
+                "5:4",
+                "8:1",
+                "9:16",
+                "16:9",
+                "21:9",
+            ),
+        ),
+        pricing=(_pricing("$0.045-$0.151", "price range"),),
+        source_binding=SourceImageBinding(provider_field="inputImage", max_count=14),
+        fixed_inputs={"safetySetting": "OFF"},
+    ),
+    "nano-banana-pro": _provider_model(
+        alias="nano-banana-pro",
+        display_name="Nano Banana Pro",
+        provider_model=NANO_BANANA_PRO_PROVIDER_MODEL,
+        text_parameters=_nano_parameters(
+            edit=False,
+            resolution_choices=("1K", "2K", "4K"),
+            aspect_ratios=(
+                "Match Input Image",
+                "1:1",
+                "2:3",
+                "3:2",
+                "3:4",
+                "4:3",
+                "4:5",
+                "5:4",
+                "9:16",
+                "16:9",
+                "21:9",
+            ),
+        ),
+        edit_parameters=_nano_parameters(
+            edit=True,
+            resolution_choices=("1K", "2K", "4K"),
+            aspect_ratios=(
+                "Match Input Image",
+                "1:1",
+                "2:3",
+                "3:2",
+                "3:4",
+                "4:3",
+                "4:5",
+                "5:4",
+                "9:16",
+                "16:9",
+                "21:9",
+            ),
+        ),
+        pricing=(_pricing("$0.14-$0.24", "price range"),),
+        source_binding=SourceImageBinding(provider_field="inputImage", max_count=14),
+        fixed_inputs={"safetySetting": "OFF"},
     ),
 }

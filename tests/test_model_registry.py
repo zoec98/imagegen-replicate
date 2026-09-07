@@ -245,6 +245,8 @@ def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
         "hidream-dev",
         "hidream-fast",
         "grok-imagine",
+        "nano-banana-2",
+        "nano-banana-pro",
     }
     assert all(
         "Uncensored" in model.display_name
@@ -435,6 +437,48 @@ def test_wiro_registry_contains_grok_imagine_contract():
     assert parameters["resolution"].choices == ("1k", "2k")
     assert parameters["resolution"].default == "1k"
     assert {price.price for price in model.text_target.pricing} == {"$0.02"}
+
+
+def test_wiro_registry_contains_nano_banana_variants_with_fixed_safety():
+    expected = {
+        "nano-banana-2": (
+            "google/nano-banana-2",
+            ("512", "1K", "2K", "4K"),
+            "1K",
+            "$0.045-$0.151",
+        ),
+        "nano-banana-pro": (
+            "google/nano-banana-pro",
+            ("1K", "2K", "4K"),
+            "1K",
+            "$0.14-$0.24",
+        ),
+    }
+
+    for alias, (
+        provider_model,
+        resolutions,
+        resolution_default,
+        price,
+    ) in expected.items():
+        model = resolve_model("wiro", alias)
+        assert model.text_target.provider_model == provider_model
+        assert model.edit_target is not None
+        assert model.edit_target.source_images is not None
+        assert model.edit_target.source_images.provider_field == "inputImage"
+        assert model.edit_target.source_images.max_count == 14
+        assert model.edit_target.source_images.max_total is None
+        assert model.text_target.fixed_inputs == {"safetySetting": "OFF"}
+        assert model.edit_target.fixed_inputs == {"safetySetting": "OFF"}
+        parameters = {
+            parameter.name: parameter for parameter in model.text_target.parameters
+        }
+        assert "safetySetting" not in parameters
+        assert parameters["resolution"].choices == resolutions
+        assert parameters["resolution"].default == resolution_default
+        assert {price_entry.price for price_entry in model.text_target.pricing} == {
+            price
+        }
 
 
 def test_falai_edit_target_uses_linked_endpoint_not_selector_duplicate():

@@ -326,6 +326,20 @@ def test_validate_wiro_grok_edit_accepts_only_one_source(tmp_path):
         )
 
 
+def test_validate_wiro_nano_rejects_safety_override():
+    model = resolve_model("wiro", "nano-banana-2")
+
+    with pytest.raises(
+        ValidationError,
+        match="safetySetting is fixed by the server.",
+    ):
+        validate_model_parameters(
+            {"safetySetting": "BLOCK_NONE"},
+            model=model,
+            target=model.text_target,
+        )
+
+
 def test_validate_wiro_lite_rejects_sources_plus_outputs_above_limit(tmp_path):
     model = resolve_model("wiro", "seedream5-lite-uncensored")
     for index in range(14):

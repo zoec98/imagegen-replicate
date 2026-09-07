@@ -304,6 +304,8 @@ def test_index_exposes_wiro_models_when_wiro_is_enabled(app_config, app_factory)
         "hidream-dev",
         "hidream-fast",
         "grok-imagine",
+        "nano-banana-2",
+        "nano-banana-pro",
     }
     lite = next(
         model

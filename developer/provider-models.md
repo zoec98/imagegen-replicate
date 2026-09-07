@@ -143,6 +143,14 @@ one `inputImage` source. It exposes `samples` (1–10, default 1),
 per output. The Wiro V2 endpoint is a report-only alternate and is not
 registered.
 
+The `google/nano-banana-2` and `google/nano-banana-pro` contracts support text
+generation and editing with up to 14 `inputImage` sources. Nano Banana 2
+offers `resolution` (`512`, `1K`, `2K`, `4K`), while Pro offers (`1K`, `2K`,
+`4K`); both default to `1K` and expose their documented aspect-ratio choices.
+The application sends fixed `safetySetting: "OFF"` and does not expose that
+provider control. Operator-facing price guidance is `$0.045–$0.151` for Nano
+Banana 2 and `$0.14–$0.24` for Pro; provider billing remains authoritative.
+
 ## Schema Extraction
 
 For provider schemas, extract useful registry information from schema input and

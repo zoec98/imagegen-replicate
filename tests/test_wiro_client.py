@@ -664,6 +664,64 @@ def test_wiro_grok_text_and_edit_requests_use_one_source_contract(tmp_path):
             }
 
 
+def test_wiro_nano_variants_send_fixed_safety_and_support_edit_sources(tmp_path):
+    source_path = tmp_path / "source.png"
+    source_path.write_bytes(b"image")
+    expected = {
+        "nano-banana-2": "google/nano-banana-2",
+        "nano-banana-pro": "google/nano-banana-pro",
+    }
+
+    for alias, provider_model in expected.items():
+        model = resolve_model("wiro", alias)
+        target = resolve_generation_target("wiro", alias, edit_mode=True)
+        client = FakeHTTPClient(
+            [
+                FakeResponse(
+                    200,
+                    {"result": True, "errors": [], "taskid": f"wiro-{alias}"},
+                ),
+                FakeResponse(
+                    200,
+                    {
+                        "result": True,
+                        "errors": [],
+                        "tasklist": [
+                            {
+                                "status": "task_postprocess_end",
+                                "pexit": "0",
+                                "outputs": [{"url": "https://cdn1.wiro.ai/nano.jpg"}],
+                            }
+                        ],
+                    },
+                ),
+            ]
+        )
+
+        generate_image_urls(
+            "edit this",
+            app_config(tmp_path),
+            model=model,
+            target=target,
+            parameters={"resolution": "1K", "aspectRatio": "1:1"},
+            source_image_paths=[source_path],
+            client=client,
+            sleep=lambda _: None,
+            clock=lambda: 0.0,
+            persist_images=lambda urls, **kwargs: [],
+        )
+
+        run_call = client.calls[0]
+        assert run_call["url"] == f"https://api.wiro.ai/v1/Run/{provider_model}"
+        assert dict(run_call["data"]) == {
+            "prompt": "edit this",
+            "aspectRatio": "1:1",
+            "resolution": "1K",
+            "safetySetting": "OFF",
+        }
+        assert [part[0] for part in run_call["files"]] == ["inputImage"]
+
+
 def test_wiro_edit_serializes_multipart_with_httpx_client(tmp_path):
     model = resolve_model("wiro", "seedream5-lite-uncensored")
     target = resolve_generation_target(
