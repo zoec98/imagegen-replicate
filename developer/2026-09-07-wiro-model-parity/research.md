@@ -266,14 +266,27 @@ default `1:1`). Tool Detail reports `$0.006` per run.
    exactly without validation work. Only Flux 2 Flex is in implementation
    scope.
 3. Conditional pricing is stored as display metadata, not executable billing
-   logic. GPT Image and Nano Banana matrices can be listed precisely; Flux's
-   `cp-pixel` contract must not be collapsed to a false flat price. HiDream's
-   absent dynamic price should remain unknown rather than guessed.
+   logic. Keep the exact GPT Image and Nano Banana matrices above as source
+   evidence, but show operators concise provider-reported ranges: GPT Image
+   1.5 `$0.009–$0.200`, GPT Image 2 `$0.003–$0.712`, Nano Banana 2
+   `$0.045–$0.151`, and Nano Banana Pro `$0.14–$0.24`. These are resource-use
+   guidance, not a billing calculator; actual billing remains in the provider
+   account. Flux's `cp-pixel` contract must not be collapsed to a false flat
+   per-image price. HiDream's absent dynamic price should remain unknown rather
+   than guessed.
 4. Wiro's generic non-LLM output-array contract matches the existing Wiro
    client's `image-urls` normalization. No paid probe is needed to implement
    registry discovery and fake-transport coverage. A real smoke test remains a
    separate, explicit authorization decision.
 5. Preserve the project policies already established for Wiro: prefer JPEG
    when an endpoint exposes a format choice, and default watermark to `false`
-   when Wiro exposes that control. Provider-supplied safety controls retain
-   their exact names, choices, and defaults.
+   when Wiro exposes that control.
+6. Provider-supplied safety controls are application policy, not user-facing
+   choices. The research above retains their source names, choices, and
+   defaults; implementation overrides them with fixed policy inputs. Use
+   `safetySetting: "OFF"` for both Nano Banana models, `moderation: "low"`
+   (Wiro's explicit low setting) for both GPT Image models, and
+   `safetyTolerance: 5` for Flux 2 Flex. Wiro exposes Flux's range as 0–5;
+   [Black Forest Labs documents 0 as most strict and 5 as least strict](https://docs.bfl.ai/api-reference/models/erase-an-object-from-an-image).
+   These settings reduce avoidable provider rejections but do not bypass
+   provider, account, or legal enforcement.
