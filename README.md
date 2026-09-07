@@ -8,9 +8,29 @@ Developer and agent contribution guidance lives in [AGENTS.md](AGENTS.md).
 
 ![](docs/imagegen-screen.jpg)
 
+## Support Chat
+
+There is a support chat for imagegen on deviantArt. 
+Contact @zoec98 on deviantArt to be added to that chat.
+
+## Currently supported Providers and models
+
+Model aliases are scoped to their provider. Models marked `edit` accept
+existing gallery images as sources; `text` models are text-to-image only. A
+provider appears in the UI only when its credentials are configured.
+
+| Provider | Registered models |
+| --- | --- |
+| Replicate | `flux-flex` — Flux 2 Flex (edit)<br>`gpt-image-15` — GPT Image 1.5 (edit)<br>`gpt-image-2` — GPT Image 2 (edit)<br>`grok-imagine` — Grok Imagine (edit)<br>`imagen-4` — Imagen 4 (text)<br>`imagen-4-fast` — Imagen 4 Fast (text)<br>`imagen-4-ultra` — Imagen 4 Ultra (text)<br>`nano-banana-2` — Nano Banana 2 (edit)<br>`nano-banana-pro` — Nano Banana Pro (edit)<br>`qwen-2512` — Qwen Image 2512 (edit)<br>`seedream45` — Seedream 4.5 (edit)<br>`seedream5` — Seedream 5 Lite (edit)<br>`seedream5-pro` — Seedream 5 Pro (edit)<br>`wan-27-pro` — Wan 2.7 Image Pro (edit) |
+| fal.ai | `bria-fibo` — Bria Fibo (edit)<br>`ernie-image` — Ernie Image (text)<br>`ernie-image-turbo` — Ernie Image Turbo (text)<br>`flux-2` — Flux 2 (edit)<br>`flux-2-pro` — Flux 2 Pro (edit)<br>`flux-2-realism` — Flux 2 Realism (text)<br>`gpt-image-2` — GPT Image 2 (edit)<br>`gpt-image15` — GPT Image 1.5 (edit)<br>`grok` — Grok Imagine Image (edit)<br>`hidream-dev` — HiDream I1 Dev (text)<br>`hidream-fast` — HiDream I1 Fast (text)<br>`hidream-full` — HiDream I1 Full (text)<br>`krea-2-large` — Krea 2 Large (text)<br>`krea-2-medium` — Krea 2 Medium (text)<br>`krea-2-turbo` — Krea 2 Turbo (edit)<br>`nano-banana-2` — Nano Banana 2 (edit)<br>`seedream` — Seedream 4 (edit)<br>`seedream45` — Seedream 4.5 (edit)<br>`seedream5` — Seedream 5 Lite (edit)<br>`seedream5-pro` — Seedream 5 Pro (edit)<br>`zit` — Z-Image Turbo (edit) |
+| Wiro | `flux-2-flex` — Flux 2 Flex (edit)<br>`gpt-image-15` — GPT Image 1.5 (edit)<br>`gpt-image-2` — GPT Image 2 (edit)<br>`grok-imagine` — Grok Imagine Image (edit)<br>`hidream-dev` — HiDream I1 Dev (text)<br>`hidream-fast` — HiDream I1 Fast (text)<br>`nano-banana-2` — Nano Banana 2 (edit)<br>`nano-banana-pro` — Nano Banana Pro (edit)<br>`seedream45-uncensored` — Seedream 4.5 Uncensored (edit)<br>`seedream5-lite-uncensored` — Seedream 5 Lite Uncensored (edit)<br>`seedream5-pro-uncensored` — Seedream 5 Pro Uncensored (edit)<br>`z-image-turbo` — Z-Image Turbo (text) |
+
+More providers, missing models or features can be added.
+Join the Support Chat on deviantArt, and request what you need.
+
 ## Requirements
 
-You machine needs to have `uv` (https://docs.astral.sh/uv/) and `git` installed.
+Your machine needs to have `uv` (https://docs.astral.sh/uv/) and `git` installed.
 
 The easiest way to get that on MacOS is homebrew.
 On Windows, use a package manager like Chocolatey, Scoop or Winget.
@@ -67,18 +87,6 @@ WIRO_API_KEY=
 Wiro uses only `WIRO_API_KEY`; the account's API secret is not required by
 this application. The complete provider/model list is below.
 
-## Providers and models
-
-Model aliases are scoped to their provider. Models marked `edit` accept
-existing gallery images as sources; `text` models are text-to-image only. A
-provider appears in the UI only when its credentials are configured.
-
-| Provider | Registered models |
-| --- | --- |
-| Replicate | `flux-flex` — Flux 2 Flex (edit)<br>`gpt-image-15` — GPT Image 1.5 (edit)<br>`gpt-image-2` — GPT Image 2 (edit)<br>`grok-imagine` — Grok Imagine (edit)<br>`imagen-4` — Imagen 4 (text)<br>`imagen-4-fast` — Imagen 4 Fast (text)<br>`imagen-4-ultra` — Imagen 4 Ultra (text)<br>`nano-banana-2` — Nano Banana 2 (edit)<br>`nano-banana-pro` — Nano Banana Pro (edit)<br>`qwen-2512` — Qwen Image 2512 (edit)<br>`seedream45` — Seedream 4.5 (edit)<br>`seedream5` — Seedream 5 Lite (edit)<br>`seedream5-pro` — Seedream 5 Pro (edit)<br>`wan-27-pro` — Wan 2.7 Image Pro (edit) |
-| fal.ai | `bria-fibo` — Bria Fibo (edit)<br>`ernie-image` — Ernie Image (text)<br>`ernie-image-turbo` — Ernie Image Turbo (text)<br>`flux-2` — Flux 2 (edit)<br>`flux-2-pro` — Flux 2 Pro (edit)<br>`flux-2-realism` — Flux 2 Realism (text)<br>`gpt-image-2` — GPT Image 2 (edit)<br>`gpt-image15` — GPT Image 1.5 (edit)<br>`grok` — Grok Imagine Image (edit)<br>`hidream-dev` — HiDream I1 Dev (text)<br>`hidream-fast` — HiDream I1 Fast (text)<br>`hidream-full` — HiDream I1 Full (text)<br>`krea-2-large` — Krea 2 Large (text)<br>`krea-2-medium` — Krea 2 Medium (text)<br>`krea-2-turbo` — Krea 2 Turbo (edit)<br>`nano-banana-2` — Nano Banana 2 (edit)<br>`seedream` — Seedream 4 (edit)<br>`seedream45` — Seedream 4.5 (edit)<br>`seedream5` — Seedream 5 Lite (edit)<br>`seedream5-pro` — Seedream 5 Pro (edit)<br>`zit` — Z-Image Turbo (edit) |
-| Wiro | `flux-2-flex` — Flux 2 Flex (edit)<br>`gpt-image-15` — GPT Image 1.5 (edit)<br>`gpt-image-2` — GPT Image 2 (edit)<br>`grok-imagine` — Grok Imagine Image (edit)<br>`hidream-dev` — HiDream I1 Dev (text)<br>`hidream-fast` — HiDream I1 Fast (text)<br>`nano-banana-2` — Nano Banana 2 (edit)<br>`nano-banana-pro` — Nano Banana Pro (edit)<br>`seedream45-uncensored` — Seedream 4.5 Uncensored (edit)<br>`seedream5-lite-uncensored` — Seedream 5 Lite Uncensored (edit)<br>`seedream5-pro-uncensored` — Seedream 5 Pro Uncensored (edit)<br>`z-image-turbo` — Z-Image Turbo (text) |
-
 Also set the `AUTHOR` key:
 
 ```bash
@@ -131,6 +139,10 @@ backward compatibility.
 
 Immich browsing is optional. Without `IMMICH_URL` and `IMMICH_API_KEY`, URL
 imports and local file uploads still work, but the Immich browser is hidden.
+
+See below the section on [Prompt Palettes](#prompt-palettes) for information on what they are and how to set them up.
+You may want to make additional directories in your data directories fragments directory.
+The coding agent specification on prompt palettes is in this file: [Prompt Palettes](developer/prompt-palettes.md).
 
 ## Running
 
@@ -197,16 +209,16 @@ Use help to discover providers and models, then model-specific help to discover
 the model's parameters:
 
 ```bash
-imagegen --help
-imagegen --provider replicate --model seedream45 --help
+uv run imagegen --help
+uv run imagegen --provider replicate --model seedream45 --help
 ```
 
 Select a model by its alias or by its display name:
 
 ```bash
-imagegen --provider replicate --model seedream45 --prompt "a red fox"
-imagegen --provider falai --model "Seedream 4.5" --file prompts/fox.txt
-imagegen --provider wiro --model seedream5-lite-uncensored --prompt "a red fox"
+uv run imagegen --provider replicate --model seedream45 --prompt "a red fox"
+uv run imagegen --provider falai --model "Seedream 4.5" --file prompts/fox.txt
+uv run imagegen --provider wiro --model seedream5-lite-uncensored --prompt "a red fox"
 ```
 
 `--prompt` and `--file` are mutually exclusive. Prompt files are read as UTF-8
@@ -216,6 +228,7 @@ names; both underscore and hyphen spellings are accepted, such as
 as `--sync_mode` and `--no-sync_mode`.
 
 Without `--quiet`, successful generation prints the completed request JSON.
+
 With `--quiet`, it prints only reusable project-root-relative image paths, one
 per line, for example `outputs/images/seedream45-prediction-123-01.jpg`.
 Errors go to stderr. Exit status `0` means success, `1` means generation or
