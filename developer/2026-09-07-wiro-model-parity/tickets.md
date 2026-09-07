@@ -63,22 +63,157 @@ Verification:
 Commit `research.md` and any necessary schema-report improvement before the
 decision gate below.
 
-## Post-research decision gate
+## Research decision
 
-After Ticket 1 is committed, revise this file from the recommended endpoint
-set in `research.md`:
+Ticket 1 is committed as `2b6e5de`. Its authenticated research recommends ten
+exact endpoints. The following implementation tickets are a draft and require
+approval and a tickets commit before Ticket 2 starts. No unavailable,
+ambiguous, excluded, already-covered, or report-only endpoint receives a code
+ticket.
 
-- Add one implementation ticket per independent Wiro model contract, or one
-  tightly scoped ticket for variants only when the research proves their Wiro
-  schemas and runtime behavior are shared.
-- Order tickets so the smallest representative contract proves the existing
-  Wiro registry/client path first. Do not create code tickets for unavailable,
-  ambiguous, blocked, skipped, or report-only endpoints.
-- Define each ticket through public behavior: provider-scoped discovery, exact
-  schema-driven validation/defaults, text and edit support where documented,
-  safe fake-transport generation, history/metadata compatibility, and operator
-  documentation.
-- Use `scripts/get_schema_wiro` output as the source contract for each registry
-  implementation. Never copy Replicate or fal.ai parameters into a Wiro entry.
-- Obtain approval for the revised ticket plan and commit it before model
-  implementation starts. Any paid probe remains separately approval-gated.
+All tickets use the contract in `research.md` and re-run
+`scripts/get_schema_wiro` before editing the registry. Follow red-green-refactor:
+write the smallest failing registry/client test, implement only that contract,
+run focused tests, then run the full required checks before committing.
+Complicated provider price matrices are displayed as the researched minimum-to-
+maximum range for operator guidance; the provider account remains authoritative
+for billing. Safety controls are fixed, hidden application policy: off where
+available, `low` for GPT moderation, and the highest documented tolerance for
+Flux.
+
+## 2. Add Seedream 4.5 Uncensored
+
+Add provider-scoped alias `wiro:seedream45-uncensored` for
+`bytedance/seedream-v4-5-uncensored`. This is the smallest new contract because
+it reuses the proven Seedream Lite parameter and source-plus-output shape.
+
+- Expose the exact resolution, ratio, output-count, watermark, pricing, and
+  14-source/15-total contract for text and edit modes.
+- Keep watermark `false` by default and do not add a safety input that Tool
+  Detail does not expose.
+- Prove web/CLI discovery, validation, fake multipart editing, and persisted
+  provider/model metadata without changing existing Seedream entries.
+- Update the Wiro operator contract in `developer/provider-models.md`.
+
+Commit after full Python tests and lint pass.
+
+## 3. Add Z-Image Turbo
+
+Add text-only alias `wiro:z-image-turbo` for
+`tongyi-mai/z-image-turbo`.
+
+- Represent the exact steps, scale, seed, resolution, ratio, runtime, and
+  `$0.006` per-run price; preserve Wiro's text-valued numeric seed contract.
+- Prove discovery, rejection of edit mode and out-of-contract values, JSON
+  request serialization through a fake transport, and metadata/history.
+- Update the Wiro operator contract.
+
+Commit after full Python tests and lint pass.
+
+## 4. Add the HiDream Dev and Fast variants
+
+Add `wiro:hidream-dev` and `wiro:hidream-fast` for the two exact HiDream
+endpoints. Research proved a shared text-only schema; keep only the differing
+step/flow-shift defaults, runtime, identity, and display name variant-specific.
+
+- Represent prompt, negative prompt, steps, scale, flow shift, samples, seed,
+  width, and height exactly.
+- Do not invent a static price: Tool Detail supplied no dynamic price for
+  either endpoint.
+- Prove both entries independently discoverable, text-only, validated, and
+  serialized while sharing only existing or genuinely duplicated helpers.
+- Update the Wiro operator contract.
+
+Commit after full Python tests and lint pass.
+
+## 5. Add Grok Imagine Image
+
+Add `wiro:grok-imagine` for `xai/grok-imagine-image`.
+
+- Expose the exact sample count, ratio choices, resolution choices, one-source
+  edit limit, runtime, and `$0.02` per-output price.
+- Prove text JSON and single-source multipart requests with fake transports,
+  including the scalar multipart source field expected for a one-file binding.
+- Prove discovery, validation, history/metadata, and unchanged behavior for the
+  report-only V2 endpoint.
+- Update the Wiro operator contract.
+
+Commit after full Python tests and lint pass.
+
+## 6. Add Nano Banana 2 and Pro
+
+Add `wiro:nano-banana-2` and `wiro:nano-banana-pro`. Research proved the same
+prompt/source/safety shape, with variant-specific aspect ratios, resolutions,
+and prices.
+
+- Preserve each endpoint's exact case-sensitive choices and 14-source edit
+  limit. Send fixed `safetySetting: "OFF"` and do not expose it as a form
+  parameter.
+- Display the provider-reported price ranges `$0.045–$0.151` for Nano Banana 2
+  and `$0.14–$0.24` for Pro.
+- Prove text and multipart edit serialization for both variants, registry/UI
+  discovery, validation, and history/metadata.
+- Update the Wiro operator contract.
+
+Commit after full Python tests and lint pass.
+
+## 7. Add Flux 2 Flex with exact dimension validation
+
+Add `wiro:flux-2-flex` for `black-forest-labs/flux-2-flex`.
+
+- First add only the minimum reusable numeric validation metadata needed to
+  express nonzero multiples of 16 while retaining Wiro's special zero value;
+  cover it with a failing server-validation test.
+- Expose exact dimensions, seed, guidance, steps, format, eight-source edit
+  limit, and runtime. Send fixed `safetyTolerance: 5`, the documented least
+  restrictive value, without exposing it as a form parameter. Default format
+  to JPEG under project policy while preserving both provider choices.
+- Preserve the conditional `cp-pixel` Tool Detail contract as descriptive
+  provider pricing; do not present it as a flat per-image price.
+- Prove JSON and multipart requests, discovery, validation, and
+  history/metadata. Update the operator contract.
+
+Commit after full Python and JavaScript checks if registry serialization changes
+browser-facing parameter behavior.
+
+## 8. Add GPT Image 1.5 and GPT Image 2
+
+Add `wiro:gpt-image-15` and `wiro:gpt-image-2`. Research proved a shared
+multi-image edit and output-control shape, with independent size/ratio and
+pricing matrices.
+
+- Expose each ordinary non-safety parameter, default, choice, bound, and
+  runtime exactly. Display the provider-reported price ranges
+  `$0.009–$0.200` for GPT Image 1.5 and `$0.003–$0.712` for GPT Image 2, and
+  default output format to JPEG under project policy.
+- Send fixed `moderation: "low"`, Wiro's explicit low setting, and do not
+  expose it as a form parameter.
+- Bind up to 16 ordinary edit sources to `inputImage` and keep both endpoints'
+  optional `inputImageMask` out of generic parameters. The current request/UI
+  contract has no trusted second file-input channel; document mask-targeted GPT
+  editing as unsupported rather than accepting a browser-submitted path or
+  silently treating a mask as an ordinary source.
+- Prove text JSON, ordinary multipart editing, discovery, validation,
+  history/metadata, and rejection of `inputImage` or `inputImageMask` in generic
+  parameters.
+- Update the Wiro operator contract and explicitly state the mask limitation.
+
+Commit after full Python and JavaScript checks if browser-facing parameter
+behavior changes.
+
+## Final verification
+
+After Ticket 8, run:
+
+```bash
+uv run pytest
+uv run ruff format src tests
+uv run ruff check --fix src tests
+npm run js:format
+npm run js:check
+git diff --check
+```
+
+Smoke-test the ten new selector entries only after the user separately chooses
+whether to authorize paid provider calls. A registry implementation requires no
+billable probe.
