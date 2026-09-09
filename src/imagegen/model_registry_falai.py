@@ -1925,6 +1925,37 @@ GPT_IMAGE25_SUNBURST = ProviderModel(
     ),
 )
 
+GPT_IMAGE25_FLARE = ProviderModel(
+    provider="falai",
+    alias="gpt-image-25-flare",
+    display_name="GPT Image 2.5 Flare",
+    text_target=GenerationTarget(
+        provider="falai",
+        alias="gpt-image-25-flare",
+        display_name="GPT Image 2.5 Flare",
+        provider_model="openai/gpt-image-2.5/flare/text-to-image",
+        documentation_url="https://fal.ai/models/openai/gpt-image-2.5/flare/text-to-image/api",
+        runtime_url="https://fal.run/openai/gpt-image-2.5/flare/text-to-image",
+        mode="text-to-image",
+        parameters=_gpt_image25_parameters(edit=False),
+        fixed_inputs=FALAI_FIXED_IMAGE_OUTPUT_INPUTS,
+        pricing=(_falai_price("$1", "per billing unit", metric="billing_unit_count"),),
+    ),
+    edit_target=GenerationTarget(
+        provider="falai",
+        alias="gpt-image-25-flare",
+        display_name="GPT Image 2.5 Flare",
+        provider_model="openai/gpt-image-2.5/flare/edit",
+        documentation_url="https://fal.ai/models/openai/gpt-image-2.5/flare/edit/api",
+        runtime_url="https://fal.run/openai/gpt-image-2.5/flare/edit",
+        mode="image-edit",
+        parameters=_gpt_image25_parameters(edit=True),
+        fixed_inputs=FALAI_FIXED_IMAGE_OUTPUT_INPUTS,
+        source_images=SourceImageBinding(provider_field="image_urls", max_count=16),
+        pricing=(_falai_price("$1", "per billing unit", metric="billing_unit_count"),),
+    ),
+)
+
 GROK = ProviderModel(
     provider="falai",
     alias="grok",
@@ -1970,6 +2001,7 @@ MODEL_REGISTRY: dict[str, ProviderModel] = {
     FLUX_2_REALISM.alias: FLUX_2_REALISM,
     GPT_IMAGE15.alias: GPT_IMAGE15,
     GPT_IMAGE2.alias: GPT_IMAGE2,
+    GPT_IMAGE25_FLARE.alias: GPT_IMAGE25_FLARE,
     GPT_IMAGE25_SUNBURST.alias: GPT_IMAGE25_SUNBURST,
     GROK.alias: GROK,
     HIDREAM_DEV.alias: HIDREAM_DEV,

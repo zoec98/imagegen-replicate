@@ -118,6 +118,7 @@ def test_provider_model_lists_are_scoped_by_provider():
         "flux-2-pro",
         "flux-2-realism",
         "gpt-image-2",
+        "gpt-image-25-flare",
         "gpt-image-25-sunburst",
         "gpt-image15",
         "grok",
@@ -591,8 +592,9 @@ def test_falai_edit_target_uses_linked_endpoint_not_selector_duplicate():
     assert edit_target.source_images.max_count == 10
 
 
-def test_falai_gpt_image25_sunburst_contract():
-    model = resolve_model("falai", "gpt-image-25-sunburst")
+@pytest.mark.parametrize("variant", ["flare", "sunburst"])
+def test_falai_gpt_image25_variants_contract(variant):
+    model = resolve_model("falai", f"gpt-image-25-{variant}")
     text_parameters = {
         parameter.name: parameter for parameter in model.text_target.parameters
     }
@@ -601,9 +603,9 @@ def test_falai_gpt_image25_sunburst_contract():
     }
 
     assert model.text_target.provider_model == (
-        "openai/gpt-image-2.5/sunburst/text-to-image"
+        f"openai/gpt-image-2.5/{variant}/text-to-image"
     )
-    assert model.edit_target.provider_model == "openai/gpt-image-2.5/sunburst/edit"
+    assert model.edit_target.provider_model == f"openai/gpt-image-2.5/{variant}/edit"
     assert model.text_target.fixed_inputs == {"sync_mode": False}
     assert model.edit_target.fixed_inputs == {"sync_mode": False}
     assert model.edit_target.source_images is not None
@@ -636,6 +638,11 @@ def test_falai_plan_ticket_models_use_linked_edit_endpoints():
         "flux-2": ("fal-ai/flux-2/edit", "image_urls", 4),
         "flux-2-pro": ("fal-ai/flux-2-pro/edit", "image_urls", 10),
         "gpt-image-2": ("openai/gpt-image-2/edit", "image_urls", 10),
+        "gpt-image-25-flare": (
+            "openai/gpt-image-2.5/flare/edit",
+            "image_urls",
+            16,
+        ),
         "gpt-image-25-sunburst": (
             "openai/gpt-image-2.5/sunburst/edit",
             "image_urls",
