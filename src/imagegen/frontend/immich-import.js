@@ -206,7 +206,7 @@ function immichAssetFigure(asset, reportThumbnailError) {
       "aria-label": `Import ${asset.label || asset.asset_id || "Immich image"}`,
       title: "Import image",
     },
-    className: "upload-immich-import",
+    className: "gallery-action upload-immich-import",
     disabled: !asset.import_eligible || !asset.asset_id,
     type: "button",
   });
