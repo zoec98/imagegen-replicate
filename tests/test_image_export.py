@@ -41,7 +41,7 @@ def test_clean_png_export_strips_text_and_app_metadata(tmp_path):
     export_path = clean_image_export(source_path, tmp_dir=tmp_path / "tmp")
 
     assert export_path.parent == tmp_path / "tmp"
-    assert export_path.name.startswith("sample-clean-")
+    assert export_path.name == "sample-clean.png"
     assert source_path.exists()
     assert read_embedded_metadata(source_path) == sample_metadata()
     assert read_embedded_metadata(export_path) is None
@@ -107,3 +107,47 @@ def test_clean_export_rejects_oversized_dimensions_before_decode(tmp_path):
         assert "decoded-image limit" in str(error)
     else:
         raise AssertionError("oversized image was exported")
+
+
+def test_clean_export_reuses_predictable_destination(tmp_path):
+    source_path = tmp_path / "sample.png"
+    write_sample(source_path, "PNG")
+
+    first = clean_image_export(source_path, tmp_dir=tmp_path / "tmp")
+    second = clean_image_export(source_path, tmp_dir=tmp_path / "tmp")
+
+    assert first == second == tmp_path / "tmp" / "sample-clean.png"
+    assert len(list(first.parent.glob("sample-clean*"))) == 1
+
+
+def test_clean_export_rejects_directory_destination(tmp_path):
+    source_path = tmp_path / "sample.png"
+    write_sample(source_path, "PNG")
+    destination = tmp_path / "tmp"
+    destination.mkdir()
+    (destination / "sample-clean.png").mkdir()
+
+    try:
+        clean_image_export(source_path, tmp_dir=destination)
+    except ImageExportError as error:
+        assert "directory" in str(error)
+    else:
+        raise AssertionError("directory destination was accepted")
+
+
+def test_clean_export_rejects_symlink_without_touching_target(tmp_path):
+    source_path = tmp_path / "sample.png"
+    write_sample(source_path, "PNG")
+    destination = tmp_path / "tmp"
+    destination.mkdir()
+    target = tmp_path / "outside.png"
+    target.write_bytes(b"target")
+    (destination / "sample-clean.png").symlink_to(target)
+
+    try:
+        clean_image_export(source_path, tmp_dir=destination)
+    except ImageExportError as error:
+        assert "symlink" in str(error)
+    else:
+        raise AssertionError("symlink destination was accepted")
+    assert target.read_bytes() == b"target"
