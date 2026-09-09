@@ -6,17 +6,26 @@ developed.
 
 ## Deployment Assumptions
 
-`imagegen` is a local Flask application. The expected deployment is one of:
+`imagegen` has two local entry points:
+
+- `imagegen-web` starts the Flask application.
+- `imagegen` performs one synchronous generation from a trusted local shell.
+
+The expected web deployment is one of:
 
 - Bound to `127.0.0.1:5002` and used from the same machine.
 - Bound to `0.0.0.0:5002` for use from trusted devices on a household LAN, such
   as an iPad.
 - Optionally placed behind a TLS reverse proxy for browser transport security.
 
-The app has no user principal, login flow, roles, tenants, or per-user data
+The web app has no user principal, login flow, roles, tenants, or per-user data
 isolation. Anyone who can reach the running web service should be treated as the
-same operator. The intended operational pattern is to start the app on demand,
-use it, and stop it afterward.
+same operator. The intended operational pattern is to start the web app on
+demand, use it, and stop it afterward.
+
+The CLI does not open a network listener and does not use the browser session or
+CSRF controls. Its caller is a trusted local user who already has the invoking
+OS user's filesystem and environment authority.
 
 This app is not designed to be exposed directly to the public internet.
 
@@ -24,14 +33,16 @@ This app is not designed to be exposed directly to the public internet.
 
 The primary assets are:
 
-- Provider API credentials, including `REPLICATE_API_TOKEN`, `FAL_KEY`, and
-  optional Immich credentials.
+- Provider API credentials, including `REPLICATE_API_TOKEN`, `FAL_KEY`,
+  `WIRO_API_KEY`, and optional Immich credentials.
 - Generated and uploaded local image files under `IMAGEGEN_DATA_DIR`.
 - Embedded image metadata, including prompts, model settings, source image
   references, author, and copyright information.
 - Prompt palette fragments under `IMAGEGEN_DATA_DIR/fragments`.
 - Durable generation history in SQLite under `IMAGEGEN_DATA_DIR`.
 - The currently running browser session, including its CSRF token.
+- CLI prompts, generated-image paths, provider errors, and other results written
+  to stdout or stderr.
 
 ## Trust Boundaries
 
@@ -44,6 +55,9 @@ The main trust boundaries are:
 - Flask worker/provider wrappers to external generation providers.
 - Optional Flask route code to Immich.
 - Optional reverse proxy to Flask.
+- Local shell arguments and prompt files to the CLI.
+- The CLI to provider credentials, billable generation operations, local image
+  storage, embedded metadata, and SQLite history.
 
 Data crossing any of these boundaries should be treated as untrusted unless it
 was just produced by the current server-side code path.
@@ -64,18 +78,24 @@ The app aims to provide these protections:
   especially source image filenames and provider/model parameters.
 - Clean downloads must not mutate the stored gallery image and must not be
   written into the gallery output directory.
+- CLI generation must continue to use the same provider enablement, model and
+  parameter validation, fixed safety inputs, prompt-annotation stripping,
+  provider wrappers, image persistence, metadata, and history boundaries as web
+  generation.
 
 ## Current Controls
 
-### Request Origin and CSRF
+### Web Request Origin and CSRF
 
-Mutating JSON API routes are protected by `require_api_csrf` in
+Mutating JSON API routes are protected by `require_api_csrf` and mutating upload
+routes are protected by `require_multipart_api_csrf` in
 `src/imagegen/security.py`.
 
 The rendered workspace obtains a random session CSRF token from `GET /`. A
 mutating API request must:
 
-- Use `Content-Type: application/json`.
+- Use `Content-Type: application/json`, or `multipart/form-data` only for a
+  route that explicitly allows it.
 - Include the `X-CSRF-Token` header matching the Flask session.
 - Come from the same `request.remote_addr` recorded when the token was created.
 
@@ -89,6 +109,25 @@ the app, read the page, and use the issued token.
 Reverse proxies must preserve a stable client address as seen by Flask. If all
 proxied requests appear to come from the proxy address, the same-client-IP check
 binds the token to the proxy rather than to the end device.
+
+### Local CLI
+
+The installed `imagegen` command is a trusted local-shell interface. It does not
+add a remotely reachable boundary, but it shares provider credentials and
+billable authority, generated-image storage, embedded metadata, SQLite history,
+and provider diagnostics with the web application.
+
+The CLI accepts a prompt directly or reads a caller-selected prompt file. This
+does not grant additional filesystem authority: the process already runs with
+the invoking OS user's permissions. Prompt content and command-line parameters
+remain untrusted application input and must pass the normal server-side
+generation validation. Prompt annotations must be stripped before provider
+submission, and provider fixed inputs must remain unavailable as CLI options.
+
+CLI output may contain prompts, parameters, generated-image paths, and provider
+errors. Operators should treat terminal scrollback, redirected output, and CI
+logs as potentially sensitive. Provider errors must remain actionable without
+including credentials.
 
 ### No User Isolation
 
@@ -207,14 +246,17 @@ must not be listed as gallery images.
 - When using `0.0.0.0:5002`, use it only on a trusted household LAN and stop the
   app when finished.
 - Use a strong `IMAGEGEN_FLASK_SECRET_KEY` for any shared LAN or proxied setup.
-  The setup flow generates this automatically, and the start scripts warn on
-  `--secure-network` when an older `.env` still contains the legacy default.
+  Do not retain a legacy or example value in `.env`.
 - Keep `.env`, `IMAGEGEN_DATA_DIR`, generated images, uploaded source images,
   and SQLite data out of source control.
 - Put a TLS reverse proxy in front when accessing the app over Wi-Fi or through
   any network where passive observation is a concern.
 - Keep Flask debug mode disabled except during active local development. The
-  provided start scripts enable debug mode only when `--dev` is specified.
+  `imagegen-web` launcher enables debug mode only when `--dev` is specified;
+  until the launcher enforces an interlock, do not combine `--dev` with
+  `--secure-network`.
+- Treat CLI output and redirected logs as potentially containing prompts,
+  parameters, paths, and provider diagnostics.
 - Do not expose the Flask development server directly to the internet.
 - Restrict firewall access to trusted local subnets or devices when possible.
 
@@ -222,10 +264,10 @@ must not be listed as gallery images.
 
 Future changes should preserve these rules:
 
-- Every mutating route must require `require_api_csrf` or an equivalent
-  same-instance write guard.
-- Mutating API routes should stay JSON-only unless a replacement CSRF strategy
-  is explicitly designed for forms or uploads.
+- Every mutating route must require `require_api_csrf`,
+  `require_multipart_api_csrf`, or an equivalent same-instance write guard.
+- Mutating API routes should stay JSON-only except for focused upload routes
+  protected by the multipart CSRF guard.
 - Do not add permissive CORS for authenticated or mutating routes.
 - Do not add user-supplied filesystem paths. Accept stable local filenames and
   resolve them under configured app directories.
@@ -237,6 +279,9 @@ Future changes should preserve these rules:
 - Do not use `innerHTML` for untrusted prompts, filenames, metadata, provider
   output, or palette content.
 - Do not expose `disable_safety_checker` as a user-configurable control.
+- Keep CLI generation on the shared validation, provider-wrapper, persistence,
+  metadata, and generation-history paths used by web generation.
+- Do not print provider credentials or include them in CLI errors.
 - Do not make tests call real image generation providers by default.
 
 ## Verification Checklist
