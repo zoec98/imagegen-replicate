@@ -17,8 +17,9 @@ import replicate
 from imagegen.config import AppConfig
 from imagegen.generation_types import GenerationResult
 from imagegen.image_store import StoredImage, persist_generated_images
-from imagegen.model_registry import ReplicateModel
+from imagegen.model_registry import GenerationTarget, ProviderModel
 from imagegen.prompt_annotations import strip_prompt_annotations
+from imagegen.provider_requests import build_provider_request
 
 TERMINAL_STATUSES = {"succeeded", "failed", "canceled"}
 PersistImages = Callable[..., list[StoredImage]]
@@ -55,6 +56,8 @@ def generate_image_urls(
     prompt: str,
     app_config: AppConfig,
     *,
+    model: ProviderModel,
+    target: GenerationTarget,
     parameters: dict[str, object] | None = None,
     source_image_paths: list[Path] | None = None,
     predictions_api: PredictionsApi | None = None,
@@ -65,32 +68,28 @@ def generate_image_urls(
     predictions = predictions_api or _replicate_predictions(app_config)
     provider_prompt = strip_prompt_annotations(prompt)
     source_image_files: list[BinaryIO] = []
-    prediction_input = build_prediction_input(
+    if source_image_paths:
+        source_image_files = [path.open("rb") for path in source_image_paths]
+    prediction_input = build_provider_request(
         provider_prompt,
-        app_config.model,
+        model,
+        target,
         parameters=parameters,
         source_image_inputs=source_image_files,
     )
-    if source_image_paths:
-        source_image_files = [path.open("rb") for path in source_image_paths]
-        prediction_input = build_prediction_input(
-            provider_prompt,
-            app_config.model,
-            parameters=parameters,
-            source_image_inputs=source_image_files,
-        )
     try:
         prediction = predictions.create(
-            model=app_config.model.replicate_model,
+            model=target.provider_model,
             input=prediction_input,
         )
     finally:
         for source_image_file in source_image_files:
             source_image_file.close()
 
-    prediction_metadata_input = build_prediction_input(
+    prediction_metadata_input = build_provider_request(
         provider_prompt,
-        app_config.model,
+        model,
+        target,
         parameters=parameters,
         source_image_inputs=[path.name for path in source_image_paths or []],
     )
@@ -106,10 +105,10 @@ def generate_image_urls(
     stored_images = persist_images(
         output_urls,
         output_dir=Path(app_config.output_dir),
-        model=app_config.model,
+        model=model,
         provider="replicate",
-        model_alias=app_config.model.alias,
-        provider_model=app_config.model.replicate_model,
+        model_alias=model.alias,
+        provider_model=target.provider_model,
         prompt=prompt,
         prediction_id=prediction.id,
         prediction_input=prediction_metadata_input,
@@ -124,54 +123,6 @@ def generate_image_urls(
 
 
 ReplicateResult = GenerationResult
-
-
-def build_prediction_input(
-    prompt: str,
-    model: ReplicateModel,
-    *,
-    parameters: dict[str, object] | None = None,
-    source_image_inputs: list[object] | None = None,
-) -> dict[str, object]:
-    custom_dimensions = model.custom_dimensions
-    use_custom_dimensions = (
-        custom_dimensions is not None
-        and parameters is not None
-        and parameters.get(custom_dimensions.activation_parameter)
-        == custom_dimensions.activation_value
-    )
-    prediction_input: dict[str, object] = {}
-    for parameter in model.parameters:
-        if parameter.name == "prompt":
-            prediction_input[parameter.name] = prompt
-        elif parameter.name == model.source_image_parameter or (
-            use_custom_dimensions
-            and custom_dimensions is not None
-            and parameter.name == custom_dimensions.scale_parameter
-        ):
-            continue
-        elif parameter.default != "":
-            prediction_input[parameter.name] = parameter.default
-    if parameters:
-        prediction_input.update(parameters)
-    if use_custom_dimensions and custom_dimensions is not None:
-        prediction_input.pop(custom_dimensions.scale_parameter, None)
-    if source_image_inputs and model.source_image_parameter:
-        prediction_input[model.source_image_parameter] = _source_image_input_value(
-            model,
-            source_image_inputs,
-        )
-    prediction_input.update(model.fixed_inputs)
-    return prediction_input
-
-
-def _source_image_input_value(
-    model: ReplicateModel,
-    source_image_inputs: list[object],
-) -> object:
-    if model.source_image_max == 1:
-        return source_image_inputs[0]
-    return source_image_inputs
 
 
 def wait_for_prediction(

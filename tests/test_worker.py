@@ -262,10 +262,19 @@ def test_run_generation_request_uses_request_model(app_config):
         parameters={"guidance": 5.5},
     )
 
-    def fake_generate(prompt, config, *, parameters, source_image_paths):
+    def fake_generate(
+        prompt,
+        config,
+        *,
+        model,
+        target,
+        parameters,
+        source_image_paths,
+    ):
         assert prompt == "a red house"
-        assert config.model_alias == "flux-flex"
-        assert config.model.replicate_model == "black-forest-labs/flux-2-flex"
+        assert config.model_alias == "seedream45"
+        assert model.alias == "flux-flex"
+        assert target.provider_model == "black-forest-labs/flux-2-flex"
         assert parameters == {"guidance": 5.5}
         assert source_image_paths == []
         return ReplicateResult(

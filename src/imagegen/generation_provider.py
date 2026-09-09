@@ -8,7 +8,6 @@ stored-image pipeline shape.
 
 from __future__ import annotations
 
-from dataclasses import replace
 from pathlib import Path
 from typing import Protocol
 
@@ -21,7 +20,6 @@ from imagegen.falai_client import (
 )
 from imagegen.generation_types import GenerationProviderTimeout, GenerationResult
 from imagegen.model_registry import (
-    MODEL_REGISTRY,
     ProviderId,
     resolve_generation_target,
     resolve_model,
@@ -57,16 +55,18 @@ class ReplicateGenerationProvider:
         request_record: GenerationRequest,
         app_config: AppConfig,
     ) -> GenerationResult:
-        request_model = MODEL_REGISTRY[request_record.model_alias]
-        request_config = replace(
-            app_config,
-            model_alias=request_model.alias,
-            model=request_model,
+        request_model = resolve_model("replicate", request_record.model_alias)
+        request_target = resolve_generation_target(
+            "replicate",
+            request_record.model_alias,
+            edit_mode=request_record.edit_mode,
         )
         try:
             return self._generate(
                 request_record.prompt,
-                request_config,
+                app_config,
+                model=request_model,
+                target=request_target,
                 parameters=request_record.parameters,
                 source_image_paths=source_image_paths(
                     request_record.source_images,

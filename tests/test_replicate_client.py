@@ -11,11 +11,17 @@ from dataclasses import dataclass, replace
 import pytest
 
 from imagegen.config import AppConfig
-from imagegen.model_registry import MODEL_REGISTRY
+from imagegen.model_registry import (
+    MODEL_REGISTRY,
+    resolve_generation_target,
+    resolve_model,
+)
 from imagegen.replicate_client import (
     ReplicatePredictionError,
     ReplicatePredictionTimeout,
-    generate_image_urls,
+)
+from imagegen.replicate_client import (
+    generate_image_urls as _generate_image_urls,
 )
 
 
@@ -76,24 +82,49 @@ def app_config(tmp_path):
     )
 
 
-def expected_default_inputs(model, *, prompt):
-    defaults = {
-        parameter.name: parameter.default
-        for parameter in model.parameters
-        if parameter.name != model.source_image_parameter and parameter.default != ""
-    }
-    defaults["prompt"] = prompt
-    defaults.update(model.fixed_inputs)
-    return defaults
-
-
 def config_for_model(tmp_path, alias):
     model = MODEL_REGISTRY[alias]
     return replace(app_config(tmp_path), model_alias=alias, model=model)
 
 
+def generate_image_urls(prompt, config, *, source_image_paths=None, **kwargs):
+    model = resolve_model("replicate", config.model_alias)
+    target = resolve_generation_target(
+        "replicate",
+        config.model_alias,
+        edit_mode=bool(source_image_paths),
+    )
+    return _generate_image_urls(
+        prompt,
+        config,
+        model=model,
+        target=target,
+        source_image_paths=source_image_paths,
+        **kwargs,
+    )
+
+
+def expected_default_inputs(model, target, *, prompt):
+    source_image_parameter = (
+        model.edit_target.source_images.provider_field
+        if model.edit_target and model.edit_target.source_images
+        else target.source_images.provider_field
+        if target.source_images
+        else None
+    )
+    defaults = {
+        parameter.name: parameter.default
+        for parameter in target.parameters
+        if parameter.name != source_image_parameter and parameter.default != ""
+    }
+    defaults["prompt"] = prompt
+    defaults.update(target.fixed_inputs)
+    return defaults
+
+
 def test_provider_payload_includes_defaults_and_fixed_inputs(tmp_path):
-    model = MODEL_REGISTRY["seedream45"]
+    model = resolve_model("replicate", "seedream45")
+    target = resolve_generation_target("replicate", "seedream45", edit_mode=False)
     api = FakePredictionsApi(
         FakePrediction(id="abc123", status="succeeded", output=[]),
         [],
@@ -108,9 +139,12 @@ def test_provider_payload_includes_defaults_and_fixed_inputs(tmp_path):
 
     payload = api.create_calls[0]["input"]
     assert payload["prompt"] == "a red house"
-    assert payload == expected_default_inputs(model, prompt="a red house")
+    assert payload == expected_default_inputs(model, target, prompt="a red house")
     assert payload["disable_safety_checker"] is True
-    assert model.source_image_parameter not in payload
+    assert (
+        target.source_images is None
+        or target.source_images.provider_field not in payload
+    )
 
 
 def test_provider_payload_applies_validated_parameters(tmp_path):
@@ -286,7 +320,8 @@ def test_generate_image_urls_creates_prediction_and_polls(tmp_path):
     assert result.stored_images == [tmp_path / "seedream45-abc123-01.png"]
     assert result.logs == "done"
     assert sleeps == [1.0]
-    assert api.create_calls[0]["model"] == MODEL_REGISTRY["seedream45"].replicate_model
+    target = resolve_generation_target("replicate", "seedream45", edit_mode=False)
+    assert api.create_calls[0]["model"] == target.provider_model
     assert api.create_calls[0]["input"]["size"] == "4K"
     assert api.create_calls[0]["input"]["disable_safety_checker"] is True
     assert api.get_calls == ["abc123"]
