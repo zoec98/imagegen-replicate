@@ -7,6 +7,8 @@ from uuid import uuid4
 
 from PIL import Image, UnidentifiedImageError
 
+from imagegen.security import ImageDecodeLimitError, validate_decoded_image_size
+
 EXPORT_FORMATS = {"JPEG", "PNG", "WEBP"}
 EXPORT_SUFFIXES = {".jpeg", ".jpg", ".png", ".webp"}
 
@@ -21,6 +23,7 @@ def clean_image_export(source_path: Path, *, tmp_dir: Path) -> Path:
     tmp_dir.mkdir(parents=True, exist_ok=True)
     try:
         with Image.open(source_path) as image:
+            validate_decoded_image_size(image.size)
             image_format = image.format
             if image_format not in EXPORT_FORMATS:
                 msg = f"Clean export is not supported for {source_path.name}."
@@ -31,6 +34,8 @@ def clean_image_export(source_path: Path, *, tmp_dir: Path) -> Path:
             return export_path
     except ImageExportError:
         raise
+    except ImageDecodeLimitError as error:
+        raise ImageExportError(str(error)) from error
     except (OSError, UnidentifiedImageError) as error:
         msg = f"Could not create clean export for {source_path.name}."
         raise ImageExportError(msg) from error

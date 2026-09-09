@@ -10,6 +10,7 @@ from PIL import Image, ImageFilter, UnidentifiedImageError
 
 from imagegen.mask_store import MaskPayloadError, decode_mask_payload
 from imagegen.metadata_embed import read_embedded_metadata, write_embedded_metadata
+from imagegen.security import ImageDecodeLimitError, validate_decoded_image_size
 from imagegen.source_images import validate_source_image_filename
 
 MIN_CROP_SIZE = 10
@@ -44,6 +45,7 @@ def crop_image(
 
     try:
         with Image.open(source_path) as source:
+            validate_decoded_image_size(source.size)
             source.load()
             rectangle = _crop_rectangle(payload, source_size=source.size)
             cropped = source.crop(
@@ -62,6 +64,8 @@ def crop_image(
             _save_image(cropped, output_path=output_path, image_format=source.format)
     except ImageEditError:
         raise
+    except ImageDecodeLimitError as error:
+        raise ImageEditError(str(error)) from error
     except (OSError, UnidentifiedImageError) as error:
         raise ImageEditError("Source image is invalid.") from error
 
@@ -82,6 +86,7 @@ def blur_image(
 
     try:
         with Image.open(source_path) as source:
+            validate_decoded_image_size(source.size)
             source.load()
             mask_image = decode_mask_payload(
                 payload,
@@ -101,6 +106,8 @@ def blur_image(
             )
     except ImageEditError:
         raise
+    except ImageDecodeLimitError as error:
+        raise ImageEditError(str(error)) from error
     except MaskPayloadError as error:
         raise ImageEditError(str(error)) from error
     except (OSError, UnidentifiedImageError) as error:

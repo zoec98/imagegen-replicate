@@ -5,9 +5,10 @@ Behaviors protected:
 - Clean exports are written outside the gallery and stay hidden from gallery listings.
 """
 
+from image_limit_helpers import oversized_png_bytes
 from PIL import Image
 
-from imagegen.image_export import clean_image_export
+from imagegen.image_export import ImageExportError, clean_image_export
 from imagegen.metadata_embed import (
     PNG_METADATA_KEY,
     read_embedded_metadata,
@@ -94,3 +95,15 @@ def test_clean_exports_do_not_appear_in_gallery(app_config, app_factory):
     assert response.status_code == 200
     assert [image["filename"] for image in response.json["images"]] == ["sample.png"]
     assert export_path.name not in response.get_data(as_text=True)
+
+
+def test_clean_export_rejects_oversized_dimensions_before_decode(tmp_path):
+    source_path = tmp_path / "sample.png"
+    source_path.write_bytes(oversized_png_bytes())
+
+    try:
+        clean_image_export(source_path, tmp_dir=tmp_path / "tmp")
+    except ImageExportError as error:
+        assert "decoded-image limit" in str(error)
+    else:
+        raise AssertionError("oversized image was exported")

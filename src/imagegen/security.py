@@ -19,6 +19,8 @@ CSRF_SESSION_KEY = "csrf_token"
 CSRF_CLIENT_IP_SESSION_KEY = "csrf_client_ip"
 CSRF_HEADER = "X-CSRF-Token"
 MAX_REQUEST_BYTES = 1 * 1024 * 1024 * 1024
+MAX_DECODED_IMAGE_BYTES = MAX_REQUEST_BYTES // 4
+MAX_DECODED_IMAGE_PIXELS = MAX_DECODED_IMAGE_BYTES // 4
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "
     "script-src 'self'; "
@@ -28,6 +30,19 @@ CONTENT_SECURITY_POLICY = (
     "base-uri 'none'; "
     "frame-ancestors 'none'"
 )
+
+
+class ImageDecodeLimitError(ValueError):
+    """Raised before Pillow decodes an image over the application limit."""
+
+
+def validate_decoded_image_size(size: tuple[int, int]) -> None:
+    width, height = size
+    if width < 1 or height < 1 or width * height > MAX_DECODED_IMAGE_PIXELS:
+        raise ImageDecodeLimitError(
+            "Image dimensions exceed the decoded-image limit of "
+            f"{MAX_DECODED_IMAGE_PIXELS:,} pixels."
+        )
 
 
 def ensure_csrf_token() -> str:

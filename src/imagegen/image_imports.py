@@ -11,6 +11,8 @@ from uuid import uuid4
 import httpx
 from PIL import Image, UnidentifiedImageError
 
+from imagegen.security import ImageDecodeLimitError, validate_decoded_image_size
+
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
 FORMAT_EXTENSIONS = {
@@ -128,8 +130,11 @@ def store_imported_image(
 def _validated_image_format(image_bytes: bytes) -> str:
     try:
         with Image.open(BytesIO(image_bytes)) as image:
+            validate_decoded_image_size(image.size)
             image.load()
             image_format = image.format
+    except ImageDecodeLimitError as error:
+        raise ImageImportError(str(error)) from error
     except (OSError, UnidentifiedImageError) as error:
         raise ImageImportError("Uploaded file is not a valid image.") from error
     if image_format not in FORMAT_EXTENSIONS:

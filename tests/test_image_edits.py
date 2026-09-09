@@ -10,6 +10,7 @@ from base64 import b64encode
 from io import BytesIO
 
 import pytest
+from image_limit_helpers import oversized_png_bytes
 from PIL import Image
 
 from imagegen.image_edits import ImageEditError, blur_image, crop_image
@@ -56,6 +57,17 @@ def test_crop_image_rejects_too_small_rectangle_without_writing_output(tmp_path)
         )
 
     assert list(tmp_path.glob("crop-*.png")) == []
+
+
+def test_crop_image_rejects_oversized_dimensions_before_decode(tmp_path):
+    (tmp_path / "sample.png").write_bytes(oversized_png_bytes())
+
+    with pytest.raises(ImageEditError, match="decoded-image limit"):
+        crop_image(
+            {"rectangle": {"x": 0, "y": 0, "width": 10, "height": 10}},
+            source_filename="sample.png",
+            output_dir=tmp_path,
+        )
 
 
 def test_repeated_crop_names_do_not_grow(tmp_path):

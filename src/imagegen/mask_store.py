@@ -11,6 +11,7 @@ from pathlib import Path
 from PIL import Image, UnidentifiedImageError
 
 from imagegen.gallery import mask_filename
+from imagegen.security import ImageDecodeLimitError, validate_decoded_image_size
 
 MASK_PNG_BYTES_PER_PIXEL_LIMIT = 4
 MASK_PNG_FIXED_OVERHEAD_BYTES = 1024 * 1024
@@ -118,6 +119,7 @@ def _mask_png_payload(payload: object, limits: MaskPayloadLimits) -> bytes:
 def _decode_mask_png(mask_bytes: bytes) -> Image.Image:
     try:
         with Image.open(BytesIO(mask_bytes)) as image:
+            validate_decoded_image_size(image.size)
             image.load()
             if image.format != "PNG":
                 raise MaskPayloadError("Mask PNG is invalid.")
@@ -127,5 +129,9 @@ def _decode_mask_png(mask_bytes: bytes) -> Image.Image:
 
 
 def _image_size(path: Path) -> tuple[int, int]:
-    with Image.open(path) as image:
-        return image.size
+    try:
+        with Image.open(path) as image:
+            validate_decoded_image_size(image.size)
+            return image.size
+    except ImageDecodeLimitError as error:
+        raise MaskPayloadError(str(error)) from error

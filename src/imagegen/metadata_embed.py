@@ -14,6 +14,8 @@ from typing import Any
 
 from PIL import Image, PngImagePlugin, UnidentifiedImageError
 
+from imagegen.security import ImageDecodeLimitError, validate_decoded_image_size
+
 IMAGE_DESCRIPTION_TAG = 270
 SOFTWARE_TAG = 305
 DATETIME_TAG = 306
@@ -39,6 +41,7 @@ def write_embedded_metadata(image_path: Path, metadata: dict[str, Any]) -> None:
     description = human_description(metadata)
     try:
         with Image.open(image_path) as image:
+            validate_decoded_image_size(image.size)
             image_format = image.format
             if image_format == "PNG":
                 _write_png_metadata(image_path, image, payload, description, metadata)
@@ -46,6 +49,9 @@ def write_embedded_metadata(image_path: Path, metadata: dict[str, Any]) -> None:
             if image_format in {"JPEG", "WEBP"}:
                 _write_exif_metadata(image_path, image, payload, description, metadata)
                 return
+    except ImageDecodeLimitError as error:
+        msg = f"Could not write embedded metadata for {image_path.name}."
+        raise EmbeddedMetadataError(msg) from error
     except (OSError, UnidentifiedImageError) as error:
         msg = f"Could not write embedded metadata for {image_path.name}."
         raise EmbeddedMetadataError(msg) from error

@@ -4,6 +4,7 @@ from base64 import b64encode
 from io import BytesIO
 
 import pytest
+from image_limit_helpers import oversized_png_bytes
 from PIL import Image
 
 from imagegen.mask_store import MaskPayloadError, save_mask_payload
@@ -66,6 +67,20 @@ def test_save_mask_payload_rejects_invalid_source_image(tmp_path):
     source_path.write_bytes(b"not an image")
 
     with pytest.raises(MaskPayloadError, match="Source image is invalid."):
+        save_mask_payload(
+            {"mask_png": _png_payload(size=(1, 1))},
+            source_filename="sample.png",
+            source_path=source_path,
+            output_dir=tmp_path,
+            content_length=None,
+        )
+
+
+def test_save_mask_payload_rejects_oversized_source_before_decode(tmp_path):
+    source_path = tmp_path / "sample.png"
+    source_path.write_bytes(oversized_png_bytes())
+
+    with pytest.raises(MaskPayloadError, match="decoded-image limit"):
         save_mask_payload(
             {"mask_png": _png_payload(size=(1, 1))},
             source_filename="sample.png",

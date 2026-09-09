@@ -9,6 +9,7 @@ Behaviors protected:
 from io import BytesIO
 
 import pytest
+from image_limit_helpers import oversized_png_bytes
 from PIL import Image
 
 from imagegen.image_imports import ImageImportError, store_imported_image
@@ -73,6 +74,13 @@ def test_store_imported_image_rejects_unsupported_formats(tmp_path):
 def test_store_imported_image_rejects_oversized_payload(tmp_path):
     with pytest.raises(ImageImportError, match="exceeding limit 8"):
         store_imported_image(b"not checked", output_dir=tmp_path, max_bytes=8)
+
+
+def test_store_imported_image_rejects_oversized_dimensions_before_decode(tmp_path):
+    with pytest.raises(ImageImportError, match="decoded-image limit"):
+        store_imported_image(oversized_png_bytes(), output_dir=tmp_path)
+
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_store_imported_image_uses_collision_safe_generated_name(
