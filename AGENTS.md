@@ -87,6 +87,7 @@ Preferred structure as the app grows:
 
 - `src/imagegen/`: application package.
 - `src/imagegen/app.py`: Flask application factory and route registration.
+- `src/imagegen/*_api_routes.py`: focused JSON route registration by domain.
 - `src/imagegen/replicate_client.py`: Replicate provider wrapper.
 - `src/imagegen/falai_client.py`: fal.ai provider wrapper.
 - `src/imagegen/generation_log.py`: SQLite generation request/result history.
