@@ -56,22 +56,22 @@ git clone https://github.com/zoec98/imagegen-replicate
 cd imgagen-replicate
 ```
 
-Install the project environment with `uv sync`.
-
-Syncing the project environment will install the required Python packages and dependencies,
-and by providing the `--managed-python` switch will also install the required version of Python.
+Install the commands with `uv tool install .`.
 
 ```bash
-uv sync --managed-python
+uv tool install .
 ```
 
+This installs both `imagegen` for generation and `imagegen-web` for the local
+web application. If uv reports that its tool executable directory is not on
+your `PATH`, run `uv tool update-shell` and restart your shell.
 
-On MacOS and Linux, start `scripts/run-dev.sh` and stop it again.
-On Windows, start `scripts\run-dev.cmd` and stop it again.
+The first command that needs runtime configuration looks for `.env` in the
+current working directory. If it is not present, it uses `~/.imagegen.env`.
+If neither file exists, imagegen creates `~/.imagegen.env` with a generated
+Flask session secret.
 
-This will create a .env file in the project directory. It will look like the `env.example` file we provide, except that `IMAGEGEN_FLASK_SECRET_KEY` is filled with a generated random session secret.
-
-Edit this file, and set at least one provider API key:
+Edit the selected file and set at least one provider API key:
 
 ```bash
 # API Token for calls to "replicate.com"
@@ -107,9 +107,17 @@ TRASHCAN_HOLD_LIMIT_DAYS=7
 ```
 
 Make a new directory `outputs` and set `IMAGEGEN_DATA_DIR=outputs`.
-You can change this at any time, and for example, switch between a `clean` and `smut` setup.
+Relative paths are resolved from the selected dotenv file. Absolute paths are
+used unchanged, and paths beginning with `~` use your home directory. You can
+change this at any time, and for example, switch between a `clean` and `smut`
+setup.
 
-The server needs to be stopped and restarted after any change to `.env`.
+For an installed tool using `~/.imagegen.env`, `IMAGEGEN_DATA_DIR=data` means
+`~/data`. Choose any Finder-accessible directory you prefer; imagegen does not
+impose a `.local` directory convention.
+
+The server needs to be stopped and restarted after any change to the selected
+dotenv file.
 
 If you want the upload overlay to browse and import from the Immich main
 gallery, configure the Immich server URL and an API key:
@@ -146,34 +154,30 @@ The coding agent specification on prompt palettes is in this file: [Prompt Palet
 
 ## Running
 
-After making these changes you can start the server again, and connect to 127.0.0.1:5002.
+Start the local web application and connect to `127.0.0.1:5002`:
 
 ```bash
-scripts/run-dev.sh  # or scripts\run-dev.cmd on Windows
+imagegen-web
 ```
 
 Debug mode is off by default. For local development with the Flask debugger and
 reloader, pass `--dev`:
 
 ```bash
-scripts/run-dev.sh --dev  # or scripts\run-dev.cmd --dev on Windows
+imagegen-web --dev
 ```
 
 To use the app from another trusted device on a secure household LAN, bind to all
 network interfaces explicitly:
 
 ```bash
-scripts/run-dev.sh --secure-network  # or scripts\run-dev.cmd --secure-network on Windows
+imagegen-web --secure-network
 ```
-
-If an older `.env` still contains `IMAGEGEN_FLASK_SECRET_KEY=dev-secret-change-me`,
-the start script warns before `--secure-network` startup. The app setup replaces
-that value with a random secret before startup.
 
 The flags can be combined when you explicitly want both behaviors:
 
 ```bash
-scripts/run-dev.sh --secure-network --dev
+imagegen-web --secure-network --dev
 ```
 
 Then open:
@@ -198,27 +202,28 @@ It will notice if the application has updated and will ask you to reload if it i
 9. Use the gallery to open generated or imported images, download metadata-rich or clean copies, inspect metadata, load metadata back into the workspace, create edit masks, or delete local images.
 
 Image edit sources are selected from local gallery images.
-Generated images are stored under `IMAGEGEN_DATA_DIR/images`, `data/images` by default.
+Generated images are stored under `IMAGEGEN_DATA_DIR/images`.
 
 ## Command-line use
 
-Run `imagegen` from the project root. It reads the same `.env` and writes
-results to the same gallery as the web application.
+Run the installed `imagegen` command from any directory. It uses the same
+dotenv discovery and writes results to the same gallery as the web
+application.
 
 Use help to discover providers and models, then model-specific help to discover
 the model's parameters:
 
 ```bash
-uv run imagegen --help
-uv run imagegen --provider replicate --model seedream45 --help
+imagegen --help
+imagegen --provider replicate --model seedream45 --help
 ```
 
 Select a model by its alias or by its display name:
 
 ```bash
-uv run imagegen --provider replicate --model seedream45 --prompt "a red fox"
-uv run imagegen --provider falai --model "Seedream 4.5" --file prompts/fox.txt
-uv run imagegen --provider wiro --model seedream5-lite-uncensored --prompt "a red fox"
+imagegen --provider replicate --model seedream45 --prompt "a red fox"
+imagegen --provider falai --model "Seedream 4.5" --file prompts/fox.txt
+imagegen --provider wiro --model seedream5-lite-uncensored --prompt "a red fox"
 ```
 
 `--prompt` and `--file` are mutually exclusive. Prompt files are read as UTF-8
@@ -262,7 +267,7 @@ does not include search, filtering, or bulk import yet.
 Prompt palettes are reusable text fragments stored as plain text files.
 Think of them as re-usable character descriptions, places or rendering styles.
 
-By default, runtime palette files live under `data/fragments`.
+Runtime palette files live under `IMAGEGEN_DATA_DIR/fragments`.
 The repository includes sample fragments under `data-example/fragments`;
 use them as reference data or duplicate selected samples into your configured runtime fragment directory.
 
@@ -300,7 +305,8 @@ the server validates the prompt and strips annotation syntax before calling the 
 The provider receives only the fragment content and plain prompt text.
 The app keeps the annotated prompt in request status, SQLite history, and embedded image metadata.
 
-External edits to files under your configured fragment root, `data/fragments` by default, are picked up on page refresh.
+External edits to files under your configured fragment root are picked up on
+page refresh.
 The in-app palette editor can create, update, and delete entries inside existing palette directories,
 but creating or deleting whole palette directories is a filesystem task.
 
@@ -347,7 +353,10 @@ Unpainted pixels are black, fully painted pixels are white, and soft brush fallo
 
 ## Storage
 
-Generated files are downloaded from the model provider into `data/images` by default.
+Generated files are downloaded from the model provider into
+`IMAGEGEN_DATA_DIR/images`. With a local `.env` containing the default
+`IMAGEGEN_DATA_DIR=data`, that is `data/images`; with the home fallback file,
+it is `~/data/images`.
 Imported URL, dropped local, and Immich images are stored in the same gallery
 directory.
 Supported local image formats are PNG, JPEG, and WebP.
@@ -364,15 +373,16 @@ Inside the overlay, use `Restore` to move an image back to the main gallery, or 
 
 Trash is automatically purged when the gallery refreshes.
 By default, files older than 7 days are deleted from `IMAGEGEN_DATA_DIR/trash`.
-Set `TRASHCAN_HOLD_LIMIT_DAYS` in `.env` to change the retention period.
+Set `TRASHCAN_HOLD_LIMIT_DAYS` in the selected dotenv file to change the
+retention period.
 Set it to `0`, or to an invalid value, to disable automatic purging.
 
-The committed `data-example/` tree is sample/reference data.
-The `data/` tree is the default local runtime directory for real generations, uploads, palette edits, trash,
-and SQLite history.
+The committed `data-example/` tree is sample/reference data. The configured
+`IMAGEGEN_DATA_DIR` tree is the runtime directory for real generations,
+uploads, palette edits, trash, and SQLite history.
 
-Set `AUTHOR` in `.env` to the author name used for generated image metadata.
-New `.env` files use `Noname Changeme Nescio` as a placeholder.
+Set `AUTHOR` in the selected dotenv file to the author name used for generated
+image metadata. New dotenv files use `Noname Changeme Nescio` as a placeholder.
 Copyright metadata is derived from the generated image year and `AUTHOR`.
 
 Clean downloads are created on demand under `IMAGEGEN_DATA_DIR/tmp` by default, and deleted after download.
@@ -400,8 +410,6 @@ uv run ruff check --fix src tests
 
 Developer scripts live in [scripts/](scripts):
 
-- `scripts/run-dev.sh`
-- `scripts/run-dev.cmd`
 - `scripts/get_schema_replicate bytedance/seedream-4.5`
 - `scripts/get_schema_falai https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image/api`
 - `scripts/get_schema_wiro bytedance/seedream-v5-pro-uncensored`
