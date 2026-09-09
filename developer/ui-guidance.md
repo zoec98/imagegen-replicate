@@ -10,6 +10,7 @@ Browser JavaScript source lives in `src/imagegen/frontend/`.
 - `main.js`: workspace bootstrap and cross-module wiring.
 - `api.js`: shared `fetch`, JSON, and CSRF request helpers.
 - `dom.js`: small DOM construction and attribute helpers.
+- `image-card.js`: shared card, media, action, and information-tooltip primitives.
 - Workflow modules such as `gallery.js`, `metadata.js`, `trash.js`,
   `palettes.js`, `source-images.js`, `generation.js`, `image-editor.js`,
   `image-upload.js`, and `immich-import.js`: own one browser workflow each.

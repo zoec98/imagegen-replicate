@@ -92,6 +92,74 @@
 		element.append(...children);
 	}
 	//#endregion
+	//#region src/imagegen/frontend/image-card.js
+	var INFO_ICON_PATH = "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 8h2v7h-2zm0-3h2v2h-2z";
+	function createImageCard(className = "") {
+		return createElement("figure", { className: ["image-card", className].filter(Boolean).join(" ") });
+	}
+	function createImageMedia({ alt, className = "", href = null, loading = null, onError = null, src }) {
+		const media = createElement(href ? "a" : "span", { className: ["image-card-media", className].filter(Boolean).join(" ") });
+		if (href) {
+			media.href = href;
+			media.target = "_blank";
+			media.rel = "noopener";
+		}
+		const image = createElement("img", {
+			alt,
+			src
+		});
+		if (loading) image.loading = loading;
+		if (onError) image.addEventListener("error", onError);
+		media.append(image);
+		return media;
+	}
+	function createImageCardRibbon(children = []) {
+		return createElement("figcaption", {
+			children,
+			className: "image-card-ribbon"
+		});
+	}
+	function createActionRibbon(label) {
+		return createElement("div", {
+			attributes: { "aria-label": label },
+			className: "gallery-actions"
+		});
+	}
+	function createInfoAction({ label, tooltipText }) {
+		const infoWrap = createElement("span", { className: "image-info-wrap" });
+		const infoButton = createElement("button", {
+			attributes: {
+				"aria-label": label,
+				title: label
+			},
+			children: [createSvgIcon(INFO_ICON_PATH)],
+			className: "gallery-action gallery-info",
+			type: "button"
+		});
+		const tooltip = createElement("span", {
+			attributes: { role: "tooltip" },
+			children: [createElement("span", {
+				className: "tooltip-line",
+				textContent: tooltipText
+			})],
+			className: "image-info-tooltip image-info-selectable"
+		});
+		infoWrap.append(infoButton, tooltip);
+		return infoWrap;
+	}
+	function toggleInfoAction(container, button) {
+		const infoWrap = button?.closest(".image-info-wrap");
+		if (!infoWrap) return;
+		container?.querySelectorAll(".image-info-wrap").forEach((other) => {
+			if (other !== infoWrap) {
+				other.classList.remove("image-info-open");
+				other.querySelector(".gallery-info")?.classList.remove("gallery-info-active");
+			}
+		});
+		const open = infoWrap.classList.toggle("image-info-open");
+		button.classList.toggle("gallery-info-active", open);
+	}
+	//#endregion
 	//#region src/imagegen/frontend/gallery.js
 	function setupGallery(root = document, services = {}) {
 		const { csrfToken, metadata = {}, openMaskEditor = () => {}, removeSourceImage = () => {}, setTrashCount = () => {}, showMessage = () => {}, toggleSourceImage = () => {}, updateSourceSelectionUi = () => {} } = services;
@@ -265,7 +333,7 @@
 		};
 	}
 	function imageFigure(image) {
-		const figure = createElement("figure", { className: "gallery-item image-card" });
+		const figure = createImageCard("gallery-item");
 		figure.dataset.filename = image.filename;
 		setDatasetValue(figure, "blurSaveUrl", image.blur_save_url);
 		setDatasetValue(figure, "cleanDownloadUrl", image.clean_download_url);
@@ -278,14 +346,14 @@
 		setDatasetValue(figure, "maskSaveUrl", image.mask_save_url);
 		setDatasetValue(figure, "maskUrl", image.mask_url);
 		setDatasetValue(figure, "metadataUrl", image.metadata_url);
-		const link = createImageMedia$2({
+		const link = createImageMedia({
 			alt: image.filename,
 			href: image.url,
 			src: image.url
 		});
-		const caption = createImageCardRibbon$1();
+		const caption = createImageCardRibbon();
 		const actions = createActionRibbon("Image actions");
-		const infoWrap = createInfoAction$1({
+		const infoWrap = createInfoAction({
 			label: `Image information for ${image.filename}`,
 			tooltipText: image.filename
 		});
@@ -311,45 +379,6 @@
 	}
 	function setDatasetValue(element, name, value) {
 		if (value) element.dataset[name] = value;
-	}
-	function createImageMedia$2({ alt, className = "", href = null, loading = null, onError = null, src }) {
-		const media = createElement(href ? "a" : "span", { className: ["image-card-media", className].filter(Boolean).join(" ") });
-		if (href) {
-			media.href = href;
-			media.target = "_blank";
-			media.rel = "noopener";
-		}
-		const img = createElement("img", {
-			alt,
-			src
-		});
-		if (loading) img.loading = loading;
-		if (onError) img.addEventListener("error", onError);
-		media.append(img);
-		return media;
-	}
-	function createImageCardRibbon$1() {
-		return createElement("figcaption", { className: "image-card-ribbon" });
-	}
-	function createActionRibbon(label) {
-		return createElement("div", {
-			attributes: { "aria-label": label },
-			className: "gallery-actions"
-		});
-	}
-	function createInfoAction$1({ label, tooltipText }) {
-		const infoWrap = createElement("span", { className: "image-info-wrap" });
-		const infoButton = iconButton("gallery-info", label, "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 8h2v7h-2zm0-3h2v2h-2z");
-		const tooltip = createElement("span", {
-			attributes: { role: "tooltip" },
-			children: [createElement("span", {
-				className: "tooltip-line",
-				textContent: tooltipText
-			})],
-			className: "image-info-tooltip image-info-selectable"
-		});
-		infoWrap.append(infoButton, tooltip);
-		return infoWrap;
 	}
 	function iconButton(className, label, pathData, title = label) {
 		return createElement("button", {
@@ -602,6 +631,11 @@
 			});
 		});
 		gallery?.addEventListener("click", (event) => {
+			const infoButton = event.target.closest(".gallery-info");
+			if (infoButton) {
+				toggleInfoAction(gallery, infoButton);
+				return;
+			}
 			const importButton = event.target.closest(".upload-immich-import");
 			if (importButton) importAsset(importButton.closest(".upload-immich-item"));
 		});
@@ -611,9 +645,9 @@
 		};
 	}
 	function immichAssetFigure(asset, reportThumbnailError) {
-		const figure = createElement("figure", { className: "image-card upload-immich-item" });
+		const figure = createImageCard("upload-immich-item");
 		figure.dataset.assetId = asset.asset_id || "";
-		const media = createImageMedia$1({
+		const media = createImageMedia({
 			alt: asset.label || "Immich image",
 			className: "upload-immich-media",
 			loading: "lazy",
@@ -642,29 +676,14 @@
 			disabled: !asset.import_eligible || !asset.asset_id,
 			type: "button"
 		});
-		importButton.append(createSvgIcon("M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 12h3l-5 5-5-5h3V8h4z"));
-		caption.append(metadata, importButton);
+		const actions = createActionRibbon("Immich image actions");
+		actions.append(createInfoAction({
+			label: `Immich image information for ${asset.label || "image"}`,
+			tooltipText: asset.label || "Immich image"
+		}), importButton);
+		caption.append(metadata, actions);
 		figure.append(media, caption);
 		return figure;
-	}
-	function createImageMedia$1({ alt, className = "", href = null, loading = null, onError = null, src }) {
-		const media = createElement(href ? "a" : "span", { className: ["image-card-media", className].filter(Boolean).join(" ") });
-		if (href) {
-			media.href = href;
-			media.target = "_blank";
-			media.rel = "noopener";
-		}
-		const image = createElement("img", {
-			alt,
-			src
-		});
-		if (loading) image.loading = loading;
-		if (onError) image.addEventListener("error", onError);
-		media.append(image);
-		return media;
-	}
-	function createImageCardRibbon() {
-		return createElement("figcaption", { className: "image-card-ribbon" });
 	}
 	//#endregion
 	//#region src/imagegen/frontend/image-upload.js
@@ -1965,6 +1984,11 @@
 			if (event.target === overlay) close();
 		});
 		gallery?.addEventListener("click", (event) => {
+			const infoButton = event.target.closest(".gallery-info");
+			if (infoButton) {
+				toggleInfoAction(gallery, infoButton);
+				return;
+			}
 			const restoreButton = event.target.closest(".trash-restore");
 			if (!restoreButton) return;
 			restoreButton.disabled = true;
@@ -1981,23 +2005,16 @@
 		};
 	}
 	function trashFigure(image) {
-		const figure = createElement("figure", {
-			className: "gallery-item image-card trash-item",
-			dataset: {
-				filename: image.filename || "",
-				restoreUrl: image.restore_url
-			}
-		});
+		const figure = createImageCard("gallery-item trash-item");
+		figure.dataset.filename = image.filename || "";
+		figure.dataset.restoreUrl = image.restore_url || "";
 		const link = createImageMedia({
 			alt: image.filename || "Trash image",
 			href: image.url || "#",
 			src: image.url || ""
 		});
-		const caption = createElement("figcaption", { className: "image-card-ribbon" });
-		const actions = createElement("div", {
-			attributes: { "aria-label": "Trash image actions" },
-			className: "gallery-actions"
-		});
+		const caption = createImageCardRibbon();
+		const actions = createActionRibbon("Trash image actions");
 		const infoWrap = createInfoAction({
 			label: `Trash image information for ${image.filename || "image"}`,
 			tooltipText: image.filename || "Image"
@@ -2013,40 +2030,6 @@
 		caption.append(actions);
 		figure.append(link, caption);
 		return figure;
-	}
-	function createImageMedia({ alt, className = "", href = null, src }) {
-		const media = createElement(href ? "a" : "span", { className: ["image-card-media", className].filter(Boolean).join(" ") });
-		if (href) {
-			media.href = href;
-			media.target = "_blank";
-			media.rel = "noopener";
-		}
-		const img = createElement("img", {
-			alt,
-			src
-		});
-		media.append(img);
-		return media;
-	}
-	function createInfoAction({ label, tooltipText }) {
-		return createElement("span", {
-			children: [createElement("button", {
-				attributes: {
-					"aria-label": label,
-					title: label
-				},
-				className: "gallery-action gallery-info",
-				type: "button"
-			}), createElement("span", {
-				attributes: { role: "tooltip" },
-				children: [createElement("span", {
-					className: "tooltip-line",
-					textContent: tooltipText
-				})],
-				className: "image-info-tooltip image-info-selectable"
-			})],
-			className: "image-info-wrap"
-		});
 	}
 	//#endregion
 	//#region src/imagegen/frontend/workspace.js

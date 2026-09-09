@@ -1,5 +1,13 @@
 import { csrfJsonRequest, requestJson } from "./api.js";
 import { createElement } from "./dom.js";
+import {
+  createActionRibbon,
+  createImageCard,
+  createImageCardRibbon,
+  createImageMedia,
+  createInfoAction,
+  toggleInfoAction,
+} from "./image-card.js";
 
 export function setupTrash(root = document, services = {}) {
   const {
@@ -136,6 +144,11 @@ export function setupTrash(root = document, services = {}) {
     }
   });
   gallery?.addEventListener("click", (event) => {
+    const infoButton = event.target.closest(".gallery-info");
+    if (infoButton) {
+      toggleInfoAction(gallery, infoButton);
+      return;
+    }
     const restoreButton = event.target.closest(".trash-restore");
     if (!restoreButton) {
       return;
@@ -156,23 +169,16 @@ export function setupTrash(root = document, services = {}) {
 }
 
 function trashFigure(image) {
-  const figure = createElement("figure", {
-    className: "gallery-item image-card trash-item",
-    dataset: {
-      filename: image.filename || "",
-      restoreUrl: image.restore_url,
-    },
-  });
+  const figure = createImageCard("gallery-item trash-item");
+  figure.dataset.filename = image.filename || "";
+  figure.dataset.restoreUrl = image.restore_url || "";
   const link = createImageMedia({
     alt: image.filename || "Trash image",
     href: image.url || "#",
     src: image.url || "",
   });
-  const caption = createElement("figcaption", { className: "image-card-ribbon" });
-  const actions = createElement("div", {
-    attributes: { "aria-label": "Trash image actions" },
-    className: "gallery-actions",
-  });
+  const caption = createImageCardRibbon();
+  const actions = createActionRibbon("Trash image actions");
   const infoWrap = createInfoAction({
     label: `Trash image information for ${image.filename || "image"}`,
     tooltipText: image.filename || "Image",
@@ -188,43 +194,4 @@ function trashFigure(image) {
   caption.append(actions);
   figure.append(link, caption);
   return figure;
-}
-
-function createImageMedia({ alt, className = "", href = null, src }) {
-  const media = createElement(href ? "a" : "span", {
-    className: ["image-card-media", className].filter(Boolean).join(" "),
-  });
-  if (href) {
-    media.href = href;
-    media.target = "_blank";
-    media.rel = "noopener";
-  }
-
-  const img = createElement("img", { alt, src });
-  media.append(img);
-  return media;
-}
-
-function createInfoAction({ label, tooltipText }) {
-  const infoButton = createElement("button", {
-    attributes: {
-      "aria-label": label,
-      title: label,
-    },
-    className: "gallery-action gallery-info",
-    type: "button",
-  });
-  const tooltipLine = createElement("span", {
-    className: "tooltip-line",
-    textContent: tooltipText,
-  });
-  const tooltip = createElement("span", {
-    attributes: { role: "tooltip" },
-    children: [tooltipLine],
-    className: "image-info-tooltip image-info-selectable",
-  });
-  return createElement("span", {
-    children: [infoButton, tooltip],
-    className: "image-info-wrap",
-  });
 }

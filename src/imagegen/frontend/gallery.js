@@ -1,5 +1,12 @@
 import { csrfJsonRequest, requestJson } from "./api.js";
 import { createElement, createSvgIcon, setBooleanAttribute } from "./dom.js";
+import {
+  createActionRibbon,
+  createImageCard,
+  createImageCardRibbon,
+  createImageMedia,
+  createInfoAction,
+} from "./image-card.js";
 
 export function setupGallery(root = document, services = {}) {
   const {
@@ -222,9 +229,7 @@ export function setupGallery(root = document, services = {}) {
 }
 
 function imageFigure(image) {
-  const figure = createElement("figure", {
-    className: "gallery-item image-card",
-  });
+  const figure = createImageCard("gallery-item");
   figure.dataset.filename = image.filename;
   setDatasetValue(figure, "blurSaveUrl", image.blur_save_url);
   setDatasetValue(figure, "cleanDownloadUrl", image.clean_download_url);
@@ -315,66 +320,6 @@ function setDatasetValue(element, name, value) {
   if (value) {
     element.dataset[name] = value;
   }
-}
-
-function createImageMedia({
-  alt,
-  className = "",
-  href = null,
-  loading = null,
-  onError = null,
-  src,
-}) {
-  const media = createElement(href ? "a" : "span", {
-    className: ["image-card-media", className].filter(Boolean).join(" "),
-  });
-  if (href) {
-    media.href = href;
-    media.target = "_blank";
-    media.rel = "noopener";
-  }
-
-  const img = createElement("img", { alt, src });
-  if (loading) {
-    img.loading = loading;
-  }
-  if (onError) {
-    img.addEventListener("error", onError);
-  }
-
-  media.append(img);
-  return media;
-}
-
-function createImageCardRibbon() {
-  return createElement("figcaption", { className: "image-card-ribbon" });
-}
-
-function createActionRibbon(label) {
-  return createElement("div", {
-    attributes: { "aria-label": label },
-    className: "gallery-actions",
-  });
-}
-
-function createInfoAction({ label, tooltipText }) {
-  const infoWrap = createElement("span", { className: "image-info-wrap" });
-  const infoButton = iconButton(
-    "gallery-info",
-    label,
-    "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 8h2v7h-2zm0-3h2v2h-2z",
-  );
-  const tooltipLine = createElement("span", {
-    className: "tooltip-line",
-    textContent: tooltipText,
-  });
-  const tooltip = createElement("span", {
-    attributes: { role: "tooltip" },
-    children: [tooltipLine],
-    className: "image-info-tooltip image-info-selectable",
-  });
-  infoWrap.append(infoButton, tooltip);
-  return infoWrap;
 }
 
 function iconButton(className, label, pathData, title = label) {

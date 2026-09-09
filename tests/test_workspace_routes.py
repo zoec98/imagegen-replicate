@@ -633,6 +633,7 @@ def test_index_exposes_gallery_filenames_for_source_selection(app_config, app_fa
     assert b'aria-label="Download clean source.png"' in response.data
     assert b'aria-label="Edit image source.png"' in response.data
     assert b'aria-label="Select source.png as source image"' in response.data
+    assert b'title="Image information for source.png"' in response.data
     assert b'title="Load metadata"' in response.data
     assert b'title="Download with metadata"' in response.data
     assert b'title="Download without metadata"' in response.data

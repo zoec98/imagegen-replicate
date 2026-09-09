@@ -1,5 +1,13 @@
 import { csrfJsonRequest, requestJson } from "./api.js";
-import { createElement, createSvgIcon, setBooleanAttribute } from "./dom.js";
+import { createElement, setBooleanAttribute } from "./dom.js";
+import {
+  createActionRibbon,
+  createImageCard,
+  createImageCardRibbon,
+  createImageMedia,
+  createInfoAction,
+  toggleInfoAction,
+} from "./image-card.js";
 
 export function setupImmichImport(root = document, services = {}) {
   const {
@@ -152,6 +160,11 @@ export function setupImmichImport(root = document, services = {}) {
     }
   });
   gallery?.addEventListener("click", (event) => {
+    const infoButton = event.target.closest(".gallery-info");
+    if (infoButton) {
+      toggleInfoAction(gallery, infoButton);
+      return;
+    }
     const importButton = event.target.closest(".upload-immich-import");
     if (importButton) {
       importAsset(importButton.closest(".upload-immich-item"));
@@ -162,9 +175,7 @@ export function setupImmichImport(root = document, services = {}) {
 }
 
 function immichAssetFigure(asset, reportThumbnailError) {
-  const figure = createElement("figure", {
-    className: "image-card upload-immich-item",
-  });
+  const figure = createImageCard("upload-immich-item");
   figure.dataset.assetId = asset.asset_id || "";
   const media = createImageMedia({
     alt: asset.label || "Immich image",
@@ -199,43 +210,15 @@ function immichAssetFigure(asset, reportThumbnailError) {
     disabled: !asset.import_eligible || !asset.asset_id,
     type: "button",
   });
-  importButton.append(
-    createSvgIcon(
-      "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 12h3l-5 5-5-5h3V8h4z",
-    ),
+  const actions = createActionRibbon("Immich image actions");
+  actions.append(
+    createInfoAction({
+      label: `Immich image information for ${asset.label || "image"}`,
+      tooltipText: asset.label || "Immich image",
+    }),
+    importButton,
   );
-  caption.append(metadata, importButton);
+  caption.append(metadata, actions);
   figure.append(media, caption);
   return figure;
-}
-
-function createImageMedia({
-  alt,
-  className = "",
-  href = null,
-  loading = null,
-  onError = null,
-  src,
-}) {
-  const media = createElement(href ? "a" : "span", {
-    className: ["image-card-media", className].filter(Boolean).join(" "),
-  });
-  if (href) {
-    media.href = href;
-    media.target = "_blank";
-    media.rel = "noopener";
-  }
-  const image = createElement("img", { alt, src });
-  if (loading) {
-    image.loading = loading;
-  }
-  if (onError) {
-    image.addEventListener("error", onError);
-  }
-  media.append(image);
-  return media;
-}
-
-function createImageCardRibbon() {
-  return createElement("figcaption", { className: "image-card-ribbon" });
 }

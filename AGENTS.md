@@ -115,6 +115,7 @@ Current frontend modules:
 - `main.js`: workspace bootstrap and workflow wiring.
 - `api.js`: shared JSON, `fetch`, and CSRF request helpers.
 - `dom.js`: small DOM creation and attribute helpers.
+- `image-card.js`: shared image-card structure, media, actions, and tooltips.
 - `gallery.js`: gallery refresh, card rendering, gallery actions, delete, mask
   trigger, Immich upload trigger, and source-select dispatch.
 - `metadata.js`: embedded metadata loading and image information tooltip data.
