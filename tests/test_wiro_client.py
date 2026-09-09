@@ -117,6 +117,7 @@ def test_wiro_text_request_submits_once_polls_same_task_and_persists_outputs(tmp
         client=client,
         sleep=lambda _: None,
         clock=lambda: 0.0,
+        local_request_id="local-request-uuid",
         persist_images=persist_images,
     )
 
@@ -140,6 +141,7 @@ def test_wiro_text_request_submits_once_polls_same_task_and_persists_outputs(tmp
     assert persisted[0]["provider"] == "wiro"
     assert persisted[0]["model_alias"] == "seedream5-pro"
     assert persisted[0]["provider_model"] == "bytedance/seedream-v5-pro-uncensored"
+    assert persisted[0]["local_request_id"] == "local-request-uuid"
     assert persisted[0]["prompt"] == "a cookie (palette: warm tasty)"
     assert persisted[0]["prediction_input"]["prompt"] == "a cookie tasty"
 

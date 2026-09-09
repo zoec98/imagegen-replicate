@@ -60,6 +60,7 @@ def generate_image_urls(
     target: GenerationTarget,
     parameters: dict[str, object] | None = None,
     source_image_paths: list[Path] | None = None,
+    local_request_id: str | None = None,
     client: WiroHTTPClient | None = None,
     sleep: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
@@ -149,6 +150,7 @@ def generate_image_urls(
             provider_model=target.provider_model,
             prompt=prompt,
             prediction_id=task_id,
+            local_request_id=local_request_id,
             prediction_input=metadata_input,
             author=app_config.author,
         )

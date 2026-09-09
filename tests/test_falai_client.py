@@ -119,6 +119,7 @@ def test_falai_text_submission_uses_resolved_endpoint_and_persists_outputs(tmp_p
         client=client,
         sleep=lambda _: None,
         clock=lambda: 0.0,
+        local_request_id="local-request-uuid",
         persist_images=persist_images,
     )
 
@@ -141,6 +142,7 @@ def test_falai_text_submission_uses_resolved_endpoint_and_persists_outputs(tmp_p
     assert persisted[0]["provider"] == "falai"
     assert persisted[0]["model_alias"] == "seedream45"
     assert persisted[0]["provider_model"] == target.provider_model
+    assert persisted[0]["local_request_id"] == "local-request-uuid"
     assert persisted[0]["prediction_input"]["prompt"] == "a red house"
 
 

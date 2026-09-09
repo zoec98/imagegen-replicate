@@ -68,6 +68,7 @@ class ReplicateGenerationProvider:
                 model=request_model,
                 target=request_target,
                 parameters=request_record.parameters,
+                local_request_id=request_record.request_id,
                 source_image_paths=source_image_paths(
                     request_record.source_images,
                     output_dir=Path(app_config.output_dir),
@@ -99,6 +100,7 @@ class FalAIGenerationProvider:
                 model=request_model,
                 target=request_target,
                 parameters=request_record.parameters,
+                local_request_id=request_record.request_id,
                 source_image_paths=source_image_paths(
                     request_record.source_images,
                     output_dir=Path(app_config.output_dir),
@@ -130,6 +132,7 @@ class WiroGenerationProvider:
                 model=request_model,
                 target=request_target,
                 parameters=request_record.parameters,
+                local_request_id=request_record.request_id,
                 source_image_paths=source_image_paths(
                     request_record.source_images,
                     output_dir=Path(app_config.output_dir),

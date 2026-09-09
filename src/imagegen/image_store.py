@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 from urllib.parse import urljoin, urlparse, urlunparse
+from uuid import uuid4
 
 import httpx
 
@@ -66,6 +67,7 @@ def persist_generated_images(
     provider_model: str | None = None,
     prompt: str,
     prediction_id: str,
+    local_request_id: str | None = None,
     prediction_input: dict[str, object],
     author: str,
     client: httpx.Client | None = None,
@@ -74,6 +76,7 @@ def persist_generated_images(
     output_dir.mkdir(parents=True, exist_ok=True)
     close_client = client is None
     http_client = client or httpx.Client(timeout=30.0, follow_redirects=False)
+    request_id = local_request_id or uuid4().hex
     try:
         return [
             download_image(
@@ -85,6 +88,7 @@ def persist_generated_images(
                 provider_model=provider_model,
                 prompt=prompt,
                 prediction_id=prediction_id,
+                local_request_id=request_id,
                 sequence=sequence,
                 prediction_input=prediction_input,
                 author=author,
@@ -108,6 +112,7 @@ def download_image(
     provider_model: str | None = None,
     prompt: str,
     prediction_id: str,
+    local_request_id: str | None = None,
     sequence: int,
     prediction_input: dict[str, object],
     author: str,
@@ -142,7 +147,8 @@ def download_image(
         raise ImageDownloadError(msg)
 
     extension = _extension_for(content_type, final_url)
-    filename = f"{model.alias}-{prediction_id}-{sequence:02d}{extension}"
+    request_id = local_request_id or uuid4().hex
+    filename = f"{model.alias}-{request_id}-{sequence:02d}{extension}"
     path = output_dir / filename
     path.write_bytes(content)
     created_at = datetime.now(UTC).isoformat()

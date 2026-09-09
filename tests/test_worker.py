@@ -269,6 +269,7 @@ def test_run_generation_request_uses_request_model(app_config):
         model,
         target,
         parameters,
+        local_request_id,
         source_image_paths,
     ):
         assert prompt == "a red house"
@@ -276,6 +277,7 @@ def test_run_generation_request_uses_request_model(app_config):
         assert model.alias == "flux-flex"
         assert target.provider_model == "black-forest-labs/flux-2-flex"
         assert parameters == {"guidance": 5.5}
+        assert local_request_id == record.request_id
         assert source_image_paths == []
         return ReplicateResult(
             prediction_id="prediction-123",
@@ -313,6 +315,7 @@ def test_wiro_generation_provider_dispatches_selected_model_and_sources(app_conf
         model,
         target,
         parameters,
+        local_request_id,
         source_image_paths,
     ):
         assert prompt == "edit this"
@@ -320,6 +323,7 @@ def test_wiro_generation_provider_dispatches_selected_model_and_sources(app_conf
         assert model.alias == "seedream5"
         assert target.provider_model == "bytedance/seedream-v5-lite-uncensored"
         assert parameters == {"watermark": "false"}
+        assert local_request_id == record.request_id
         assert source_image_paths == [source_path]
         return GenerationResult(
             prediction_id="wiro-task-1",

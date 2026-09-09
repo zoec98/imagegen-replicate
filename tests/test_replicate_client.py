@@ -312,6 +312,7 @@ def test_generate_image_urls_creates_prediction_and_polls(tmp_path):
         parameters={"size": "4K"},
         predictions_api=api,
         sleep=sleeps.append,
+        local_request_id="local-request-uuid",
         persist_images=fake_persist,
     )
 
@@ -327,6 +328,7 @@ def test_generate_image_urls_creates_prediction_and_polls(tmp_path):
     assert api.get_calls == ["abc123"]
     assert stored[0][0] == ["https://example.com/one.png"]
     assert stored[0][1]["prediction_id"] == "abc123"
+    assert stored[0][1]["local_request_id"] == "local-request-uuid"
     assert stored[0][1]["author"] == "Test Author"
 
 

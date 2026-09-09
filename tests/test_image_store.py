@@ -54,7 +54,8 @@ def test_download_image_writes_file_and_embedded_metadata(tmp_path):
         output_dir=tmp_path,
         model=model,
         prompt="a cookie",
-        prediction_id="abc123",
+        prediction_id="provider/../abc123",
+        local_request_id="request-uuid",
         sequence=1,
         prediction_input={"prompt": "a cookie", "disable_safety_checker": True},
         author="Zoé Cordelier",
@@ -62,8 +63,8 @@ def test_download_image_writes_file_and_embedded_metadata(tmp_path):
         resolver=safe_resolver,
     )
 
-    assert stored.path == tmp_path / "seedream45-abc123-01.jpg"
-    assert not (tmp_path / "seedream45-abc123-01.jpg.json").exists()
+    assert stored.path == tmp_path / "seedream45-request-uuid-01.jpg"
+    assert not (tmp_path / "seedream45-request-uuid-01.jpg.json").exists()
     metadata = EmbeddedImageMetadataProvider().get(stored.path)
     assert metadata.content_type == "image/jpeg"
     assert metadata.created_at == stored.created_at
@@ -99,6 +100,7 @@ def test_persist_generated_images_creates_output_directory(tmp_path):
         model=model,
         prompt="a cookie",
         prediction_id="abc123",
+        local_request_id="request-uuid",
         prediction_input={"prompt": "a cookie"},
         author="Zoé Cordelier",
         client=httpx.Client(transport=httpx.MockTransport(handler)),
@@ -107,8 +109,8 @@ def test_persist_generated_images_creates_output_directory(tmp_path):
 
     assert output_dir.exists()
     assert [image.path for image in stored] == [
-        output_dir / "seedream45-abc123-01.png",
-        output_dir / "seedream45-abc123-02.png",
+        output_dir / "seedream45-request-uuid-01.png",
+        output_dir / "seedream45-request-uuid-02.png",
     ]
 
 
