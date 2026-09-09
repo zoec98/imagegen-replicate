@@ -36,7 +36,7 @@ def test_crop_image_writes_new_cropped_image(tmp_path):
         output_dir=tmp_path,
     )
 
-    assert edited.path.name.startswith("sample-crop-")
+    assert edited.path.name.startswith("crop-")
     assert edited.path.suffix == ".png"
     assert source_path.read_bytes() == original_bytes
     with Image.open(edited.path) as image:
@@ -55,7 +55,28 @@ def test_crop_image_rejects_too_small_rectangle_without_writing_output(tmp_path)
             output_dir=tmp_path,
         )
 
-    assert list(tmp_path.glob("sample-crop-*.png")) == []
+    assert list(tmp_path.glob("crop-*.png")) == []
+
+
+def test_repeated_crop_names_do_not_grow(tmp_path):
+    source_path = tmp_path / "sample.png"
+    Image.new("RGB", (20, 20), (255, 0, 0)).save(source_path, "PNG")
+
+    first = crop_image(
+        {"rectangle": {"x": 0, "y": 0, "width": 10, "height": 10}},
+        source_filename="sample.png",
+        output_dir=tmp_path,
+    )
+    second = crop_image(
+        {"rectangle": {"x": 0, "y": 0, "width": 10, "height": 10}},
+        source_filename=first.path.name,
+        output_dir=tmp_path,
+    )
+
+    assert first.path.name.startswith("crop-")
+    assert second.path.name.startswith("crop-")
+    assert len(second.path.name) == len(first.path.name)
+    assert first.path.name not in second.path.name
 
 
 def test_crop_image_preserves_embedded_metadata(tmp_path):
@@ -98,7 +119,7 @@ def test_blur_image_blurs_only_masked_pixels(tmp_path):
         output_dir=tmp_path,
     )
 
-    assert edited.path.name.startswith("sample-blur-")
+    assert edited.path.name.startswith("blur-")
     assert edited.path.suffix == ".png"
     assert source_path.read_bytes() == original_bytes
     with Image.open(edited.path) as image:
@@ -183,7 +204,7 @@ def test_blur_image_rejects_invalid_radius(tmp_path, payload, error):
     with pytest.raises(ImageEditError, match=error):
         blur_image(payload, source_filename="sample.png", output_dir=tmp_path)
 
-    assert list(tmp_path.glob("sample-blur-*.png")) == []
+    assert list(tmp_path.glob("blur-*.png")) == []
 
 
 @pytest.mark.parametrize(
@@ -210,4 +231,4 @@ def test_blur_image_rejects_invalid_mask(tmp_path, payload, error):
     with pytest.raises(ImageEditError, match=error):
         blur_image(payload, source_filename="sample.png", output_dir=tmp_path)
 
-    assert list(tmp_path.glob("sample-blur-*.png")) == []
+    assert list(tmp_path.glob("blur-*.png")) == []

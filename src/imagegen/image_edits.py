@@ -183,7 +183,7 @@ def _edited_output_path(filename: str, *, operation: str, output_dir: Path) -> P
     source = Path(filename)
     output_dir.mkdir(parents=True, exist_ok=True)
     while True:
-        path = output_dir / f"{source.stem}-{operation}-{uuid4().hex}{source.suffix}"
+        path = output_dir / f"{operation}-{uuid4().hex}{source.suffix}"
         if not path.exists():
             return path
 

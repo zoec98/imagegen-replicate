@@ -1235,7 +1235,7 @@ def test_api_crop_image_writes_new_gallery_image(app_config, app_factory):
         "content_type": None,
         "created_at": None,
     }
-    assert image["filename"].startswith("sample-crop-")
+    assert image["filename"].startswith("crop-")
     assert image["filename"].endswith(".png")
     assert source_path.read_bytes() == original_bytes
     with Image.open(app_config.output_dir / image["filename"]) as cropped:
@@ -1306,7 +1306,7 @@ def test_api_crop_image_does_not_overwrite_collision(
     source_path = app_config.output_dir / "sample.png"
     source_path.parent.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (20, 20), (255, 0, 0)).save(source_path, "PNG")
-    existing = app_config.output_dir / "sample-crop-collision.png"
+    existing = app_config.output_dir / "crop-collision.png"
     existing.write_bytes(b"existing")
     tokens = iter([Token("collision"), Token("unique")])
     monkeypatch.setattr("imagegen.image_edits.uuid4", lambda: next(tokens))
@@ -1322,7 +1322,7 @@ def test_api_crop_image_does_not_overwrite_collision(
     )
 
     assert response.status_code == 201
-    assert response.json["image"]["filename"] == "sample-crop-unique.png"
+    assert response.json["image"]["filename"] == "crop-unique.png"
     assert existing.read_bytes() == b"existing"
 
 
@@ -1343,7 +1343,7 @@ def test_api_crop_image_rejects_unsafe_source_filename(app_config, app_factory):
 
     assert response.status_code == 404
     assert response.json == {"error": "Image not found."}
-    assert len(list(app_config.output_dir.glob("sample-crop-*.png"))) == 0
+    assert len(list(app_config.output_dir.glob("crop-*.png"))) == 0
 
 
 def test_api_crop_image_rejects_missing_source_image(app_factory):
@@ -1406,7 +1406,7 @@ def test_api_crop_image_rejects_invalid_rectangle(
 
     assert response.status_code == 400
     assert response.json == {"error": error}
-    assert len(list(app_config.output_dir.glob("sample-crop-*.png"))) == 0
+    assert len(list(app_config.output_dir.glob("crop-*.png"))) == 0
 
 
 def test_api_crop_image_requires_csrf(app_config, app_factory):
@@ -1424,7 +1424,7 @@ def test_api_crop_image_requires_csrf(app_config, app_factory):
 
     assert response.status_code == 403
     assert response.json == {"error": "Invalid CSRF token."}
-    assert len(list(app_config.output_dir.glob("sample-crop-*.png"))) == 0
+    assert len(list(app_config.output_dir.glob("crop-*.png"))) == 0
 
 
 def test_api_blur_image_writes_new_gallery_image(app_config, app_factory):
@@ -1469,7 +1469,7 @@ def test_api_blur_image_writes_new_gallery_image(app_config, app_factory):
         "content_type": None,
         "created_at": None,
     }
-    assert image["filename"].startswith("sample-blur-")
+    assert image["filename"].startswith("blur-")
     assert image["filename"].endswith(".png")
     assert source_path.read_bytes() == original_bytes
     with Image.open(app_config.output_dir / image["filename"]) as blurred:
@@ -1658,7 +1658,7 @@ def test_blurred_image_appears_in_gallery_and_can_be_reused_as_source_image(
                 "filename": "client-chosen.png",
                 "rectangle": {"x": 0, "y": 0, "width": 10, "height": 10},
             },
-            "sample-crop-",
+            "crop-",
         ),
         (
             "blur",
@@ -1667,7 +1667,7 @@ def test_blurred_image_appears_in_gallery_and_can_be_reused_as_source_image(
                 "blur_radius": 2,
                 "mask_png": grayscale_png_payload([255] + [0] * 63, (8, 8)),
             },
-            "sample-blur-",
+            "blur-",
         ),
     ],
 )
@@ -1724,7 +1724,7 @@ def test_api_blur_image_rejects_unsafe_source_filename(app_config, app_factory):
 
     assert response.status_code == 404
     assert response.json == {"error": "Image not found."}
-    assert len(list(app_config.output_dir.glob("sample-blur-*.png"))) == 0
+    assert len(list(app_config.output_dir.glob("blur-*.png"))) == 0
 
 
 def test_api_blur_image_rejects_missing_source_image(app_factory):
@@ -1808,7 +1808,7 @@ def test_api_blur_image_rejects_invalid_payload(
 
     assert response.status_code == 400
     assert response.json == {"error": error}
-    assert len(list(app_config.output_dir.glob("sample-blur-*.png"))) == 0
+    assert len(list(app_config.output_dir.glob("blur-*.png"))) == 0
 
 
 def test_api_blur_image_requires_csrf(app_config, app_factory):
@@ -1829,7 +1829,7 @@ def test_api_blur_image_requires_csrf(app_config, app_factory):
 
     assert response.status_code == 403
     assert response.json == {"error": "Invalid CSRF token."}
-    assert len(list(app_config.output_dir.glob("sample-blur-*.png"))) == 0
+    assert len(list(app_config.output_dir.glob("blur-*.png"))) == 0
 
 
 def test_api_save_mask_preserves_black_white_and_gray_pixels(
