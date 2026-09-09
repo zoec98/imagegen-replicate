@@ -28,7 +28,7 @@ from imagegen.trash import (
 )
 
 
-def register_local_image_api_routes(app: Flask) -> None:
+def register_image_api_routes(app: Flask) -> None:
     @app.get("/api/images")
     def api_images():
         app_config = app.config["IMAGEGEN_APP_CONFIG"]
