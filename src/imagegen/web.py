@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Sequence
 
 from imagegen.app import create_app
@@ -24,6 +25,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         arguments = parser.parse_args(argv)
     except SystemExit as error:
         return int(error.code or 0)
+
+    if arguments.dev and arguments.secure_network:
+        print(
+            f"{parser.prog}: error: cannot combine --dev with --secure-network",
+            file=sys.stderr,
+        )
+        return 2
 
     app = create_app()
     app.run(

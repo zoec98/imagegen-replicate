@@ -14,7 +14,7 @@ def test_web_main_starts_local_server(monkeypatch):
     assert calls == [{"debug": False, "host": "127.0.0.1", "port": 5002}]
 
 
-def test_web_main_supports_dev_and_secure_network(monkeypatch):
+def test_web_main_rejects_dev_and_secure_network(monkeypatch, capsys):
     calls = []
 
     class FakeApp:
@@ -23,8 +23,9 @@ def test_web_main_supports_dev_and_secure_network(monkeypatch):
 
     monkeypatch.setattr(web, "create_app", lambda: FakeApp())
 
-    assert web.main(["--dev", "--secure-network"]) == 0
-    assert calls == [{"debug": True, "host": "0.0.0.0", "port": 5002}]
+    assert web.main(["--dev", "--secure-network"]) == 2
+    assert calls == []
+    assert "cannot combine --dev with --secure-network" in capsys.readouterr().err
 
 
 def test_web_main_rejects_unknown_arguments(monkeypatch, capsys):
