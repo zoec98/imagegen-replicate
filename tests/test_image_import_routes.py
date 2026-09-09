@@ -392,5 +392,3 @@ def test_api_import_uploaded_image_requires_csrf(app_factory):
 
     assert response.status_code == 403
     assert response.json == {"error": "Invalid CSRF token."}
-
-

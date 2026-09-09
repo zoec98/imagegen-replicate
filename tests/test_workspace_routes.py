@@ -474,8 +474,9 @@ def test_index_renders_upload_button_and_overlay_shell(app_factory):
     assert b'class="upload-url-load" type="button">Load' in response.data
     assert b'class="upload-drop-target"' in response.data
     assert b'aria-label="Choose or drop image files to upload"' in response.data
-    assert b'class="upload-file-input" type="file" accept="image/*" multiple hidden' in (
-        response.data
+    assert (
+        b'class="upload-file-input" type="file" accept="image/*" multiple hidden'
+        in (response.data)
     )
     assert b'class="upload-file-choose" type="button">Choose images' in response.data
     assert b"image/*" in response.data

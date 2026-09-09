@@ -407,5 +407,3 @@ def mask_limit_values(size):
         "base64": base64_chars,
         "request": base64_chars + MASK_JSON_FIXED_OVERHEAD_BYTES,
     }
-
-

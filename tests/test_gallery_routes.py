@@ -162,5 +162,3 @@ def test_api_images_includes_embedded_metadata(app_config, app_factory):
         ],
         "trash_count": 0,
     }
-
-
