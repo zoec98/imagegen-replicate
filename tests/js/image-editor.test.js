@@ -698,4 +698,3 @@ describe("setupImageEditor", () => {
     expect(document.querySelector(".mask-editor-save").disabled).toBe(false);
   });
 });
-

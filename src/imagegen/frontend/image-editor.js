@@ -1,4 +1,11 @@
 import { csrfJsonRequest } from "./api.js";
+import {
+  cropRectangle,
+  invertMask,
+  isValidCropSelection as hasValidCropSelection,
+  paintMask,
+  pointerPosition as getPointerPosition,
+} from "./image-editor-operations.js";
 
 const DEFAULT_BRUSH_SIZE = 50;
 const DEFAULT_BRUSH_FALLOFF = 0;
@@ -312,66 +319,32 @@ export function setupImageEditor(root = document, services = {}) {
   }
 
   function pointerPosition(event) {
-    if (!maskCanvas) {
-      return null;
-    }
-    const rect = maskCanvas.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) {
-      return null;
-    }
-    return {
-      x: ((event.clientX - rect.left) / rect.width) * maskCanvas.width,
-      y: ((event.clientY - rect.top) / rect.height) * maskCanvas.height,
-      scale: maskCanvas.width / rect.width,
-    };
+    return getPointerPosition(
+      event,
+      maskCanvas?.getBoundingClientRect(),
+      maskCanvas?.width,
+      maskCanvas?.height,
+    );
   }
 
   function paintAt(position) {
     if (!position || !maskCanvas || !maskData) {
       return;
     }
-    const radius = Math.max((brushSize * position.scale) / 2, 1);
-    const innerRadius = radius * (1 - brushFalloff);
-    const minX = Math.max(Math.floor(position.x - radius), 0);
-    const maxX = Math.min(Math.ceil(position.x + radius), maskCanvas.width - 1);
-    const minY = Math.max(Math.floor(position.y - radius), 0);
-    const maxY = Math.min(Math.ceil(position.y + radius), maskCanvas.height - 1);
-    for (let y = minY; y <= maxY; y += 1) {
-      for (let x = minX; x <= maxX; x += 1) {
-        const distance = Math.hypot(x - position.x, y - position.y);
-        if (distance > radius) {
-          continue;
-        }
-        const intensity =
-          distance <= innerRadius
-            ? 1
-            : 1 - (distance - innerRadius) / Math.max(radius - innerRadius, 1);
-        const index = y * maskCanvas.width + x;
-        maskData[index] = Math.max(maskData[index], intensity);
-      }
-    }
+    paintMask(
+      maskData,
+      maskCanvas.width,
+      maskCanvas.height,
+      position,
+      brushSize,
+      brushFalloff,
+    );
     redrawOverlay();
     updateBlurButton();
   }
 
-  function cropRectangle(start, end) {
-    if (!start || !end) {
-      return null;
-    }
-    const minX = Math.max(Math.min(start.x, end.x), 0);
-    const minY = Math.max(Math.min(start.y, end.y), 0);
-    const maxX = Math.min(Math.max(start.x, end.x), maskCanvas.width);
-    const maxY = Math.min(Math.max(start.y, end.y), maskCanvas.height);
-    return {
-      height: Math.round(maxY - minY),
-      width: Math.round(maxX - minX),
-      x: Math.round(minX),
-      y: Math.round(minY),
-    };
-  }
-
   function isValidCropSelection() {
-    return Boolean(cropSelection?.width >= 10 && cropSelection?.height >= 10);
+    return hasValidCropSelection(cropSelection);
   }
 
   function updateCropControls() {
@@ -416,7 +389,12 @@ export function setupImageEditor(root = document, services = {}) {
       return;
     }
     event.preventDefault();
-    cropSelection = cropRectangle(cropStart, position);
+    cropSelection = cropRectangle(
+      cropStart,
+      position,
+      maskCanvas?.width,
+      maskCanvas?.height,
+    );
     updateCropControls();
     redrawOverlay();
   }
@@ -493,12 +471,7 @@ export function setupImageEditor(root = document, services = {}) {
   }
 
   function invert() {
-    if (!maskData) {
-      return;
-    }
-    for (let index = 0; index < maskData.length; index += 1) {
-      maskData[index] = 1 - Math.min(Math.max(maskData[index], 0), 1);
-    }
+    invertMask(maskData);
     redrawOverlay();
   }
 
@@ -651,4 +624,3 @@ export function setupImageEditor(root = document, services = {}) {
     updateOperationControls,
   };
 }
-
