@@ -2027,9 +2027,10 @@
 		});
 	}
 	//#endregion
-	//#region src/imagegen/frontend/main.js
-	(() => {
-		const form = document.querySelector(".prompt-form");
+	//#region src/imagegen/frontend/workspace.js
+	function setupWorkspace(root = document) {
+		const documentRoot = root.ownerDocument || root;
+		const form = documentRoot.querySelector(".prompt-form");
 		if (!form) return;
 		const promptInput = form.querySelector("#prompt");
 		const providerSelector = form.querySelector("#provider-selector");
@@ -2038,13 +2039,16 @@
 		const pricingTooltip = form.querySelector(".pricing-tooltip");
 		const parameterGrid = form.querySelector(".parameter-grid");
 		const messages = form.querySelector(".messages");
-		const csrfToken = document.querySelector("meta[name=\"csrf-token\"]")?.getAttribute("content");
-		const pageChecksum = document.querySelector("meta[name=\"app-build\"]")?.getAttribute("content");
+		const csrfToken = documentRoot.querySelector("meta[name=\"csrf-token\"]")?.getAttribute("content");
+		const pageChecksum = documentRoot.querySelector("meta[name=\"app-build\"]")?.getAttribute("content");
 		const pollSeconds = Number.parseFloat(form.dataset.pollSeconds || "1");
 		const pollMilliseconds = Math.max(250, (Number.isFinite(pollSeconds) ? pollSeconds : 1) * 1e3);
 		let isPageStale = false;
 		function loadJsonArray(selector) {
-			const value = readJsonScript(selector, { fallback: [] });
+			const value = readJsonScript(selector, {
+				root,
+				fallback: []
+			});
 			return Array.isArray(value) ? value : [];
 		}
 		const modelRegistry = loadJsonArray("#model-registry-data");
@@ -2072,7 +2076,7 @@
 			const previous = modelSelector.value;
 			modelSelector.replaceChildren();
 			providerModels.forEach((model) => {
-				const option = document.createElement("option");
+				const option = documentRoot.createElement("option");
 				option.value = model.alias;
 				option.textContent = model.display_name;
 				modelSelector.append(option);
@@ -2086,7 +2090,7 @@
 			if (!messages) return;
 			messages.replaceChildren();
 			if (!text) return;
-			const message = document.createElement("p");
+			const message = documentRoot.createElement("p");
 			message.className = `message message-${category}`;
 			message.textContent = text;
 			messages.append(message);
@@ -2162,9 +2166,9 @@
 		function parameterInput(parameter) {
 			const value = parameterValue(parameter);
 			if (Array.isArray(parameter.choices) && parameter.choices.length > 0) {
-				const select = document.createElement("select");
+				const select = documentRoot.createElement("select");
 				parameter.choices.forEach((choice) => {
-					const option = document.createElement("option");
+					const option = documentRoot.createElement("option");
 					option.value = String(choice);
 					option.textContent = String(choice);
 					if (choice === value) option.selected = true;
@@ -2172,7 +2176,7 @@
 				});
 				return select;
 			}
-			const input = document.createElement("input");
+			const input = documentRoot.createElement("input");
 			if (parameter.type === "integer" || parameter.type === "number") {
 				input.type = "number";
 				if (parameter.type === "number") input.step = "any";
@@ -2196,10 +2200,10 @@
 				if (dimensionControl && !customActive && (parameter.name === dimensionControl.width_parameter || parameter.name === dimensionControl.height_parameter)) return;
 				if (dimensionControl && customActive && parameter.name === dimensionControl.scale_parameter) return;
 				const id = `parameter-${parameter.name}`;
-				const label = document.createElement("label");
+				const label = documentRoot.createElement("label");
 				label.className = "field";
 				label.htmlFor = id;
-				const text = document.createElement("span");
+				const text = documentRoot.createElement("span");
 				text.textContent = parameterLabel(parameter.name);
 				const control = parameterInput(parameter);
 				control.id = id;
@@ -2216,7 +2220,7 @@
 			pricingInfo.hidden = pricing.length === 0;
 			if (pricing.length === 0) return;
 			pricing.forEach((item) => {
-				const line = document.createElement("span");
+				const line = documentRoot.createElement("span");
 				line.textContent = `${item.price} ${item.title}${item.description ? ` ${item.description}` : ""}`;
 				pricingTooltip.append(line);
 			});
@@ -2274,27 +2278,27 @@
 		async function refreshGallery() {
 			await galleryWorkflow?.refresh();
 		}
-		const trashWorkflow = setupTrash(document, {
+		const trashWorkflow = setupTrash(documentRoot, {
 			csrfToken,
 			refreshGallery,
 			showMessage
 		});
-		sourceWorkflow = setupSourceImages(document, { getModel: selectedModel });
-		const metadataWorkflow = setupMetadata(document, {
+		sourceWorkflow = setupSourceImages(documentRoot, { getModel: selectedModel });
+		const metadataWorkflow = setupMetadata(documentRoot, {
 			applyMetadata: applyImageMetadata,
 			modelRegistry,
 			showMessage
 		});
-		maskEditorWorkflow = setupMaskEditor(document, {
+		maskEditorWorkflow = setupMaskEditor(documentRoot, {
 			csrfToken,
 			refreshGallery,
 			showMessage
 		});
-		uploadWorkflow = setupImageUpload(document, {
+		uploadWorkflow = setupImageUpload(documentRoot, {
 			csrfToken,
 			refreshGallery
 		});
-		galleryWorkflow = setupGallery(document, {
+		galleryWorkflow = setupGallery(documentRoot, {
 			csrfToken,
 			metadata: metadataWorkflow,
 			openMaskEditor: (figure) => maskEditorWorkflow.open(figure),
@@ -2304,7 +2308,7 @@
 			toggleSourceImage: (filename) => sourceWorkflow.toggle(filename),
 			updateSourceSelectionUi
 		});
-		generationWorkflow = setupGeneration(document, {
+		generationWorkflow = setupGeneration(documentRoot, {
 			checkAppFreshness,
 			collectParameters,
 			csrfToken,
@@ -2317,7 +2321,7 @@
 			showMessage,
 			sourceState: () => sourceWorkflow.payload()
 		});
-		setupPalettes(document, {
+		setupPalettes(documentRoot, {
 			csrfToken,
 			showMessage
 		});
@@ -2339,7 +2343,7 @@
 			renderParameters(model);
 			updateSourceSelectionUi();
 		});
-		document.addEventListener("keydown", (event) => {
+		documentRoot.addEventListener("keydown", (event) => {
 			if (event.key === "Escape" && maskEditorWorkflow.isOpen()) {
 				maskEditorWorkflow.close();
 				return;
@@ -2365,7 +2369,19 @@
 		renderPricing(selectedModel());
 		renderParameters(selectedModel());
 		updateSourceSelectionUi();
-	})();
+		return {
+			checkAppFreshness,
+			collectParameters,
+			renderModelOptions,
+			renderParameters,
+			renderPricing,
+			selectedModel,
+			selectedProvider
+		};
+	}
+	//#endregion
+	//#region src/imagegen/frontend/main.js
+	setupWorkspace();
 	//#endregion
 })();
 

@@ -52,3 +52,14 @@ test("workspace shows models for the selected provider", async () => {
   ]);
   expect(modelSelector.value).toBe("bria-fibo");
 });
+
+test("workspace controller exposes the selected model", async () => {
+  renderWorkspace({ modelRegistry, selectedProvider: "replicate" });
+
+  const { setupWorkspace } = await import(
+    "../../src/imagegen/frontend/workspace.js"
+  );
+  const controller = setupWorkspace(document);
+
+  expect(controller.selectedModel().alias).toBe("seedream45");
+});
