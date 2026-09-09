@@ -552,6 +552,128 @@ OPENAI_GPT_IMAGE_2 = ReplicateModel(
 )
 
 
+def _gpt_image25_parameters() -> tuple[ModelParameter, ...]:
+    return (
+        _param("prompt", "A text description of the desired image.", "string", order=0),
+        _param(
+            "input_images",
+            "A list of images to use as input for the generation.",
+            "array",
+            (),
+            order=3,
+        ),
+        _param(
+            "aspect_ratio",
+            "The size of the generated image.",
+            "select",
+            "1:1",
+            choices=(
+                "1:1",
+                "3:2",
+                "2:3",
+                "4:3",
+                "3:4",
+                "16:9",
+                "9:16",
+                "auto",
+                "1024x1024",
+                "1536x1024",
+                "1024x1536",
+                "1536x1152",
+                "1152x1536",
+                "2048x2048",
+                "2048x1152",
+                "1152x2048",
+                "3840x2160",
+                "2160x3840",
+            ),
+            order=2,
+        ),
+        _param(
+            "number_of_images",
+            "Number of images to generate.",
+            "integer",
+            1,
+            minimum=1,
+            maximum=10,
+            order=4,
+        ),
+        _param(
+            "quality",
+            "The quality of the generated image.",
+            "select",
+            "auto",
+            choices=("low", "medium", "high", "xhigh", "max", "auto"),
+            order=5,
+        ),
+        _param(
+            "background",
+            "Set whether the background is transparent, opaque, or automatic.",
+            "select",
+            "auto",
+            choices=("auto", "transparent", "opaque"),
+            order=6,
+        ),
+        _param(
+            "output_compression",
+            "Compression level.",
+            "integer",
+            90,
+            minimum=0,
+            maximum=100,
+            order=7,
+        ),
+        _param(
+            "output_format",
+            "Output format.",
+            "select",
+            "webp",
+            choices=("png", "jpeg", "webp"),
+            order=8,
+        ),
+        _param(
+            "moderation",
+            "Content moderation level.",
+            "select",
+            "auto",
+            choices=("auto", "low"),
+            order=9,
+        ),
+    )
+
+
+OPENAI_GPT_IMAGE_25_FLARE = ReplicateModel(
+    alias="gpt-image-25-flare",
+    display_name="GPT Image 2.5 Flare",
+    documentation_url="https://replicate.com/openai/gpt-image-2.5-flare/api/schema",
+    replicate_model="openai/gpt-image-2.5-flare",
+    edit_capable=True,
+    fixed_inputs={},
+    default_width=2048,
+    default_height=2048,
+    modes=("text-to-image", "image-edit"),
+    source_image_parameter="input_images",
+    source_image_max=10,
+    parameters=_gpt_image25_parameters(),
+)
+
+
+OPENAI_GPT_IMAGE_25_SUNBURST = ReplicateModel(
+    alias="gpt-image-25-sunburst",
+    display_name="GPT Image 2.5 Sunburst",
+    documentation_url="https://replicate.com/openai/gpt-image-2.5-sunburst/api/schema",
+    replicate_model="openai/gpt-image-2.5-sunburst",
+    edit_capable=True,
+    fixed_inputs={},
+    default_width=2048,
+    default_height=2048,
+    modes=("text-to-image", "image-edit"),
+    source_image_parameter="input_images",
+    source_image_max=10,
+    parameters=_gpt_image25_parameters(),
+)
+
+
 OPENAI_GPT_IMAGE_15 = ReplicateModel(
     alias="gpt-image-15",
     display_name="GPT Image 1.5",
@@ -1218,6 +1340,8 @@ MODEL_REGISTRY: dict[str, ReplicateModel] = {
     NANO_BANANA_PRO.alias: NANO_BANANA_PRO,
     OPENAI_GPT_IMAGE_15.alias: OPENAI_GPT_IMAGE_15,
     OPENAI_GPT_IMAGE_2.alias: OPENAI_GPT_IMAGE_2,
+    OPENAI_GPT_IMAGE_25_FLARE.alias: OPENAI_GPT_IMAGE_25_FLARE,
+    OPENAI_GPT_IMAGE_25_SUNBURST.alias: OPENAI_GPT_IMAGE_25_SUNBURST,
     QWEN_2512.alias: QWEN_2512,
     SEEDREAM45.alias: SEEDREAM45,
     SEEDREAM5.alias: SEEDREAM5,

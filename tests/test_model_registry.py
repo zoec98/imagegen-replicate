@@ -204,6 +204,36 @@ def test_replicate_seedream5_models_expose_supported_inputs_only():
     ]
 
 
+@pytest.mark.parametrize("variant", ["flare", "sunburst"])
+def test_replicate_gpt_image25_variants_match_schema(variant):
+    model = resolve_model("replicate", f"gpt-image-25-{variant}")
+    parameters = {
+        parameter.name: parameter for parameter in model.text_target.parameters
+    }
+
+    assert model.text_target.provider_model == f"openai/gpt-image-2.5-{variant}"
+    assert model.edit_target is not None
+    assert model.edit_target.source_images is not None
+    assert model.edit_target.source_images.provider_field == "input_images"
+    assert model.edit_target.source_images.max_count == 10
+    assert "openai_api_key" not in parameters
+    assert "user_id" not in parameters
+    assert parameters["aspect_ratio"].default == "1:1"
+    assert "3840x2160" in parameters["aspect_ratio"].choices
+    assert parameters["number_of_images"].maximum == 10
+    assert parameters["quality"].choices == (
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "auto",
+    )
+    assert parameters["output_compression"].default == 90
+    assert parameters["output_format"].choices == ("png", "jpeg", "webp")
+    assert parameters["moderation"].choices == ("auto", "low")
+
+
 def test_fully_qualified_and_bare_model_refs_resolve_by_provider():
     assert resolve_model_ref("replicate:seedream45").provider == "replicate"
     assert resolve_model_ref("falai:seedream45").provider == "falai"
