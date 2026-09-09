@@ -104,6 +104,25 @@ describe("setupImageUpload", () => {
     });
   });
 
+  it("imports a local URL without Immich browser markup", async () => {
+    renderUploadWorkspace();
+    document.querySelector(".upload-immich-browser").remove();
+    const refreshGallery = vi.fn().mockResolvedValue(undefined);
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ image: { filename: "local.png" } }));
+    vi.stubGlobal("fetch", fetcher);
+    setupImageUpload(document, { csrfToken: "csrf-token", refreshGallery });
+    document.querySelector(".upload-url").value = "https://example.test/local.png";
+
+    document.querySelector(".upload-url-load").click();
+
+    await vi.waitFor(() => expect(refreshGallery).toHaveBeenCalledTimes(1));
+    expect(document.querySelector(".upload-status").textContent).toBe(
+      "local.png imported.",
+    );
+  });
+
   it("uploads every file selected in one chooser interaction", async () => {
     renderUploadWorkspace();
     const refreshGallery = vi.fn().mockResolvedValue(undefined);

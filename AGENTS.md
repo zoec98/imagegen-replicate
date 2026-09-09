@@ -126,8 +126,9 @@ Current frontend modules:
   status handling.
 - `image-editor.js`: image-edit overlay, crop/blur/mask controls, drawing state,
   invert, and save behavior.
-- `image-upload.js`: upload overlay, URL import, file/drop import, and Immich
-  import browser behavior.
+- `image-upload.js`: upload overlay, URL import, and file/drop import.
+- `immich-import.js`: Immich asset browsing and import behavior within the upload
+  overlay.
 
 ## Hard Guardrails
 

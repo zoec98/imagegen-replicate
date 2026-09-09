@@ -1,5 +1,6 @@
-import { csrfFormRequest, csrfJsonRequest, requestJson } from "./api.js";
-import { createElement, createSvgIcon, setBooleanAttribute } from "./dom.js";
+import { csrfFormRequest, csrfJsonRequest } from "./api.js";
+import { setBooleanAttribute } from "./dom.js";
+import { setupImmichImport } from "./immich-import.js";
 
 export function setupImageUpload(root = document, services = {}) {
   const { csrfToken = "", refreshGallery = async () => {} } = services;
@@ -13,16 +14,6 @@ export function setupImageUpload(root = document, services = {}) {
   const fileInput = overlay?.querySelector(".upload-file-input");
   const fileChoose = overlay?.querySelector(".upload-file-choose");
   const status = overlay?.querySelector(".upload-status");
-  const immichBrowser = overlay?.querySelector(".upload-immich-browser");
-  const immichPrev = overlay?.querySelector(".upload-immich-prev");
-  const immichNext = overlay?.querySelector(".upload-immich-next");
-  const immichPage = overlay?.querySelector(".upload-immich-page");
-  const immichEmpty = overlay?.querySelector(".upload-immich-empty");
-  const immichGallery = overlay?.querySelector(".upload-immich-gallery");
-  let immichCurrentPage = 1;
-  let immichNextPage = null;
-  let immichPreviousPage = null;
-  let immichLoading = false;
   let busy = false;
 
   function setStatus(text, category = "info") {
@@ -71,11 +62,7 @@ export function setupImageUpload(root = document, services = {}) {
     overlay.hidden = false;
     setStatus("Add an image URL, choose image files, or drop image files.", "empty");
     urlInput?.focus();
-    if (overlay.dataset.apiImmichAssetsUrl) {
-      loadImmichPage(1).catch((error) => {
-        setStatus(error.message || "Immich gallery could not be loaded.", "error");
-      });
-    }
+    immichWorkflow.open();
   }
 
   function close() {
@@ -115,163 +102,11 @@ export function setupImageUpload(root = document, services = {}) {
     setStatus(filename ? `${filename} imported.` : message, "success");
   }
 
-  function setImmichLoading(isLoading) {
-    immichLoading = isLoading;
-    setBooleanAttribute(immichGallery, "aria-busy", isLoading);
-    if (immichPrev) {
-      immichPrev.disabled = isLoading || !immichPreviousPage;
-    }
-    if (immichNext) {
-      immichNext.disabled = isLoading || !immichNextPage;
-    }
-  }
-
-  function setImmichPageLabel(text) {
-    if (immichPage) {
-      immichPage.textContent = text;
-    }
-  }
-
-  function immichAssetFigure(asset) {
-    const figure = createImageCard("image-card upload-immich-item");
-    figure.dataset.assetId = asset.asset_id || "";
-
-    const media = createImageMedia({
-      alt: asset.label || "Immich image",
-      className: "upload-immich-media",
-      loading: "lazy",
-      onError: () => {
-        figure.classList.add("upload-immich-item-thumbnail-error");
-        reportImmichThumbnailError(asset.thumbnail_url);
-      },
-      src: asset.thumbnail_url || "",
-    });
-
-    const caption = createImageCardRibbon();
-    const metadata = document.createElement("span");
-    metadata.className = "upload-immich-metadata";
-
-    const dimensions =
-      asset.width && asset.height ? `${asset.width} x ${asset.height}` : "";
-    const sizeLine = document.createElement("span");
-    sizeLine.className = "upload-immich-size";
-    sizeLine.textContent = dimensions || "Size unavailable";
-    const dateLine = document.createElement("span");
-    dateLine.className = "upload-immich-date";
-    dateLine.textContent = asset.created_at || "Date unavailable";
-    metadata.append(sizeLine, dateLine);
-
-    const importButton = document.createElement("button");
-    importButton.className = "upload-immich-import";
-    importButton.type = "button";
-    importButton.disabled = !asset.import_eligible || !asset.asset_id;
-    importButton.setAttribute("title", "Import image");
-    importButton.setAttribute(
-      "aria-label",
-      `Import ${asset.label || asset.asset_id || "Immich image"}`,
-    );
-    const importIcon = createSvgIcon(
-      "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 12h3l-5 5-5-5h3V8h4z",
-    );
-    importButton.append(importIcon);
-
-    caption.append(metadata);
-    caption.append(importButton);
-    figure.append(media, caption);
-    return figure;
-  }
-
-  async function reportImmichThumbnailError(thumbnailUrl) {
-    if (!thumbnailUrl) {
-      setStatus("Immich thumbnail could not be loaded.", "error");
-      return;
-    }
-    try {
-      await requestJson(thumbnailUrl, {
-        fallbackMessage: "Immich thumbnail could not be loaded.",
-      });
-    } catch (error) {
-      setStatus(error.message || "Immich thumbnail could not be loaded.", "error");
-    }
-  }
-
-  function renderImmichAssets(data) {
-    if (!immichGallery || !immichEmpty) {
-      return;
-    }
-    const assets = Array.isArray(data.assets) ? data.assets : [];
-    immichCurrentPage = Number.isFinite(data.page) ? data.page : immichCurrentPage;
-    const pageSize = Number.isFinite(data.page_size) ? data.page_size : 20;
-    immichNextPage =
-      data.next_page || (assets.length >= pageSize ? immichCurrentPage + 1 : null);
-    immichPreviousPage = data.previous_page || null;
-    setImmichPageLabel(`Page ${immichCurrentPage}`);
-    immichGallery.replaceChildren();
-    if (assets.length === 0) {
-      immichEmpty.hidden = false;
-      return;
-    }
-    immichEmpty.hidden = true;
-    assets.forEach((asset) => {
-      immichGallery.append(immichAssetFigure(asset));
-    });
-  }
-
-  async function loadImmichPage(page) {
-    const baseUrl = overlay?.dataset.apiImmichAssetsUrl;
-    if (!baseUrl || !immichBrowser || immichLoading) {
-      return;
-    }
-    setImmichPageLabel("Loading");
-    setImmichLoading(true);
-    if (immichEmpty) {
-      immichEmpty.hidden = true;
-    }
-    const url = new URL(baseUrl, window.location.href);
-    url.searchParams.set("page", String(page));
-    try {
-      const data = await requestJson(url.toString(), {
-        fallbackMessage: "Immich gallery could not be loaded.",
-      });
-      renderImmichAssets(data);
-    } catch (error) {
-      setImmichPageLabel(`Page ${immichCurrentPage}`);
-      throw error;
-    } finally {
-      setImmichLoading(false);
-    }
-  }
-
-  async function importImmichAsset(figure) {
-    const assetId = figure?.dataset.assetId || "";
-    const button = figure?.querySelector(".upload-immich-import");
-    if (!assetId) {
-      setStatus("Immich asset id is unavailable.", "error");
-      return;
-    }
-    if (button) {
-      button.disabled = true;
-      button.setAttribute("aria-busy", "true");
-    }
-    setStatus("Importing Immich image.", "info");
-    try {
-      const data = await postJson(
-        overlay?.dataset.apiImmichImportUrl,
-        { asset_id: assetId },
-        "Immich image could not be imported.",
-      );
-      await finishImport(data, "Immich image imported.");
-    } catch (error) {
-      if (button) {
-        button.disabled = false;
-      }
-      setStatus(error.message || "Immich image could not be imported.", "error");
-    } finally {
-      if (button) {
-        button.removeAttribute("aria-busy");
-      }
-    }
-  }
+  const immichWorkflow = setupImmichImport(root, {
+    csrfToken,
+    refreshGallery,
+    setStatus,
+  });
 
   async function importUrl() {
     const url = urlInput?.value.trim() || "";
@@ -443,73 +278,10 @@ export function setupImageUpload(root = document, services = {}) {
       setStatus(error.message || "Image files could not be uploaded.", "error");
     });
   });
-  immichPrev?.addEventListener("click", () => {
-    if (!immichPreviousPage || immichLoading) {
-      return;
-    }
-    loadImmichPage(immichPreviousPage).catch((error) => {
-      setStatus(error.message || "Immich gallery could not be loaded.", "error");
-    });
-  });
-  immichNext?.addEventListener("click", () => {
-    if (!immichNextPage || immichLoading) {
-      return;
-    }
-    loadImmichPage(immichNextPage).catch((error) => {
-      setStatus(error.message || "Immich gallery could not be loaded.", "error");
-    });
-  });
-  immichGallery?.addEventListener("click", (event) => {
-    const importButton = event.target.closest(".upload-immich-import");
-    if (!importButton) {
-      return;
-    }
-    importImmichAsset(importButton.closest(".upload-immich-item")).catch((error) => {
-      setStatus(error.message || "Immich image could not be imported.", "error");
-    });
-  });
-
   return {
     close,
     importUrl,
     isOpen: () => Boolean(overlay && !overlay.hidden),
     open,
   };
-}
-
-function createImageCard(className) {
-  return createElement("figure", { className });
-}
-
-function createImageMedia({
-  alt,
-  className = "",
-  href = null,
-  loading = null,
-  onError = null,
-  src,
-}) {
-  const media = createElement(href ? "a" : "span", {
-    className: ["image-card-media", className].filter(Boolean).join(" "),
-  });
-  if (href) {
-    media.href = href;
-    media.target = "_blank";
-    media.rel = "noopener";
-  }
-
-  const img = createElement("img", { alt, src });
-  if (loading) {
-    img.loading = loading;
-  }
-  if (onError) {
-    img.addEventListener("error", onError);
-  }
-
-  media.append(img);
-  return media;
-}
-
-function createImageCardRibbon() {
-  return createElement("figcaption", { className: "image-card-ribbon" });
 }
