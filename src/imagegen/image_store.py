@@ -116,6 +116,7 @@ def download_image(
 ) -> StoredImage:
     response, final_url = _fetch_validated_image_url(
         url,
+        provider=provider,
         client=client,
         resolver=resolver or resolve_host_ips,
     )
@@ -203,6 +204,7 @@ def resolve_host_ips(
 def validate_download_url(
     url: str,
     *,
+    provider: ProviderId = "replicate",
     resolver: HostResolver = resolve_host_ips,
 ) -> str:
     parsed = urlparse(url)
@@ -213,19 +215,24 @@ def validate_download_url(
     if parsed.hostname.lower().rstrip(".") in {"localhost"}:
         raise ImageDownloadError("Image download host is unsafe: localhost.")
     for address in resolver(parsed.hostname):
-        if _is_unsafe_download_address(address):
+        if is_unsafe_download_address(address):
             msg = f"Image download host resolves to unsafe address: {parsed.hostname}."
             raise ImageDownloadError(msg)
+    if not _provider_host_allowed(provider, parsed.hostname):
+        raise ImageDownloadError(
+            f"Image download host is not allowed for provider {provider}."
+        )
     return url
 
 
 def _fetch_validated_image_url(
     url: str,
     *,
+    provider: ProviderId,
     client: httpx.Client,
     resolver: HostResolver,
 ) -> tuple[httpx.Response, str]:
-    current_url = validate_download_url(url, resolver=resolver)
+    current_url = validate_download_url(url, provider=provider, resolver=resolver)
     for _ in range(MAX_REDIRECTS + 1):
         try:
             response = client.get(current_url, follow_redirects=False)
@@ -249,12 +256,13 @@ def _fetch_validated_image_url(
             )
         current_url = validate_download_url(
             urljoin(str(response.url), location),
+            provider=provider,
             resolver=resolver,
         )
     raise ImageDownloadError("Image download followed too many redirects.")
 
 
-def _is_unsafe_download_address(
+def is_unsafe_download_address(
     address: ipaddress.IPv4Address | ipaddress.IPv6Address,
 ) -> bool:
     return any(
@@ -267,6 +275,17 @@ def _is_unsafe_download_address(
             address.is_reserved,
         )
     )
+
+
+def _provider_host_allowed(provider: ProviderId, hostname: str) -> bool:
+    host = hostname.lower().rstrip(".")
+    if provider == "replicate":
+        return host == "replicate.delivery" or host.endswith(".replicate.delivery")
+    if provider == "falai":
+        return host.endswith(".fal.media")
+    if provider == "wiro":
+        return host.endswith(".wiro.ai")
+    return False
 
 
 def _display_url(url: str) -> str:

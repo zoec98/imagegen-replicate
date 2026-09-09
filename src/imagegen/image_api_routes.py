@@ -68,6 +68,7 @@ def register_image_api_routes(app: Flask) -> None:
                     "IMAGEGEN_IMAGE_IMPORT_MAX_BYTES",
                     MAX_UPLOAD_BYTES,
                 ),
+                resolver=app.config.get("IMAGEGEN_IMAGE_IMPORT_HOST_RESOLVER"),
             )
         except (ImageImportError, ImageImportFetchError) as error:
             return jsonify({"error": str(error)}), 400

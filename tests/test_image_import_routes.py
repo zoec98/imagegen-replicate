@@ -9,12 +9,18 @@ Behaviors protected:
 """
 
 from io import BytesIO
+from ipaddress import ip_address
 
 import httpx
 from image_route_helpers import import_response_client, route_image_bytes
 from PIL import Image
 from route_helpers import extract_csrf_token
+
 from imagegen.security import MAX_REQUEST_BYTES
+
+
+def public_resolver(hostname):
+    return [ip_address("93.184.216.34")]
 
 
 def test_api_import_image_url_stores_http_image(app_config, app_factory):
@@ -25,7 +31,10 @@ def test_api_import_image_url_stores_http_image(app_config, app_factory):
             request=httpx.Request("GET", "http://example.test/image.png"),
         )
     )
-    app = app_factory(IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client)
+    app = app_factory(
+        IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client,
+        IMAGEGEN_IMAGE_IMPORT_HOST_RESOLVER=public_resolver,
+    )
     client = app.test_client()
     token = extract_csrf_token(client.get("/"))
 
@@ -65,7 +74,10 @@ def test_api_import_image_url_stores_https_image(app_config, app_factory):
             request=httpx.Request("GET", "https://example.test/image.jpg"),
         )
     )
-    client = app_factory(IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client).test_client()
+    client = app_factory(
+        IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client,
+        IMAGEGEN_IMAGE_IMPORT_HOST_RESOLVER=public_resolver,
+    ).test_client()
     token = extract_csrf_token(client.get("/"))
 
     response = client.post(
@@ -143,7 +155,10 @@ def test_api_import_image_url_reports_fetch_failures(app_factory):
         raise httpx.ConnectError("connection failed", request=request)
 
     http_client = httpx.Client(transport=httpx.MockTransport(handler))
-    client = app_factory(IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client).test_client()
+    client = app_factory(
+        IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client,
+        IMAGEGEN_IMAGE_IMPORT_HOST_RESOLVER=public_resolver,
+    ).test_client()
     token = extract_csrf_token(client.get("/"))
 
     response = client.post(
@@ -154,6 +169,70 @@ def test_api_import_image_url_reports_fetch_failures(app_factory):
 
     assert response.status_code == 400
     assert response.json == {"error": "Image URL request failed."}
+
+
+def test_api_import_image_url_rejects_private_resolved_host_before_fetch(
+    app_factory,
+):
+    def handler(request):
+        raise AssertionError("unsafe URL should not be fetched")
+
+    http_client = httpx.Client(transport=httpx.MockTransport(handler))
+    client = app_factory(
+        IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client,
+        IMAGEGEN_IMAGE_IMPORT_HOST_RESOLVER=lambda hostname: [
+            ip_address("192.168.1.10")
+        ],
+    ).test_client()
+    token = extract_csrf_token(client.get("/"))
+
+    response = client.post(
+        "/api/images/import-url",
+        json={"url": "https://example.test/image.png"},
+        headers={"X-CSRF-Token": token},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Image URL host resolves to an unsafe address."}
+
+
+def test_api_import_image_url_checks_redirect_destination(app_factory):
+    requested_urls = []
+
+    def handler(request):
+        requested_urls.append(str(request.url))
+        if str(request.url) == "https://example.test/start":
+            return httpx.Response(
+                302,
+                headers={"location": "http://127.0.0.1/image.png"},
+                request=request,
+            )
+        raise AssertionError("unsafe redirect target should not be fetched")
+
+    def resolver(hostname):
+        if hostname == "example.test":
+            return [ip_address("93.184.216.34")]
+        if hostname == "127.0.0.1":
+            return [ip_address("127.0.0.1")]
+        raise AssertionError(f"unexpected hostname {hostname}")
+
+    client = app_factory(
+        IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=httpx.Client(
+            transport=httpx.MockTransport(handler)
+        ),
+        IMAGEGEN_IMAGE_IMPORT_HOST_RESOLVER=resolver,
+    ).test_client()
+    token = extract_csrf_token(client.get("/"))
+
+    response = client.post(
+        "/api/images/import-url",
+        json={"url": "https://example.test/start"},
+        headers={"X-CSRF-Token": token},
+    )
+
+    assert response.status_code == 400
+    assert response.json == {"error": "Image URL host resolves to an unsafe address."}
+    assert requested_urls == ["https://example.test/start"]
 
 
 def test_api_import_image_url_rejects_oversized_response(app_factory):
@@ -167,6 +246,7 @@ def test_api_import_image_url_rejects_oversized_response(app_factory):
     )
     client = app_factory(
         IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client,
+        IMAGEGEN_IMAGE_IMPORT_HOST_RESOLVER=public_resolver,
         IMAGEGEN_IMAGE_IMPORT_MAX_BYTES=8,
     ).test_client()
     token = extract_csrf_token(client.get("/"))
@@ -189,7 +269,10 @@ def test_api_import_image_url_rejects_non_image_response(app_factory):
             request=httpx.Request("GET", "https://example.test/image.txt"),
         )
     )
-    client = app_factory(IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client).test_client()
+    client = app_factory(
+        IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client,
+        IMAGEGEN_IMAGE_IMPORT_HOST_RESOLVER=public_resolver,
+    ).test_client()
     token = extract_csrf_token(client.get("/"))
 
     response = client.post(
@@ -210,7 +293,10 @@ def test_api_import_image_url_rejects_unsupported_image_format(app_factory):
             request=httpx.Request("GET", "https://example.test/image.gif"),
         )
     )
-    client = app_factory(IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client).test_client()
+    client = app_factory(
+        IMAGEGEN_IMAGE_IMPORT_HTTP_CLIENT=http_client,
+        IMAGEGEN_IMAGE_IMPORT_HOST_RESOLVER=public_resolver,
+    ).test_client()
     token = extract_csrf_token(client.get("/"))
 
     response = client.post(

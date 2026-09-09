@@ -19,6 +19,7 @@ from imagegen.image_store import (
     download_image,
     max_download_bytes,
     persist_generated_images,
+    validate_download_url,
 )
 from imagegen.metadata import EmbeddedImageMetadataProvider
 from imagegen.metadata_embed import read_embedded_metadata
@@ -45,11 +46,11 @@ def test_download_image_writes_file_and_embedded_metadata(tmp_path):
         200,
         headers={"content-type": "image/jpeg"},
         content=image_bytes("JPEG"),
-        request=httpx.Request("GET", "https://example.com/out.jpg"),
+        request=httpx.Request("GET", "https://replicate.delivery/out.jpg"),
     )
 
     stored = download_image(
-        "https://example.com/out.jpg",
+        "https://replicate.delivery/out.jpg",
         output_dir=tmp_path,
         model=model,
         prompt="a cookie",
@@ -90,7 +91,10 @@ def test_persist_generated_images_creates_output_directory(tmp_path):
         )
 
     stored = persist_generated_images(
-        ["https://example.com/out-1.png", "https://example.com/out-2.png"],
+        [
+            "https://replicate.delivery/out-1.png",
+            "https://replicate.delivery/out-2.png",
+        ],
         output_dir=output_dir,
         model=model,
         prompt="a cookie",
@@ -113,12 +117,12 @@ def test_download_image_rejects_non_image_response(tmp_path):
         200,
         headers={"content-type": "text/plain"},
         content=b"not an image",
-        request=httpx.Request("GET", "https://example.com/out.txt"),
+        request=httpx.Request("GET", "https://replicate.delivery/out.txt"),
     )
 
     with pytest.raises(ImageDownloadError, match="Expected image content"):
         download_image(
-            "https://example.com/out.txt",
+            "https://replicate.delivery/out.txt",
             output_dir=tmp_path,
             model=MODEL_REGISTRY["seedream45"],
             prompt="a cookie",
@@ -136,12 +140,12 @@ def test_download_image_rejects_gif_response(tmp_path):
         200,
         headers={"content-type": "image/gif"},
         content=b"gif-data",
-        request=httpx.Request("GET", "https://example.com/out.gif"),
+        request=httpx.Request("GET", "https://replicate.delivery/out.gif"),
     )
 
     with pytest.raises(ImageDownloadError, match="GIF image outputs are not supported"):
         download_image(
-            "https://example.com/out.gif",
+            "https://replicate.delivery/out.gif",
             output_dir=tmp_path,
             model=MODEL_REGISTRY["seedream45"],
             prompt="a cookie",
@@ -160,12 +164,12 @@ def test_download_image_rejects_oversized_response(tmp_path):
         200,
         headers={"content-type": "image/png"},
         content=b"x" * (max_download_bytes(model) + 1),
-        request=httpx.Request("GET", "https://example.com/out.png"),
+        request=httpx.Request("GET", "https://replicate.delivery/out.png"),
     )
 
     with pytest.raises(ImageDownloadError, match="exceeding limit"):
         download_image(
-            "https://example.com/out.png",
+            "https://replicate.delivery/out.png",
             output_dir=tmp_path,
             model=model,
             prompt="a cookie",
@@ -260,7 +264,7 @@ def test_download_image_rejects_private_resolved_host_before_fetch(tmp_path):
 
     with pytest.raises(ImageDownloadError, match="unsafe address"):
         download_image(
-            "https://images.example.test/out.png",
+            "https://images.replicate.delivery/out.png",
             output_dir=tmp_path,
             model=MODEL_REGISTRY["seedream45"],
             prompt="a cookie",
@@ -273,12 +277,39 @@ def test_download_image_rejects_private_resolved_host_before_fetch(tmp_path):
         )
 
 
+@pytest.mark.parametrize(
+    ("provider", "url"),
+    [
+        ("replicate", "https://replicate.delivery/out.png"),
+        ("replicate", "https://cdn.replicate.delivery/out.png"),
+        ("falai", "https://cdn.fal.media/out.png"),
+        ("wiro", "https://cdn.wiro.ai/out.png"),
+    ],
+)
+def test_validate_download_url_accepts_documented_provider_hosts(provider, url):
+    assert validate_download_url(url, provider=provider, resolver=safe_resolver) == url
+
+
+@pytest.mark.parametrize(
+    ("provider", "url"),
+    [
+        ("replicate", "https://replicate.delivery.evil.example/out.png"),
+        ("falai", "https://fal.media/out.png"),
+        ("wiro", "https://wiro.ai/out.png"),
+        ("wiro", "https://cdn.fal.media/out.png"),
+    ],
+)
+def test_validate_download_url_rejects_undocumented_provider_hosts(provider, url):
+    with pytest.raises(ImageDownloadError, match="not allowed"):
+        validate_download_url(url, provider=provider, resolver=safe_resolver)
+
+
 def test_download_image_rejects_redirect_to_unsafe_host_before_fetch(tmp_path):
     requested_urls = []
 
     def handler(request):
         requested_urls.append(str(request.url))
-        if str(request.url) == "https://cdn.example.test/start":
+        if str(request.url) == "https://cdn.replicate.delivery/start":
             return httpx.Response(
                 302,
                 headers={"location": "https://127.0.0.1/out.png"},
@@ -286,7 +317,7 @@ def test_download_image_rejects_redirect_to_unsafe_host_before_fetch(tmp_path):
         raise AssertionError("unsafe redirect target should not be fetched")
 
     def resolver(hostname):
-        if hostname == "cdn.example.test":
+        if hostname == "cdn.replicate.delivery":
             return [ip_address("93.184.216.34")]
         if hostname == "127.0.0.1":
             return [ip_address("127.0.0.1")]
@@ -294,7 +325,7 @@ def test_download_image_rejects_redirect_to_unsafe_host_before_fetch(tmp_path):
 
     with pytest.raises(ImageDownloadError, match="unsafe address"):
         download_image(
-            "https://cdn.example.test/start",
+            "https://cdn.replicate.delivery/start",
             output_dir=tmp_path,
             model=MODEL_REGISTRY["seedream45"],
             prompt="a cookie",
@@ -306,7 +337,7 @@ def test_download_image_rejects_redirect_to_unsafe_host_before_fetch(tmp_path):
             resolver=resolver,
         )
 
-    assert requested_urls == ["https://cdn.example.test/start"]
+    assert requested_urls == ["https://cdn.replicate.delivery/start"]
 
 
 def test_download_image_redacts_query_from_http_errors(tmp_path):
@@ -314,13 +345,13 @@ def test_download_image_redacts_query_from_http_errors(tmp_path):
         403,
         request=httpx.Request(
             "GET",
-            "https://example.com/out.png?token=secret-token",
+            "https://replicate.delivery/out.png?token=secret-token",
         ),
     )
 
     with pytest.raises(ImageDownloadError) as error:
         download_image(
-            "https://example.com/out.png?token=secret-token",
+            "https://replicate.delivery/out.png?token=secret-token",
             output_dir=tmp_path,
             model=MODEL_REGISTRY["seedream45"],
             prompt="a cookie",
@@ -333,7 +364,7 @@ def test_download_image_redacts_query_from_http_errors(tmp_path):
         )
 
     assert "secret-token" not in str(error.value)
-    assert "https://example.com/out.png" in str(error.value)
+    assert "https://replicate.delivery/out.png" in str(error.value)
 
 
 def test_max_download_bytes_uses_expected_bmp_size_plus_overhead():
