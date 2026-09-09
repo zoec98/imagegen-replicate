@@ -20,7 +20,7 @@ from imagegen.metadata import EmbeddedImageMetadataProvider
 from imagegen.palettes import initialize_default_palettes
 from imagegen.request_store import RequestStore
 from imagegen.routes import register_routes
-from imagegen.security import no_cors_response
+from imagegen.security import MAX_REQUEST_BYTES, no_cors_response
 from imagegen.worker import ThreadedGenerationWorker
 
 
@@ -38,6 +38,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     )
     if config:
         app.config.update(config)
+    app.config["MAX_CONTENT_LENGTH"] = MAX_REQUEST_BYTES
     request_store = app.config.setdefault("IMAGEGEN_REQUEST_STORE", RequestStore())
     generation_log = app.config.setdefault(
         "IMAGEGEN_GENERATION_LOG",

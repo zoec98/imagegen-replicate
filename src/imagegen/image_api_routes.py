@@ -94,14 +94,15 @@ def register_image_api_routes(app: Flask) -> None:
                 {"error": "Only one image file can be uploaded at a time."}
             ), 400
 
+        max_bytes = app.config.get(
+            "IMAGEGEN_IMAGE_IMPORT_MAX_BYTES",
+            MAX_UPLOAD_BYTES,
+        )
         try:
             imported = store_imported_image(
-                files[0].read(),
+                files[0].stream.read(max_bytes + 1),
                 output_dir=app_config.output_dir,
-                max_bytes=app.config.get(
-                    "IMAGEGEN_IMAGE_IMPORT_MAX_BYTES",
-                    MAX_UPLOAD_BYTES,
-                ),
+                max_bytes=max_bytes,
             )
         except ImageImportError as error:
             return jsonify({"error": str(error)}), 400

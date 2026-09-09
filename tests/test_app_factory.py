@@ -7,6 +7,7 @@ Behaviors protected:
 """
 
 from imagegen.app_version import app_checksum
+from imagegen.security import MAX_REQUEST_BYTES
 
 
 def test_app_checksum_changes_when_asset_content_changes(tmp_path):
@@ -28,6 +29,7 @@ def test_create_app_returns_flask_app(app_factory):
     app = app_factory()
 
     assert app.name == "imagegen.app"
+    assert app.config["MAX_CONTENT_LENGTH"] == MAX_REQUEST_BYTES
 
 
 def test_create_app_creates_derived_data_directories(app_config, app_factory):

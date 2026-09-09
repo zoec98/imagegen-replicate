@@ -14,6 +14,7 @@ import httpx
 from image_route_helpers import import_response_client, route_image_bytes
 from PIL import Image
 from route_helpers import extract_csrf_token
+from imagegen.security import MAX_REQUEST_BYTES
 
 
 def test_api_import_image_url_stores_http_image(app_config, app_factory):
@@ -90,6 +91,23 @@ def test_api_import_image_url_rejects_non_http_scheme(app_factory):
 
     assert response.status_code == 400
     assert response.json == {"error": "Image URL must use http or https."}
+
+
+def test_api_import_image_url_rejects_oversized_request_before_route_work(
+    app_factory,
+):
+    client = app_factory().test_client()
+    token = extract_csrf_token(client.get("/"))
+
+    response = client.post(
+        "/api/images/import-url",
+        data='{"url":"https://example.test/image.png"}',
+        content_type="application/json",
+        headers={"X-CSRF-Token": token},
+        environ_overrides={"CONTENT_LENGTH": str(MAX_REQUEST_BYTES + 1)},
+    )
+
+    assert response.status_code == 413
 
 
 def test_api_import_image_url_rejects_missing_or_invalid_payload(app_factory):
@@ -281,6 +299,23 @@ def test_api_import_uploaded_image_rejects_empty_upload(app_factory):
 
     assert response.status_code == 400
     assert response.json == {"error": "Image upload is empty."}
+
+
+def test_api_import_uploaded_image_reads_only_one_byte_over_limit(app_factory):
+    client = app_factory(IMAGEGEN_IMAGE_IMPORT_MAX_BYTES=8).test_client()
+    token = extract_csrf_token(client.get("/"))
+
+    response = client.post(
+        "/api/images/import-upload",
+        data={"image": (BytesIO(b"1234567890"), "sample.png", "image/png")},
+        headers={"X-CSRF-Token": token},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    assert response.json == {
+        "error": "Image upload is 9 bytes, exceeding limit 8."
+    }
 
 
 def test_api_import_uploaded_image_rejects_multiple_files(app_factory):

@@ -18,6 +18,7 @@ CSRF_TOKEN_BYTES = 32
 CSRF_SESSION_KEY = "csrf_token"
 CSRF_CLIENT_IP_SESSION_KEY = "csrf_client_ip"
 CSRF_HEADER = "X-CSRF-Token"
+MAX_REQUEST_BYTES = 1 * 1024 * 1024 * 1024
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "
     "script-src 'self'; "
