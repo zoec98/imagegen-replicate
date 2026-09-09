@@ -3,7 +3,7 @@ import { readJsonScript } from "./dom.js";
 import { setupGallery } from "./gallery.js";
 import { setupGeneration } from "./generation.js";
 import { setupImageUpload } from "./image-upload.js";
-import { setupMaskEditor } from "./mask-editor.js";
+import { setupImageEditor } from "./image-editor.js";
 import { setupMetadata } from "./metadata.js";
 import { setupPalettes } from "./palettes.js";
 import { setupSourceImages } from "./source-images.js";
@@ -46,7 +46,7 @@ export function setupWorkspace(root = document) {
   let sourceWorkflow = null;
   let galleryWorkflow = null;
   let generationWorkflow = null;
-  let maskEditorWorkflow = null;
+  let imageEditorWorkflow = null;
   let uploadWorkflow = null;
 
   function selectedProvider() {
@@ -452,7 +452,7 @@ export function setupWorkspace(root = document) {
     modelRegistry,
     showMessage,
   });
-  maskEditorWorkflow = setupMaskEditor(documentRoot, {
+  imageEditorWorkflow = setupImageEditor(documentRoot, {
     csrfToken,
     refreshGallery,
     showMessage,
@@ -464,7 +464,7 @@ export function setupWorkspace(root = document) {
   galleryWorkflow = setupGallery(documentRoot, {
     csrfToken,
     metadata: metadataWorkflow,
-    openMaskEditor: (figure) => maskEditorWorkflow.open(figure),
+    openMaskEditor: (figure) => imageEditorWorkflow.open(figure),
     removeSourceImage: (filename) => sourceWorkflow.remove(filename),
     setTrashCount: (value) => trashWorkflow.setCount(value),
     showMessage,
@@ -508,8 +508,8 @@ export function setupWorkspace(root = document) {
     updateSourceSelectionUi();
   });
   documentRoot.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && maskEditorWorkflow.isOpen()) {
-      maskEditorWorkflow.close();
+    if (event.key === "Escape" && imageEditorWorkflow.isOpen()) {
+      imageEditorWorkflow.close();
       return;
     }
     if (event.key === "Escape" && trashWorkflow.isOpen()) {

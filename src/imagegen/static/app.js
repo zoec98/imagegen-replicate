@@ -875,11 +875,11 @@
 		return createElement("figcaption", { className: "image-card-ribbon" });
 	}
 	//#endregion
-	//#region src/imagegen/frontend/mask-editor.js
+	//#region src/imagegen/frontend/image-editor.js
 	var DEFAULT_BRUSH_SIZE = 50;
 	var DEFAULT_BRUSH_FALLOFF = 0;
 	var MAX_BLUR_RADIUS = 50;
-	function setupMaskEditor(root = document, services = {}) {
+	function setupImageEditor(root = document, services = {}) {
 		const { csrfToken = "", imageFactory = () => new Image(), refreshGallery = async () => {}, showMessage = () => {} } = services;
 		const overlay = root.querySelector(".mask-editor-overlay");
 		const stage = overlay?.querySelector(".mask-editor-stage");
@@ -2056,7 +2056,7 @@
 		let sourceWorkflow = null;
 		let galleryWorkflow = null;
 		let generationWorkflow = null;
-		let maskEditorWorkflow = null;
+		let imageEditorWorkflow = null;
 		let uploadWorkflow = null;
 		function selectedProvider() {
 			return providerSelector?.value || null;
@@ -2289,7 +2289,7 @@
 			modelRegistry,
 			showMessage
 		});
-		maskEditorWorkflow = setupMaskEditor(documentRoot, {
+		imageEditorWorkflow = setupImageEditor(documentRoot, {
 			csrfToken,
 			refreshGallery,
 			showMessage
@@ -2301,7 +2301,7 @@
 		galleryWorkflow = setupGallery(documentRoot, {
 			csrfToken,
 			metadata: metadataWorkflow,
-			openMaskEditor: (figure) => maskEditorWorkflow.open(figure),
+			openMaskEditor: (figure) => imageEditorWorkflow.open(figure),
 			removeSourceImage: (filename) => sourceWorkflow.remove(filename),
 			setTrashCount: (value) => trashWorkflow.setCount(value),
 			showMessage,
@@ -2344,8 +2344,8 @@
 			updateSourceSelectionUi();
 		});
 		documentRoot.addEventListener("keydown", (event) => {
-			if (event.key === "Escape" && maskEditorWorkflow.isOpen()) {
-				maskEditorWorkflow.close();
+			if (event.key === "Escape" && imageEditorWorkflow.isOpen()) {
+				imageEditorWorkflow.close();
 				return;
 			}
 			if (event.key === "Escape" && trashWorkflow.isOpen()) {

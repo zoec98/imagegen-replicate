@@ -4,7 +4,7 @@ const DEFAULT_BRUSH_SIZE = 50;
 const DEFAULT_BRUSH_FALLOFF = 0;
 const MAX_BLUR_RADIUS = 50;
 
-export function setupMaskEditor(root = document, services = {}) {
+export function setupImageEditor(root = document, services = {}) {
   const {
     csrfToken = "",
     imageFactory = () => new Image(),
@@ -651,3 +651,4 @@ export function setupMaskEditor(root = document, services = {}) {
     updateOperationControls,
   };
 }
+

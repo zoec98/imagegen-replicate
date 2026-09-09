@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { setupMaskEditor } from "../../src/imagegen/frontend/mask-editor.js";
+import { setupImageEditor } from "../../src/imagegen/frontend/image-editor.js";
 
 function jsonResponse(data, init = {}) {
   return new Response(JSON.stringify(data), {
@@ -150,11 +150,11 @@ function selectMaskMode() {
   selectOperationMode("mask");
 }
 
-describe("setupMaskEditor", () => {
+describe("setupImageEditor", () => {
   it("opens and closes the image editor for a gallery image", () => {
     renderMaskWorkspace();
     stubCanvas();
-    const editor = setupMaskEditor(document, { imageFactory: fakeImageFactory });
+    const editor = setupImageEditor(document, { imageFactory: fakeImageFactory });
     const overlay = document.querySelector(".mask-editor-overlay");
 
     editor.open(document.querySelector(".gallery-item"));
@@ -179,7 +179,7 @@ describe("setupMaskEditor", () => {
   it("shows operation-specific controls without closing the editor", () => {
     renderMaskWorkspace();
     stubCanvas();
-    const editor = setupMaskEditor(document, { imageFactory: fakeImageFactory });
+    const editor = setupImageEditor(document, { imageFactory: fakeImageFactory });
     const overlay = document.querySelector(".mask-editor-overlay");
     editor.open(document.querySelector(".gallery-item"));
 
@@ -227,7 +227,7 @@ describe("setupMaskEditor", () => {
   it("resets transient editor mode when closed", () => {
     renderMaskWorkspace();
     stubCanvas();
-    const editor = setupMaskEditor(document, { imageFactory: fakeImageFactory });
+    const editor = setupImageEditor(document, { imageFactory: fakeImageFactory });
     editor.open(document.querySelector(".gallery-item"));
     const operation = document.querySelector(".mask-editor-operation");
     operation.value = "mask";
@@ -245,7 +245,7 @@ describe("setupMaskEditor", () => {
   it("draws a crop rectangle and enables crop when the selection is valid", async () => {
     renderMaskWorkspace();
     const context = stubCanvas();
-    const editor = setupMaskEditor(document, {
+    const editor = setupImageEditor(document, {
       imageFactory: largeFakeImageFactory,
     });
     editor.open(document.querySelector(".gallery-item"));
@@ -272,7 +272,7 @@ describe("setupMaskEditor", () => {
   it("keeps crop disabled for too-small selections", async () => {
     renderMaskWorkspace();
     stubCanvas();
-    const editor = setupMaskEditor(document, {
+    const editor = setupImageEditor(document, {
       imageFactory: largeFakeImageFactory,
     });
     editor.open(document.querySelector(".gallery-item"));
@@ -304,7 +304,7 @@ describe("setupMaskEditor", () => {
       }),
     );
     vi.stubGlobal("fetch", fetcher);
-    const editor = setupMaskEditor(document, {
+    const editor = setupImageEditor(document, {
       csrfToken: "csrf-token",
       imageFactory: largeFakeImageFactory,
       refreshGallery,
@@ -357,7 +357,7 @@ describe("setupMaskEditor", () => {
           jsonResponse({ error: "Crop rectangle is invalid." }, { status: 400 }),
         ),
     );
-    const editor = setupMaskEditor(document, {
+    const editor = setupImageEditor(document, {
       csrfToken: "csrf-token",
       imageFactory: largeFakeImageFactory,
       showMessage,
@@ -388,7 +388,7 @@ describe("setupMaskEditor", () => {
   it("updates brush control labels", () => {
     renderMaskWorkspace();
     stubCanvas();
-    setupMaskEditor(document, { imageFactory: fakeImageFactory });
+    setupImageEditor(document, { imageFactory: fakeImageFactory });
 
     const size = document.querySelector(".mask-editor-brush-size");
     const falloff = document.querySelector(".mask-editor-brush-falloff");
@@ -408,7 +408,7 @@ describe("setupMaskEditor", () => {
   it("uses the selected image dimensions for the blur default", async () => {
     renderMaskWorkspace();
     stubCanvas();
-    const editor = setupMaskEditor(document, { imageFactory: largeFakeImageFactory });
+    const editor = setupImageEditor(document, { imageFactory: largeFakeImageFactory });
     editor.open(document.querySelector(".gallery-item"));
     await new Promise((resolve) => queueMicrotask(resolve));
 
@@ -429,7 +429,7 @@ describe("setupMaskEditor", () => {
   it("caps the image-derived blur default at 50 pixels", async () => {
     renderMaskWorkspace();
     stubCanvas();
-    const editor = setupMaskEditor(document, { imageFactory: cappedFakeImageFactory });
+    const editor = setupImageEditor(document, { imageFactory: cappedFakeImageFactory });
     editor.open(document.querySelector(".gallery-item"));
     await new Promise((resolve) => queueMicrotask(resolve));
 
@@ -442,7 +442,7 @@ describe("setupMaskEditor", () => {
   it("recomputes the blur default for each image without clobbering current edits", async () => {
     renderMaskWorkspace();
     stubCanvas();
-    const editor = setupMaskEditor(document, {
+    const editor = setupImageEditor(document, {
       imageFactory: sequentialImageFactory(),
     });
     const firstFigure = document.querySelector(".gallery-item");
@@ -470,7 +470,7 @@ describe("setupMaskEditor", () => {
   it("preserves a blur edit made while the image is loading", async () => {
     renderMaskWorkspace();
     stubCanvas();
-    const editor = setupMaskEditor(document, { imageFactory: largeFakeImageFactory });
+    const editor = setupImageEditor(document, { imageFactory: largeFakeImageFactory });
     editor.open(document.querySelector(".gallery-item"));
 
     const radius = document.querySelector(".mask-editor-blur-radius");
@@ -484,7 +484,7 @@ describe("setupMaskEditor", () => {
   it("updates blur radius labels", () => {
     renderMaskWorkspace();
     stubCanvas();
-    setupMaskEditor(document, { imageFactory: fakeImageFactory });
+    setupImageEditor(document, { imageFactory: fakeImageFactory });
 
     const radius = document.querySelector(".mask-editor-blur-radius");
     radius.value = "7.5";
@@ -506,7 +506,7 @@ describe("setupMaskEditor", () => {
       }),
     );
     vi.stubGlobal("fetch", fetcher);
-    const editor = setupMaskEditor(document, {
+    const editor = setupImageEditor(document, {
       csrfToken: "csrf-token",
       imageFactory: largeFakeImageFactory,
       refreshGallery,
@@ -569,7 +569,7 @@ describe("setupMaskEditor", () => {
           ),
         ),
     );
-    const editor = setupMaskEditor(document, {
+    const editor = setupImageEditor(document, {
       csrfToken: "csrf-token",
       imageFactory: largeFakeImageFactory,
       showMessage,
@@ -609,7 +609,7 @@ describe("setupMaskEditor", () => {
     const showMessage = vi.fn();
     const fetcher = vi.fn().mockResolvedValue(jsonResponse({ filename: "mask.png" }));
     vi.stubGlobal("fetch", fetcher);
-    const editor = setupMaskEditor(document, {
+    const editor = setupImageEditor(document, {
       csrfToken: "csrf-token",
       imageFactory: fakeImageFactory,
       refreshGallery,
@@ -650,7 +650,7 @@ describe("setupMaskEditor", () => {
           }),
       ),
     );
-    const editor = setupMaskEditor(document, {
+    const editor = setupImageEditor(document, {
       csrfToken: "csrf-token",
       imageFactory: fakeImageFactory,
     });
@@ -680,7 +680,7 @@ describe("setupMaskEditor", () => {
           jsonResponse({ error: "Mask could not be saved." }, { status: 500 }),
         ),
     );
-    const editor = setupMaskEditor(document, {
+    const editor = setupImageEditor(document, {
       csrfToken: "csrf-token",
       imageFactory: fakeImageFactory,
       showMessage,
@@ -698,3 +698,4 @@ describe("setupMaskEditor", () => {
     expect(document.querySelector(".mask-editor-save").disabled).toBe(false);
   });
 });
+

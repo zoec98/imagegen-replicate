@@ -11,7 +11,7 @@ Browser JavaScript source lives in `src/imagegen/frontend/`.
 - `api.js`: shared `fetch`, JSON, and CSRF request helpers.
 - `dom.js`: small DOM construction and attribute helpers.
 - Workflow modules such as `gallery.js`, `metadata.js`, `trash.js`,
-  `palettes.js`, `source-images.js`, `generation.js`, `mask-editor.js`, and
+  `palettes.js`, `source-images.js`, `generation.js`, `image-editor.js`, and
   `image-upload.js`: own one browser workflow each.
 
 Keep module interfaces small. Prefer `setupX(root, services)` functions that

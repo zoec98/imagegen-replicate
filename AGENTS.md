@@ -124,8 +124,8 @@ Current frontend modules:
   source-image UI state.
 - `generation.js`: generation payload assembly, submit, polling, and completion
   status handling.
-- `mask-editor.js`: mask overlay, brush controls, drawing state, invert, and
-  save behavior.
+- `image-editor.js`: image-edit overlay, crop/blur/mask controls, drawing state,
+  invert, and save behavior.
 - `image-upload.js`: upload overlay, URL import, file/drop import, and Immich
   import browser behavior.
 
