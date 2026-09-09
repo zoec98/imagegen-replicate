@@ -229,7 +229,7 @@ def test_replicate_gpt_image25_variants_match_schema(variant):
         "max",
         "auto",
     )
-    assert parameters["output_compression"].default == 90
+    assert parameters["output_compression"].default == 100
     assert parameters["output_format"].default == "jpeg"
     assert parameters["output_format"].choices == ("png", "jpeg", "webp")
     assert parameters["moderation"].choices == ("auto", "low")
@@ -687,6 +687,7 @@ def test_falai_gpt_image25_variants_contract(variant):
     )
     assert text_parameters["num_images"].maximum == 10
     assert text_parameters["output_format"].default == "jpeg"
+    assert text_parameters["output_compression"].default == 100
     assert text_parameters["output_compression"].minimum == 0
     assert text_parameters["output_compression"].maximum == 100
 

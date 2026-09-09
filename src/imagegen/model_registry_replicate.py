@@ -618,7 +618,7 @@ def _gpt_image25_parameters() -> tuple[ModelParameter, ...]:
             "output_compression",
             "Compression level.",
             "integer",
-            90,
+            100,
             minimum=0,
             maximum=100,
             order=7,

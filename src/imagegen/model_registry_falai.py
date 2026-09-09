@@ -1026,6 +1026,7 @@ def _gpt_image25_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
             "output_compression",
             "Compression level for JPEG or WebP output.",
             "integer",
+            100,
             minimum=0,
             maximum=100,
             order=9 if edit else 7,
