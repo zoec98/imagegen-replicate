@@ -1330,9 +1330,79 @@ QWEN_2512 = ReplicateModel(
 )
 
 
+HUNYUAN_IMAGE_3 = ReplicateModel(
+    alias="hunyuan-image-3",
+    display_name="Hunyuan Image 3",
+    documentation_url="https://replicate.com/tencent/hunyuan-image-3/api/schema",
+    replicate_model="tencent/hunyuan-image-3",
+    edit_capable=False,
+    fixed_inputs={"disable_safety_checker": True},
+    default_width=2048,
+    default_height=2048,
+    modes=("text-to-image",),
+    pricing=(_price("$0.08", "or around 12 images for $1"),),
+    parameters=(
+        _param("prompt", "Text prompt for image generation.", "string", order=0),
+        _param(
+            "aspect_ratio",
+            "Aspect ratio for the generated image.",
+            "select",
+            "1:1",
+            choices=(
+                "1:1",
+                "16:9",
+                "21:9",
+                "3:2",
+                "2:3",
+                "4:5",
+                "5:4",
+                "3:4",
+                "4:3",
+                "9:16",
+                "9:21",
+            ),
+            order=1,
+        ),
+        _param(
+            "go_fast",
+            "Run faster predictions with additional optimizations.",
+            "boolean",
+            True,
+            order=2,
+        ),
+        _param(
+            "seed",
+            "Random seed. Set for reproducible generation.",
+            "integer",
+            "",
+            order=3,
+            semantic_type="seed",
+        ),
+        _param(
+            "output_format",
+            "Format of the output images.",
+            "select",
+            "webp",
+            choices=("webp", "jpg", "png"),
+            order=4,
+        ),
+        _param(
+            "output_quality",
+            "Quality when saving output images.",
+            "integer",
+            95,
+            minimum=0,
+            maximum=100,
+            order=5,
+        ),
+    ),
+)
+
+
 MODEL_REGISTRY: dict[str, ReplicateModel] = {
     FLUX_FLEX.alias: FLUX_FLEX,
     GROK_IMAGINE.alias: GROK_IMAGINE,
+    HUNYUAN_IMAGE_3.alias: HUNYUAN_IMAGE_3,
     IMAGEN_4.alias: IMAGEN_4,
     IMAGEN_4_FAST.alias: IMAGEN_4_FAST,
     IMAGEN_4_ULTRA.alias: IMAGEN_4_ULTRA,

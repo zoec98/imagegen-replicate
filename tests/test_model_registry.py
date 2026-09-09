@@ -234,6 +234,36 @@ def test_replicate_gpt_image25_variants_match_schema(variant):
     assert parameters["moderation"].choices == ("auto", "low")
 
 
+def test_replicate_hunyuan_image3_matches_schema_and_safety_policy():
+    model = resolve_model("replicate", "hunyuan-image-3")
+    parameters = {
+        parameter.name: parameter for parameter in model.text_target.parameters
+    }
+
+    assert model.text_target.provider_model == "tencent/hunyuan-image-3"
+    assert model.edit_target is None
+    assert model.text_target.fixed_inputs == {"disable_safety_checker": True}
+    assert "disable_safety_checker" not in parameters
+    assert parameters["aspect_ratio"].choices == (
+        "1:1",
+        "16:9",
+        "21:9",
+        "3:2",
+        "2:3",
+        "4:5",
+        "5:4",
+        "3:4",
+        "4:3",
+        "9:16",
+        "9:21",
+    )
+    assert parameters["go_fast"].default is True
+    assert parameters["seed"].semantic_type == "seed"
+    assert parameters["output_format"].choices == ("webp", "jpg", "png")
+    assert parameters["output_quality"].default == 95
+    assert {price.price for price in model.text_target.pricing} == {"$0.08"}
+
+
 def test_fully_qualified_and_bare_model_refs_resolve_by_provider():
     assert resolve_model_ref("replicate:seedream45").provider == "replicate"
     assert resolve_model_ref("falai:seedream45").provider == "falai"
