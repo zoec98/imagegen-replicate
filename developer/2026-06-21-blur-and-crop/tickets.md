@@ -1,6 +1,6 @@
 # Blur And Crop Tickets
 
-Source stories: `development/2026-06-21-blur-and-crop/user-stories.md`.
+Source stories: `developer/2026-06-21-blur-and-crop/user-stories.md`.
 
 ## Decisions Applied
 
@@ -29,7 +29,7 @@ Source stories: `development/2026-06-21-blur-and-crop/user-stories.md`.
 
 Status: Complete.
 
-Result: `development/2026-06-21-blur-and-crop/boundary-audit.md`.
+Result: `developer/2026-06-21-blur-and-crop/boundary-audit.md`.
 
 ### Goal
 

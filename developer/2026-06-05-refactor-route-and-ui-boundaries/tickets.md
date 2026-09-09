@@ -1,6 +1,6 @@
 # Refactor Route and UI Boundaries Tickets
 
-Source audit: `development/refactors/2026-06-05-refactoring-audit.md`.
+Source audit: `developer/2026-06-05-refactoring-audit/2026-06-05-refactoring-audit.md`.
 
 ## Decisions Applied
 
@@ -284,4 +284,3 @@ maintenance or correctness problem.
   fixed inputs, selectable models, and custom dimensions.
 - `uv run pytest`
 - `uv run ruff check src tests`
-

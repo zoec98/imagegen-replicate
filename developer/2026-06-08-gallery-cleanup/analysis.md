@@ -178,7 +178,7 @@ Recommended CSS changes:
 
 ## JS Refactor Recommendation
 
-Do not process `development/refactors/2026-06-07-js-refactor.md` before fixing
+Do not process `developer/2026-06-07-js-refactor/refactoring-audit.md` before fixing
 the gallery layout.
 
 That proposal is directionally useful, but it is a larger toolchain and source

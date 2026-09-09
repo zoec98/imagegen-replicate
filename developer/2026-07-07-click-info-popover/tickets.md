@@ -1,6 +1,6 @@
 # Click Image Info Popover Tickets
 
-Source stories: `development/2026-07-07-click-info-popover/user-stories.md`.
+Source stories: `developer/2026-07-07-click-info-popover/user-stories.md`.
 
 ## TDD Approach
 

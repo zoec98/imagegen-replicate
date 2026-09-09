@@ -1,6 +1,6 @@
 # JavaScript Refactor Tickets
 
-Source proposal: `development/refactors/2026-06-07-js-refactor.md`.
+Source proposal: `developer/2026-06-07-js-refactor/refactoring-audit.md`.
 
 ## Decisions Applied
 
@@ -444,7 +444,7 @@ future contributors edit the right files.
 
 - Update `AGENTS.md` or the focused development guidance with JS build
   commands.
-- Update `development/ui-guidance.md` or a focused JS note with source layout
+- Update `developer/ui-guidance.md` or a focused JS note with source layout
   and module conventions.
 - Document that `src/imagegen/static/app.js` is generated and should not be
   edited directly.
@@ -467,8 +467,8 @@ future contributors edit the right files.
 
 Completed verification:
 
-- Reviewed `AGENTS.md`, `development/README.md`, and
-  `development/ui-guidance.md`.
+- Reviewed `AGENTS.md`, `developer/README.md`, and
+  `developer/ui-guidance.md`.
 - `npm run js:check`
 - `uv run pytest`
 - `uv run ruff check src tests`

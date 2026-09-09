@@ -266,5 +266,5 @@ Conclusion:
   `gallery.py` until more behavior appears?
 - Should JavaScript remain a single no-build file, or is a small multi-file
   static module setup acceptable?
-- Should root legacy planning files be migrated into `development/epics/` now,
+- Should root legacy planning files be migrated into `developer/` now,
   or left as historical artifacts until the next feature starts?

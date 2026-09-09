@@ -1,6 +1,6 @@
 # Blur And Crop Boundary Audit
 
-Implemented for ticket 1 in `development/2026-06-21-blur-and-crop/tickets.md`.
+Implemented for ticket 1 in `developer/2026-06-21-blur-and-crop/tickets.md`.
 
 ## Summary
 

@@ -46,38 +46,38 @@ Project scripts live in `scripts/`:
 ## Progressive Discovery
 
 Keep this file short. Detailed internal working material belongs under
-[`development/`](development/index.md).
+[`developer/`](developer/README.md).
 
 Before work, load only the focused detail file needed for the task:
 
-- Provider/model registry work: [development/provider-models.md](development/provider-models.md)
-- Generated image storage and metadata: [development/generated-images.md](development/generated-images.md)
-- Prompt palette work: [development/prompt-palettes.md](development/prompt-palettes.md)
-- UI work: [development/ui-guidance.md](development/ui-guidance.md)
-- Refactoring reviews: [development/refactoring.md](development/refactoring.md)
-- Security-sensitive work: [development/security-boundary.md](development/security-boundary.md)
-- Development folder structure: [development/README.md](development/README.md)
+- Provider/model registry work: [developer/provider-models.md](developer/provider-models.md)
+- Generated image storage and metadata: [developer/generated-images.md](developer/generated-images.md)
+- Prompt palette work: [developer/prompt-palettes.md](developer/prompt-palettes.md)
+- UI work: [developer/ui-guidance.md](developer/ui-guidance.md)
+- Refactoring reviews: [developer/refactoring.md](developer/refactoring.md)
+- Security-sensitive work: [developer/security-boundary.md](developer/security-boundary.md)
+- Development folder structure: [developer/README.md](developer/README.md)
 - Current JavaScript refactor decisions and tickets:
-  [development/2026-06-07-js-refactor/tickets.md](development/2026-06-07-js-refactor/tickets.md)
+  [developer/2026-06-07-js-refactor/tickets.md](developer/2026-06-07-js-refactor/tickets.md)
 - Image upload planning:
-  [development/2026-06-07-image-upload/tickets.md](development/2026-06-07-image-upload/tickets.md)
-  and [development/2026-06-07-image-upload/user-story.md](development/2026-06-07-image-upload/user-story.md)
+  [developer/2026-06-07-image-upload/tickets.md](developer/2026-06-07-image-upload/tickets.md)
+  and [developer/2026-06-07-image-upload/user-story.md](developer/2026-06-07-image-upload/user-story.md)
 - Gallery cleanup findings and follow-up work:
-  [development/2026-06-08-gallery-cleanup/analysis.md](development/2026-06-08-gallery-cleanup/analysis.md),
-  [development/2026-06-08-gallery-cleanup/audit.md](development/2026-06-08-gallery-cleanup/audit.md),
-  [development/2026-06-08-gallery-cleanup/test-notes.md](development/2026-06-08-gallery-cleanup/test-notes.md),
-  and [development/2026-06-08-gallery-cleanup/tickets.md](development/2026-06-08-gallery-cleanup/tickets.md)
+  [developer/2026-06-08-gallery-cleanup/analysis.md](developer/2026-06-08-gallery-cleanup/analysis.md),
+  [developer/2026-06-08-gallery-cleanup/audit.md](developer/2026-06-08-gallery-cleanup/audit.md),
+  [developer/2026-06-08-gallery-cleanup/test-notes.md](developer/2026-06-08-gallery-cleanup/test-notes.md),
+  and [developer/2026-06-08-gallery-cleanup/tickets.md](developer/2026-06-08-gallery-cleanup/tickets.md)
 - Historical route/UI boundary and refactoring audits:
-  [development/2026-06-05-refactor-route-and-ui-boundaries/tickets.md](development/2026-06-05-refactor-route-and-ui-boundaries/tickets.md),
-  [development/2026-06-05-refactoring-audit/2026-06-05-refactoring-audit.md](development/2026-06-05-refactoring-audit/2026-06-05-refactoring-audit.md),
-  and [development/2026-06-05-test-audit/audit.md](development/2026-06-05-test-audit/audit.md)
+  [developer/2026-06-05-refactor-route-and-ui-boundaries/tickets.md](developer/2026-06-05-refactor-route-and-ui-boundaries/tickets.md),
+  [developer/2026-06-05-refactoring-audit/2026-06-05-refactoring-audit.md](developer/2026-06-05-refactoring-audit/2026-06-05-refactoring-audit.md),
+  and [developer/2026-06-05-test-audit/audit.md](developer/2026-06-05-test-audit/audit.md)
 
 For new non-trivial work, create or update a focused workstream under
-`development/` with a date-prefixed directory such as
-`development/YYYY-MM-DD-short-name/`. Store user stories, tickets, notes, and
+`developer/` with a date-prefixed directory such as
+`developer/YYYY-MM-DD-short-name/`. Store user stories, tickets, notes, and
 audit output there. Root planning files such as `PLAN.md`, `USER-STORY.md`,
 `AUDIT.md`, and `SCENARIO.md` are legacy or temporary artifacts; prefer
-`development/` for future work unless the user explicitly asks otherwise.
+`developer/` for future work unless the user explicitly asks otherwise.
 
 ## Expected Application Shape
 
@@ -186,4 +186,4 @@ Keep [README.md](README.md) focused on end users:
 - Where generated files are stored.
 
 Keep internal user stories, tickets, audits, security-boundary notes, and
-architecture decisions under `development/`.
+architecture decisions under `developer/`.

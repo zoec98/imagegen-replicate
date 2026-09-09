@@ -260,7 +260,7 @@ future changes do not silently split the three views again.
   DOM, document that limitation in the test or epic notes rather than adding a
   heavy JS toolchain in this ticket.
 - Do not add the JS build/test tooling from
-  `development/refactors/2026-06-07-js-refactor.md` just for this cleanup.
+  `developer/2026-06-07-js-refactor/refactoring-audit.md` just for this cleanup.
 
 ### Acceptance Criteria
 
@@ -345,6 +345,6 @@ visibly stable in the workflows where the bug was reported.
 - Do Ticket 5 after the local gallery/trash contract is stable, because upload
   has legitimate product differences around external asset browsing.
 - Do Ticket 6 only after the CSS/markup direction is proven in the browser.
-- Defer `development/refactors/2026-06-07-js-refactor.md` until after these
+- Defer `developer/2026-06-07-js-refactor/refactoring-audit.md` until after these
   tickets land; use the final helper shape from this work as input to that
   larger refactor.

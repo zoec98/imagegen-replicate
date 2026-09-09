@@ -1,6 +1,6 @@
 # Image Upload Tickets
 
-Source story: `development/epics/2026-06-07-image-upload/user-story.md`.
+Source story: `developer/2026-06-07-image-upload/user-story.md`.
 
 ## Decisions Applied
 
@@ -344,7 +344,7 @@ and Immich imports work.
 ### Acceptance Criteria
 
 - README stays end-user focused.
-- Internal implementation notes remain in `development/`.
+- Internal implementation notes remain in `developer/`.
 - Documentation does not promise unsupported bulk upload, search, filtering, or
   metadata rewriting behavior.
 
