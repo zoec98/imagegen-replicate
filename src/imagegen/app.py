@@ -79,5 +79,5 @@ def _resolve_app_config(config: dict[str, Any] | None) -> AppConfig:
             msg = "IMAGEGEN_APP_CONFIG must be an AppConfig instance."
             raise TypeError(msg)
         return value
-    env_path = config.get("IMAGEGEN_ENV_PATH", ".env") if config else ".env"
+    env_path = config.get("IMAGEGEN_ENV_PATH") if config else None
     return load_config(env_path)

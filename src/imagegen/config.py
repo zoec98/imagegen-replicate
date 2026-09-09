@@ -198,10 +198,11 @@ def write_env_example(path: str | Path = ".env.example") -> Path:
     return example_path
 
 
-def load_config(env_path: str | Path = ".env") -> AppConfig:
-    """Ensure .env exists, load it, and return typed application config."""
+def load_config(env_path: str | Path | None = None) -> AppConfig:
+    """Ensure the selected dotenv file exists and load typed application config."""
 
-    env_file = ensure_env_file(env_path).resolve()
+    selected_env_path = env_path if env_path is not None else _default_env_path()
+    env_file = ensure_env_file(selected_env_path).resolve()
     load_dotenv(env_file, override=False)
 
     model_alias = os.getenv("IMAGEGEN_MODEL", DEFAULT_MODEL_ALIAS).strip()
@@ -248,6 +249,11 @@ def load_config(env_path: str | Path = ".env") -> AppConfig:
         ),
         wiro_api_key=wiro_api_key,
     )
+
+
+def _default_env_path() -> Path:
+    local_env = Path.cwd() / ".env"
+    return local_env if local_env.exists() else Path.home() / ".imagegen.env"
 
 
 def _with_required_settings(existing_lines: list[str]) -> list[str]:

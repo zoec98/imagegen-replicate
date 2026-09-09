@@ -7,10 +7,16 @@ Behaviors protected:
 """
 
 import os
+from pathlib import Path
 
 import pytest
 
-from imagegen.config import ensure_env_file, load_config, write_env_example
+from imagegen.config import (
+    ENV_SETTINGS,
+    ensure_env_file,
+    load_config,
+    write_env_example,
+)
 from imagegen.metadata_policy import synthesize_copyright
 from imagegen.model_registry import MODEL_REGISTRY
 
@@ -184,6 +190,79 @@ def test_load_config_reads_env_file(tmp_path, monkeypatch):
     assert config.trashcan_hold_limit_days == 7
 
 
+def test_load_config_falls_back_to_home_env_file(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / ".imagegen.env").write_text(
+        "IMAGEGEN_DATA_DIR=home-data\nAUTHOR=Home Author\n",
+        encoding="utf-8",
+    )
+    clear_config_environment(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(Path, "home", lambda: home)
+
+    config = load_config()
+
+    assert config.data_dir == home / "home-data"
+    assert config.author == "Home Author"
+    assert not (tmp_path / ".env").exists()
+
+
+def test_load_config_prefers_local_env_without_merging_home_env(
+    tmp_path,
+    monkeypatch,
+):
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / ".imagegen.env").write_text(
+        "IMAGEGEN_DATA_DIR=home-data\nAUTHOR=Home Author\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".env").write_text(
+        "IMAGEGEN_DATA_DIR=local-data\n",
+        encoding="utf-8",
+    )
+    clear_config_environment(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(Path, "home", lambda: home)
+
+    config = load_config()
+
+    assert config.data_dir == tmp_path / "local-data"
+    assert config.author == "Noname Changeme Nescio"
+
+
+def test_load_config_creates_home_env_when_no_env_exists(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    clear_config_environment(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(Path, "home", lambda: home)
+
+    config = load_config()
+
+    assert (home / ".imagegen.env").exists()
+    assert not (tmp_path / ".env").exists()
+    assert config.data_dir == home / "data"
+
+
+def test_load_config_expands_home_in_data_dir(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / ".imagegen.env").write_text(
+        "IMAGEGEN_DATA_DIR=~/imagegen-data\n",
+        encoding="utf-8",
+    )
+    clear_config_environment(monkeypatch)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(Path, "home", lambda: home)
+
+    config = load_config()
+
+    assert config.data_dir == home / "imagegen-data"
+
+
 def test_load_config_reads_trashcan_hold_limit_days(tmp_path, monkeypatch):
     monkeypatch.delenv("TRASHCAN_HOLD_LIMIT_DAYS", raising=False)
     env_path = tmp_path / ".env"
@@ -192,6 +271,12 @@ def test_load_config_reads_trashcan_hold_limit_days(tmp_path, monkeypatch):
     config = load_config(env_path)
 
     assert config.trashcan_hold_limit_days == 14
+
+
+def clear_config_environment(monkeypatch):
+    for setting in ENV_SETTINGS:
+        monkeypatch.delenv(setting.name, raising=False)
+    monkeypatch.delenv("IMMICH_GALLERY_ID", raising=False)
 
 
 @pytest.mark.parametrize("value", ["0", "invalid", "-3", "1.5"])
