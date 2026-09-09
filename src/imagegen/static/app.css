@@ -505,7 +505,6 @@ select {
 }
 
 .upload-pane {
-  max-width: min(58rem, calc(100vw - 2rem));
   overflow: hidden;
 }
 
