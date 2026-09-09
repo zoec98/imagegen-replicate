@@ -230,6 +230,7 @@ def test_replicate_gpt_image25_variants_match_schema(variant):
         "auto",
     )
     assert parameters["output_compression"].default == 90
+    assert parameters["output_format"].default == "jpeg"
     assert parameters["output_format"].choices == ("png", "jpeg", "webp")
     assert parameters["moderation"].choices == ("auto", "low")
 

@@ -627,7 +627,7 @@ def _gpt_image25_parameters() -> tuple[ModelParameter, ...]:
             "output_format",
             "Output format.",
             "select",
-            "webp",
+            "jpeg",
             choices=("png", "jpeg", "webp"),
             order=8,
         ),
