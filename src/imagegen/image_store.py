@@ -20,6 +20,7 @@ import httpx
 from imagegen.metadata_embed import write_embedded_metadata
 from imagegen.metadata_policy import synthesize_copyright
 from imagegen.model_registry import ProviderId
+from imagegen.security import MAX_GENERATED_IMAGE_BYTES, MAX_GENERATED_IMAGES
 
 SOFTWARE_NAME = "https://github.com/zoec98/imagegen-replicate"
 
@@ -29,8 +30,6 @@ CONTENT_TYPE_EXTENSIONS = {
     "image/png": ".png",
     "image/webp": ".webp",
 }
-DOWNLOAD_SIZE_OVERHEAD_BYTES = 1024 * 1024
-DEFAULT_MAX_DOWNLOAD_BYTES = 4096 * 4096 * 3 + DOWNLOAD_SIZE_OVERHEAD_BYTES
 MAX_REDIRECTS = 5
 
 
@@ -73,30 +72,41 @@ def persist_generated_images(
     client: httpx.Client | None = None,
     resolver: HostResolver | None = None,
 ) -> list[StoredImage]:
+    if len(urls) > MAX_GENERATED_IMAGES:
+        raise ImageDownloadError(
+            f"Provider returned {len(urls)} images; maximum is {MAX_GENERATED_IMAGES}."
+        )
     output_dir.mkdir(parents=True, exist_ok=True)
     close_client = client is None
     http_client = client or httpx.Client(timeout=30.0, follow_redirects=False)
     request_id = local_request_id or uuid4().hex
     try:
-        return [
-            download_image(
-                url,
-                output_dir=output_dir,
-                model=model,
-                provider=provider,
-                model_alias=model_alias,
-                provider_model=provider_model,
-                prompt=prompt,
-                prediction_id=prediction_id,
-                local_request_id=request_id,
-                sequence=sequence,
-                prediction_input=prediction_input,
-                author=author,
-                client=http_client,
-                resolver=resolver,
-            )
-            for sequence, url in enumerate(urls, start=1)
-        ]
+        stored: list[StoredImage] = []
+        try:
+            for sequence, url in enumerate(urls, start=1):
+                stored.append(
+                    download_image(
+                        url,
+                        output_dir=output_dir,
+                        model=model,
+                        provider=provider,
+                        model_alias=model_alias,
+                        provider_model=provider_model,
+                        prompt=prompt,
+                        prediction_id=prediction_id,
+                        local_request_id=request_id,
+                        sequence=sequence,
+                        prediction_input=prediction_input,
+                        author=author,
+                        client=http_client,
+                        resolver=resolver,
+                    )
+                )
+        except Exception:
+            for image in stored:
+                image.path.unlink(missing_ok=True)
+            raise
+        return stored
     finally:
         if close_client:
             http_client.close()
@@ -119,14 +129,14 @@ def download_image(
     client: httpx.Client,
     resolver: HostResolver | None = None,
 ) -> StoredImage:
-    response, final_url = _fetch_validated_image_url(
+    content, content_type, final_url = _fetch_validated_image(
         url,
         provider=provider,
         client=client,
         resolver=resolver or resolve_host_ips,
+        max_bytes=max_download_bytes(model),
     )
 
-    content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
     if content_type == "image/gif":
         msg = f"GIF image outputs are not supported from {_display_url(final_url)}."
         raise ImageDownloadError(msg)
@@ -137,39 +147,40 @@ def download_image(
         )
         raise ImageDownloadError(msg)
 
-    content = response.content
-    max_bytes = max_download_bytes(model)
-    if len(content) > max_bytes:
-        msg = (
-            f"Image from {_display_url(final_url)} is {len(content)} bytes, "
-            f"exceeding limit {max_bytes}."
-        )
-        raise ImageDownloadError(msg)
-
     extension = _extension_for(content_type, final_url)
     request_id = local_request_id or uuid4().hex
     filename = f"{model.alias}-{request_id}-{sequence:02d}{extension}"
     path = output_dir / filename
-    path.write_bytes(content)
-    created_at = datetime.now(UTC).isoformat()
-    metadata = {
-        "created_at": created_at,
-        "provider": provider,
-        "model_alias": model_alias or model.alias,
-        "model": provider_model or getattr(model, "replicate_model", model.alias),
-        "prediction_id": prediction_id,
-        "sequence": sequence,
-        "prompt": prompt,
-        "parameters": prediction_input,
-        "source_url": url,
-        "content_type": content_type,
-        "size_bytes": len(content),
-        "filename": filename,
-        "author": author,
-        "copyright": synthesize_copyright(author, created_at),
-        "software": SOFTWARE_NAME,
-    }
-    write_embedded_metadata(path, metadata)
+    try:
+        with path.open("xb") as output:
+            output.write(content)
+    except FileExistsError as error:
+        raise ImageDownloadError(
+            f"Image output path already exists: {filename}."
+        ) from error
+    try:
+        created_at = datetime.now(UTC).isoformat()
+        metadata = {
+            "created_at": created_at,
+            "provider": provider,
+            "model_alias": model_alias or model.alias,
+            "model": provider_model or getattr(model, "replicate_model", model.alias),
+            "prediction_id": prediction_id,
+            "sequence": sequence,
+            "prompt": prompt,
+            "parameters": prediction_input,
+            "source_url": url,
+            "content_type": content_type,
+            "size_bytes": len(content),
+            "filename": filename,
+            "author": author,
+            "copyright": synthesize_copyright(author, created_at),
+            "software": SOFTWARE_NAME,
+        }
+        write_embedded_metadata(path, metadata)
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
     return StoredImage(
         path=path,
         source_url=url,
@@ -180,11 +191,7 @@ def download_image(
 
 
 def max_download_bytes(model: StoredImageModel) -> int:
-    default_width = getattr(model, "default_width", None)
-    default_height = getattr(model, "default_height", None)
-    if isinstance(default_width, int) and isinstance(default_height, int):
-        return default_width * default_height * 3 + DOWNLOAD_SIZE_OVERHEAD_BYTES
-    return DEFAULT_MAX_DOWNLOAD_BYTES
+    return MAX_GENERATED_IMAGE_BYTES
 
 
 def resolve_host_ips(
@@ -231,41 +238,77 @@ def validate_download_url(
     return url
 
 
-def _fetch_validated_image_url(
+def _fetch_validated_image(
     url: str,
     *,
     provider: ProviderId,
     client: httpx.Client,
     resolver: HostResolver,
-) -> tuple[httpx.Response, str]:
+    max_bytes: int,
+) -> tuple[bytes, str, str]:
     current_url = validate_download_url(url, provider=provider, resolver=resolver)
     for _ in range(MAX_REDIRECTS + 1):
         try:
-            response = client.get(current_url, follow_redirects=False)
+            response_context = client.stream(
+                "GET",
+                current_url,
+                follow_redirects=False,
+            )
+            with response_context as response:
+                if response.is_redirect:
+                    location = response.headers.get("location")
+                    if not location:
+                        raise ImageDownloadError(
+                            "Image download redirect did not include a location."
+                        )
+                    current_url = validate_download_url(
+                        urljoin(str(response.url), location),
+                        provider=provider,
+                        resolver=resolver,
+                    )
+                    continue
+                try:
+                    response.raise_for_status()
+                except httpx.HTTPStatusError as error:
+                    msg = (
+                        f"Image download failed with status {response.status_code} "
+                        f"from {_display_url(current_url)}."
+                    )
+                    raise ImageDownloadError(msg) from error
+                content_length = response.headers.get("content-length")
+                if content_length is not None:
+                    try:
+                        if int(content_length) > max_bytes:
+                            raise ImageDownloadError(
+                                f"Image from {_display_url(current_url)} is too large, "
+                                f"exceeding limit {max_bytes} bytes."
+                            )
+                    except ValueError:
+                        pass
+                content = _read_bounded_download(response, max_bytes=max_bytes)
+                content_type = (
+                    response.headers.get("content-type", "")
+                    .split(";", 1)[0]
+                    .lower()
+                )
+                return content, content_type, str(response.url)
         except httpx.HTTPError as error:
             msg = f"Image download request failed for {_display_url(current_url)}."
             raise ImageDownloadError(msg) from error
-        if not response.is_redirect:
-            try:
-                response.raise_for_status()
-            except httpx.HTTPStatusError as error:
-                msg = (
-                    f"Image download failed with status {response.status_code} "
-                    f"from {_display_url(current_url)}."
-                )
-                raise ImageDownloadError(msg) from error
-            return response, str(response.url)
-        location = response.headers.get("location")
-        if not location:
-            raise ImageDownloadError(
-                "Image download redirect did not include a location."
-            )
-        current_url = validate_download_url(
-            urljoin(str(response.url), location),
-            provider=provider,
-            resolver=resolver,
-        )
     raise ImageDownloadError("Image download followed too many redirects.")
+
+
+def _read_bounded_download(response: httpx.Response, *, max_bytes: int) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    for chunk in response.iter_bytes():
+        total += len(chunk)
+        if total > max_bytes:
+            raise ImageDownloadError(
+                f"Image download is too large, exceeding limit {max_bytes} bytes."
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 def is_unsafe_download_address(

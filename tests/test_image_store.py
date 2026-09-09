@@ -24,6 +24,7 @@ from imagegen.image_store import (
 from imagegen.metadata import EmbeddedImageMetadataProvider
 from imagegen.metadata_embed import read_embedded_metadata
 from imagegen.model_registry import MODEL_REGISTRY
+from imagegen.security import MAX_GENERATED_IMAGE_BYTES, MAX_GENERATED_IMAGES
 
 
 def response_client(response):
@@ -112,6 +113,96 @@ def test_persist_generated_images_creates_output_directory(tmp_path):
         output_dir / "seedream45-request-uuid-01.png",
         output_dir / "seedream45-request-uuid-02.png",
     ]
+
+
+def test_persist_generated_images_rejects_more_than_global_output_limit(tmp_path):
+    fetched = []
+
+    def handler(request):
+        fetched.append(str(request.url))
+        raise AssertionError("over-limit output should not be fetched")
+
+    urls = [f"https://replicate.delivery/out-{index}.png" for index in range(17)]
+    with pytest.raises(ImageDownloadError, match="maximum is 16"):
+        persist_generated_images(
+            urls,
+            output_dir=tmp_path,
+            model=MODEL_REGISTRY["seedream45"],
+            prompt="a cookie",
+            prediction_id="provider-id",
+            local_request_id="request-uuid",
+            prediction_input={},
+            author="Zoé Cordelier",
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+            resolver=safe_resolver,
+        )
+
+    assert fetched == []
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_persist_generated_images_accepts_global_output_limit(tmp_path):
+    def handler(request):
+        return httpx.Response(
+            200,
+            headers={"content-type": "image/png"},
+            content=image_bytes("PNG"),
+            request=request,
+        )
+
+    urls = [f"https://replicate.delivery/out-{index}.png" for index in range(16)]
+    stored = persist_generated_images(
+        urls,
+        output_dir=tmp_path,
+        model=MODEL_REGISTRY["seedream45"],
+        prompt="a cookie",
+        prediction_id="provider-id",
+        local_request_id="request-uuid",
+        prediction_input={},
+        author="Zoé Cordelier",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        resolver=safe_resolver,
+    )
+
+    assert len(stored) == MAX_GENERATED_IMAGES
+    assert stored[-1].path.name == "seedream45-request-uuid-16.png"
+
+
+def test_persist_generated_images_cleans_partial_results_on_failure(tmp_path):
+    responses = iter(
+        [
+            httpx.Response(
+                200,
+                headers={"content-type": "image/png"},
+                content=image_bytes("PNG"),
+            ),
+            httpx.Response(502),
+        ]
+    )
+
+    def handler(request):
+        response = next(responses)
+        response.request = request
+        return response
+
+    with pytest.raises(ImageDownloadError):
+        persist_generated_images(
+            [
+                "https://replicate.delivery/out-1.png",
+                "https://replicate.delivery/out-2.png",
+            ],
+            output_dir=tmp_path,
+            model=MODEL_REGISTRY["seedream45"],
+            prompt="a cookie",
+            prediction_id="provider-id",
+            local_request_id="request-uuid",
+            prediction_input={},
+            author="Zoé Cordelier",
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+            resolver=safe_resolver,
+        )
+
+    assert list(tmp_path.glob("*.png")) == []
 
 
 def test_download_image_rejects_non_image_response(tmp_path):
@@ -372,4 +463,4 @@ def test_download_image_redacts_query_from_http_errors(tmp_path):
 def test_max_download_bytes_uses_expected_bmp_size_plus_overhead():
     model = MODEL_REGISTRY["seedream45"]
 
-    assert max_download_bytes(model) == 2048 * 2048 * 3 + 1024 * 1024
+    assert max_download_bytes(model) == MAX_GENERATED_IMAGE_BYTES
