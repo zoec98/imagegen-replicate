@@ -19,10 +19,15 @@ from imagegen.validation import (
 
 
 def expected_default_parameters(model):
+    source_image_parameter = (
+        model.edit_target.source_images.provider_field
+        if model.edit_target is not None and model.edit_target.source_images is not None
+        else None
+    )
     return {
         parameter.name: parameter.default
-        for parameter in model.parameters
-        if parameter.name not in {"prompt", model.source_image_parameter}
+        for parameter in model.text_target.parameters
+        if parameter.name not in {"prompt", source_image_parameter}
         and parameter.default not in {"", ()}
     }
 
@@ -137,7 +142,7 @@ def test_validate_generation_payload_rejects_sources_outside_edit_mode(tmp_path)
 
 
 def test_validate_generation_payload_rejects_edit_mode_for_text_only_model(tmp_path):
-    text_only_model = replace(MODEL_REGISTRY["seedream45"], edit_capable=False)
+    text_only_model = replace(MODEL_REGISTRY["seedream45"], edit_target=None)
     (tmp_path / "source.png").write_bytes(b"image")
 
     with pytest.raises(

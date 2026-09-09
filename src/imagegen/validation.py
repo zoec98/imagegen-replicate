@@ -16,7 +16,6 @@ from imagegen.model_registry import (
     GenerationTarget,
     ModelParameter,
     ProviderModel,
-    ReplicateModel,
 )
 from imagegen.prompt_annotations import (
     PromptAnnotationError,
@@ -40,7 +39,7 @@ class ValidationError(ValueError):
 def validate_generation_payload(
     payload: dict[str, Any],
     *,
-    model: ProviderModel | ReplicateModel,
+    model: ProviderModel,
     target: GenerationTarget | None = None,
     output_dir: Path,
 ) -> ValidatedGenerationRequest:
@@ -96,7 +95,7 @@ def _validate_payload_source_images(
     value: Any,
     *,
     edit_mode: bool,
-    model: ProviderModel | ReplicateModel,
+    model: ProviderModel,
     target: GenerationTarget | None,
     output_dir: Path,
 ) -> list[str]:
@@ -131,7 +130,7 @@ def _validate_payload_source_images(
 def validate_model_parameters(
     raw_parameters: dict[str, Any],
     *,
-    model: ProviderModel | ReplicateModel,
+    model: ProviderModel,
     target: GenerationTarget | None = None,
 ) -> dict[str, object]:
     parameters = _model_parameters(model, target)
@@ -214,7 +213,7 @@ def _normalize_model_parameters(
     validated: dict[str, object],
     *,
     raw_parameters: dict[str, Any],
-    model: ProviderModel | ReplicateModel,
+    model: ProviderModel,
     target: GenerationTarget | None,
 ) -> dict[str, object]:
     control = _custom_dimensions(model, target)
@@ -325,65 +324,61 @@ def _validate_numeric_constraints(parameter: ModelParameter, value: float) -> No
 
 
 def _model_parameters(
-    model: ProviderModel | ReplicateModel,
+    model: ProviderModel,
     target: GenerationTarget | None,
 ) -> tuple[ModelParameter, ...]:
     if target is not None:
         return target.parameters
-    return model.parameters
+    return model.text_target.parameters
 
 
 def _fixed_inputs(
-    model: ProviderModel | ReplicateModel,
+    model: ProviderModel,
     target: GenerationTarget | None,
 ) -> dict[str, object]:
     if target is not None:
         return dict(target.fixed_inputs)
-    return dict(model.fixed_inputs)
+    return dict(model.text_target.fixed_inputs)
 
 
 def _custom_dimensions(
-    model: ProviderModel | ReplicateModel,
+    model: ProviderModel,
     target: GenerationTarget | None,
 ) -> CustomDimensionsControl | None:
     if target is not None:
         return target.custom_dimensions
-    return model.custom_dimensions
+    return model.text_target.custom_dimensions
 
 
 def _source_image_parameter(
-    model: ProviderModel | ReplicateModel,
+    model: ProviderModel,
     target: GenerationTarget | None,
 ) -> str | None:
-    if isinstance(model, ReplicateModel):
-        return model.source_image_parameter
-    if model.edit_target is not None and model.edit_target.source_images is not None:
-        return model.edit_target.source_images.provider_field
     if target is not None and target.source_images is not None:
         return target.source_images.provider_field
+    if model.edit_target is not None and model.edit_target.source_images is not None:
+        return model.edit_target.source_images.provider_field
     return None
 
 
 def _source_image_max(
-    model: ProviderModel | ReplicateModel,
+    model: ProviderModel,
     target: GenerationTarget | None,
 ) -> int | None:
-    if isinstance(model, ReplicateModel):
-        return model.source_image_max if model.edit_capable else None
-    if model.edit_target is not None and model.edit_target.source_images is not None:
-        return model.edit_target.source_images.max_count
     if target is not None and target.source_images is not None:
         return target.source_images.max_count
+    if model.edit_target is not None and model.edit_target.source_images is not None:
+        return model.edit_target.source_images.max_count
     return None
 
 
 def _source_image_total(
-    model: ProviderModel | ReplicateModel,
+    model: ProviderModel,
     target: GenerationTarget | None,
 ):
     if target is not None and target.source_images is not None:
         return target.source_images
-    if isinstance(model, ProviderModel) and model.edit_target is not None:
+    if model.edit_target is not None:
         return model.edit_target.source_images
     return None
 
@@ -392,7 +387,7 @@ def _validate_source_image_total(
     source_images: list[str],
     parameters: dict[str, object],
     *,
-    model: ProviderModel | ReplicateModel,
+    model: ProviderModel,
     target: GenerationTarget | None,
 ) -> None:
     binding = _source_image_total(model, target)

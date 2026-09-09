@@ -399,7 +399,7 @@ def test_api_generate_logs_recreatable_request_payload(app_factory):
     assert request_log.prompt == "a small red house"
     assert request_log.request_sent == {
         **expected_response_parameters(model, {"size": "2K"}),
-        **model.fixed_inputs,
+        **model.text_target.fixed_inputs,
         "prompt": "a small red house",
     }
 

@@ -87,6 +87,8 @@ class ProviderModel:
     text_target: GenerationTarget
     edit_target: GenerationTarget | None = None
     selectable: bool = True
+    default_width: int | None = None
+    default_height: int | None = None
 
     @property
     def edit_capable(self) -> bool:
@@ -97,21 +99,3 @@ class ProviderModel:
 class ProviderInfo:
     id: ProviderId
     display_name: str
-
-
-@dataclass(frozen=True)
-class ReplicateModel:
-    alias: str
-    display_name: str
-    documentation_url: str
-    replicate_model: str
-    edit_capable: bool
-    fixed_inputs: dict[str, object]
-    default_width: int
-    default_height: int
-    modes: tuple[ModelMode, ...]
-    parameters: tuple[ModelParameter, ...]
-    source_image_parameter: str | None = None
-    source_image_max: int = 14
-    custom_dimensions: CustomDimensionsControl | None = None
-    pricing: tuple[ModelPricing, ...] = ()

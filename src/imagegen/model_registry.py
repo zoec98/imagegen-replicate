@@ -5,13 +5,11 @@ from __future__ import annotations
 from imagegen.model_registry_base import (
     CustomDimensionsControl,
     GenerationTarget,
-    ModelMode,
     ModelParameter,
     ModelPricing,
     ProviderId,
     ProviderInfo,
     ProviderModel,
-    ReplicateModel,
     SourceImageBinding,
 )
 from imagegen.model_registry_falai import MODEL_REGISTRY as FALAI_MODEL_REGISTRY
@@ -35,7 +33,6 @@ __all__ = [
     "ProviderInfo",
     "ProviderModel",
     "RegistryLookupError",
-    "ReplicateModel",
     "SourceImageBinding",
     "default_model_for_provider",
     "list_models_for_provider",
@@ -152,53 +149,8 @@ def _provider_id(value: str) -> ProviderId:
     raise RegistryLookupError(f"Unknown provider `{value}`.")
 
 
-def _provider_model_from_replicate(model: ReplicateModel) -> ProviderModel:
-    text_target = _target_from_replicate(model, mode="text-to-image")
-    edit_target = (
-        _target_from_replicate(model, mode="image-edit") if model.edit_capable else None
-    )
-    return ProviderModel(
-        provider="replicate",
-        alias=model.alias,
-        display_name=model.display_name,
-        text_target=text_target,
-        edit_target=edit_target,
-    )
-
-
-def _target_from_replicate(
-    model: ReplicateModel,
-    *,
-    mode: ModelMode,
-) -> GenerationTarget:
-    return GenerationTarget(
-        provider="replicate",
-        alias=model.alias,
-        display_name=model.display_name,
-        provider_model=model.replicate_model,
-        documentation_url=model.documentation_url,
-        runtime_url=f"https://replicate.com/{model.replicate_model}",
-        mode=mode,
-        parameters=model.parameters,
-        fixed_inputs=model.fixed_inputs,
-        source_images=(
-            SourceImageBinding(
-                provider_field=model.source_image_parameter,
-                max_count=model.source_image_max,
-            )
-            if mode == "image-edit" and model.source_image_parameter
-            else None
-        ),
-        pricing=model.pricing,
-        custom_dimensions=model.custom_dimensions,
-    )
-
-
 PROVIDER_REGISTRIES: dict[ProviderId, dict[str, ProviderModel]] = {
-    "replicate": {
-        alias: _provider_model_from_replicate(model)
-        for alias, model in MODEL_REGISTRY.items()
-    },
+    "replicate": MODEL_REGISTRY,
     "falai": FALAI_MODEL_REGISTRY,
     "wiro": WIRO_MODEL_REGISTRY,
 }

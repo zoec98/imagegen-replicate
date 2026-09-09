@@ -18,7 +18,6 @@ from imagegen.model_registry import (
     MODEL_REGISTRY,
     ProviderId,
     ProviderModel,
-    ReplicateModel,
     default_model_for_provider,
     resolve_model,
 )
@@ -126,7 +125,7 @@ class AppConfig:
     immich_upload_album_id: str
     immich_api_key: str
     model_alias: str
-    model: ReplicateModel | ProviderModel
+    model: ProviderModel
     flask_secret_key: str
     replicate_poll_seconds: float
     replicate_timeout_seconds: float
@@ -381,7 +380,7 @@ def _enabled_providers(
 def _configured_model(
     model_alias: str,
     selected_provider: ProviderId | None,
-) -> tuple[ReplicateModel | ProviderModel, str]:
+) -> tuple[ProviderModel, str]:
     if selected_provider == "wiro" and model_alias == DEFAULT_MODEL_ALIAS:
         model = default_model_for_provider("wiro")
         if model is None:

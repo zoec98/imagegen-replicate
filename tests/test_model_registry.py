@@ -31,23 +31,23 @@ def test_every_model_has_required_registry_shape():
     for alias, model in MODEL_REGISTRY.items():
         assert alias == model.alias
         assert model.display_name
-        assert "/" in model.replicate_model
-        assert model.documentation_url == (
-            f"https://replicate.com/{model.replicate_model}/api/schema"
+        target = model.text_target
+        assert "/" in target.provider_model
+        assert target.documentation_url == (
+            f"https://replicate.com/{target.provider_model}/api/schema"
         )
-        assert set(model.modes) <= VALID_MODES
-        assert model.modes
+        assert target.mode in VALID_MODES
         assert model.default_width > 0
         assert model.default_height > 0
-        assert model.parameters
-        assert model.parameters[0].name == "prompt"
-        assert model.parameters[0].type == "string"
+        assert target.parameters
+        assert target.parameters[0].name == "prompt"
+        assert target.parameters[0].type == "string"
 
 
 def test_every_model_parameter_has_useful_shape():
     for model in MODEL_REGISTRY.values():
         seen_names = set()
-        for parameter in model.parameters:
+        for parameter in model.text_target.parameters:
             assert parameter.name
             assert parameter.name not in seen_names
             seen_names.add(parameter.name)
@@ -66,28 +66,30 @@ def test_every_model_parameter_has_useful_shape():
 
 def test_fixed_inputs_are_not_user_parameters():
     for model in MODEL_REGISTRY.values():
-        parameter_names = {parameter.name for parameter in model.parameters}
-        assert set(model.fixed_inputs).isdisjoint(parameter_names)
+        parameter_names = {parameter.name for parameter in model.text_target.parameters}
+        assert set(model.text_target.fixed_inputs).isdisjoint(parameter_names)
 
 
 def test_edit_capable_models_declare_source_image_contract():
     for model in MODEL_REGISTRY.values():
-        parameter_names = {parameter.name for parameter in model.parameters}
+        parameter_names = {parameter.name for parameter in model.text_target.parameters}
         if model.edit_capable:
-            assert "image-edit" in model.modes
-            assert model.source_image_parameter
-            assert model.source_image_parameter in parameter_names
-            assert model.source_image_max >= 1
+            assert model.edit_target is not None
+            assert model.edit_target.mode == "image-edit"
+            assert model.edit_target.source_images is not None
+            source_images = model.edit_target.source_images
+            assert source_images.provider_field in parameter_names
+            assert source_images.max_count >= 1
         else:
-            assert model.source_image_parameter is None
+            assert model.edit_target is None
 
 
 def test_custom_dimension_controls_reference_model_parameters():
     for model in MODEL_REGISTRY.values():
-        control = model.custom_dimensions
+        control = model.text_target.custom_dimensions
         if control is None:
             continue
-        parameter_names = {parameter.name for parameter in model.parameters}
+        parameter_names = {parameter.name for parameter in model.text_target.parameters}
         assert control.activation_parameter in parameter_names
         assert control.width_parameter in parameter_names
         assert control.height_parameter in parameter_names
