@@ -118,6 +118,7 @@ def test_provider_model_lists_are_scoped_by_provider():
         "flux-2-pro",
         "flux-2-realism",
         "gpt-image-2",
+        "gpt-image-25-sunburst",
         "gpt-image15",
         "grok",
         "hidream-dev",
@@ -590,6 +591,43 @@ def test_falai_edit_target_uses_linked_endpoint_not_selector_duplicate():
     assert edit_target.source_images.max_count == 10
 
 
+def test_falai_gpt_image25_sunburst_contract():
+    model = resolve_model("falai", "gpt-image-25-sunburst")
+    text_parameters = {
+        parameter.name: parameter for parameter in model.text_target.parameters
+    }
+    edit_parameters = {
+        parameter.name: parameter for parameter in model.edit_target.parameters
+    }
+
+    assert model.text_target.provider_model == (
+        "openai/gpt-image-2.5/sunburst/text-to-image"
+    )
+    assert model.edit_target.provider_model == "openai/gpt-image-2.5/sunburst/edit"
+    assert model.text_target.fixed_inputs == {"sync_mode": False}
+    assert model.edit_target.fixed_inputs == {"sync_mode": False}
+    assert model.edit_target.source_images is not None
+    assert model.edit_target.source_images.provider_field == "image_urls"
+    assert model.edit_target.source_images.max_count == 16
+    assert "image_urls" not in edit_parameters
+    assert "mask_url" not in text_parameters
+    assert "mask_url" in edit_parameters
+    assert text_parameters["image_size"].default == "landscape_4_3"
+    assert edit_parameters["image_size"].default == "auto"
+    assert text_parameters["quality"].choices == (
+        "auto",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+    )
+    assert text_parameters["num_images"].maximum == 10
+    assert text_parameters["output_format"].default == "jpeg"
+    assert text_parameters["output_compression"].minimum == 0
+    assert text_parameters["output_compression"].maximum == 100
+
+
 def test_falai_plan_ticket_models_use_linked_edit_endpoints():
     models = list_models_for_provider("falai")
     selectable_endpoint_ids = {model.text_target.provider_model for model in models}
@@ -598,6 +636,11 @@ def test_falai_plan_ticket_models_use_linked_edit_endpoints():
         "flux-2": ("fal-ai/flux-2/edit", "image_urls", 4),
         "flux-2-pro": ("fal-ai/flux-2-pro/edit", "image_urls", 10),
         "gpt-image-2": ("openai/gpt-image-2/edit", "image_urls", 10),
+        "gpt-image-25-sunburst": (
+            "openai/gpt-image-2.5/sunburst/edit",
+            "image_urls",
+            16,
+        ),
         "gpt-image15": ("fal-ai/gpt-image-1.5/edit", "image_urls", 10),
         "grok": ("xai/grok-imagine-image/edit", "image_urls", 3),
         "krea-2-turbo": ("fal-ai/krea-2/turbo/style", "reference_image_urls", 3),

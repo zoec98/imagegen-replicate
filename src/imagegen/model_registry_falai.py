@@ -976,6 +976,68 @@ def _gpt_image2_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
     return tuple(parameters)
 
 
+def _gpt_image25_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
+    parameters = [
+        _param(
+            "prompt", "The prompt for image generation or editing.", "string", order=1
+        ),
+        _param(
+            "image_size",
+            "The size of the generated image.",
+            "select",
+            "auto" if edit else "landscape_4_3",
+            choices=AUTO_IMAGE_SIZE_CHOICES,
+            order=4 if edit else 2,
+        ),
+        _param(
+            "background",
+            "Background for the generated image.",
+            "select",
+            "auto",
+            choices=("auto", "transparent", "opaque"),
+            order=5 if edit else 3,
+        ),
+        _param(
+            "quality",
+            "Quality for the generated image.",
+            "select",
+            "high",
+            choices=("auto", "low", "medium", "high", "xhigh", "max"),
+            order=6 if edit else 4,
+        ),
+        _param(
+            "num_images",
+            "Number of images to generate.",
+            "integer",
+            1,
+            minimum=1,
+            maximum=10,
+            order=7 if edit else 5,
+        ),
+        _param(
+            "output_format",
+            "Output format for the images.",
+            "select",
+            "jpeg",
+            choices=EXTENDED_OUTPUT_FORMAT_CHOICES,
+            order=8 if edit else 6,
+        ),
+        _param(
+            "output_compression",
+            "Compression level for JPEG or WebP output.",
+            "integer",
+            minimum=0,
+            maximum=100,
+            order=9 if edit else 7,
+        ),
+    ]
+    if edit:
+        parameters.append(
+            _param("mask_url", "Mask image URL for edits.", "string", order=3)
+        )
+    return tuple(sorted(parameters, key=lambda item: item.order or 999))
+
+
 def _grok_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
     return (
         _param("prompt", "Text description of the desired image.", "string", order=1),
@@ -1832,6 +1894,37 @@ GPT_IMAGE2 = ProviderModel(
     ),
 )
 
+GPT_IMAGE25_SUNBURST = ProviderModel(
+    provider="falai",
+    alias="gpt-image-25-sunburst",
+    display_name="GPT Image 2.5 Sunburst",
+    text_target=GenerationTarget(
+        provider="falai",
+        alias="gpt-image-25-sunburst",
+        display_name="GPT Image 2.5 Sunburst",
+        provider_model="openai/gpt-image-2.5/sunburst/text-to-image",
+        documentation_url="https://fal.ai/models/openai/gpt-image-2.5/sunburst/text-to-image/api",
+        runtime_url="https://fal.run/openai/gpt-image-2.5/sunburst/text-to-image",
+        mode="text-to-image",
+        parameters=_gpt_image25_parameters(edit=False),
+        fixed_inputs=FALAI_FIXED_IMAGE_OUTPUT_INPUTS,
+        pricing=(_falai_price("$1", "per billing unit", metric="billing_unit_count"),),
+    ),
+    edit_target=GenerationTarget(
+        provider="falai",
+        alias="gpt-image-25-sunburst",
+        display_name="GPT Image 2.5 Sunburst",
+        provider_model="openai/gpt-image-2.5/sunburst/edit",
+        documentation_url="https://fal.ai/models/openai/gpt-image-2.5/sunburst/edit/api",
+        runtime_url="https://fal.run/openai/gpt-image-2.5/sunburst/edit",
+        mode="image-edit",
+        parameters=_gpt_image25_parameters(edit=True),
+        fixed_inputs=FALAI_FIXED_IMAGE_OUTPUT_INPUTS,
+        source_images=SourceImageBinding(provider_field="image_urls", max_count=16),
+        pricing=(_falai_price("$1", "per billing unit", metric="billing_unit_count"),),
+    ),
+)
+
 GROK = ProviderModel(
     provider="falai",
     alias="grok",
@@ -1877,6 +1970,7 @@ MODEL_REGISTRY: dict[str, ProviderModel] = {
     FLUX_2_REALISM.alias: FLUX_2_REALISM,
     GPT_IMAGE15.alias: GPT_IMAGE15,
     GPT_IMAGE2.alias: GPT_IMAGE2,
+    GPT_IMAGE25_SUNBURST.alias: GPT_IMAGE25_SUNBURST,
     GROK.alias: GROK,
     HIDREAM_DEV.alias: HIDREAM_DEV,
     HIDREAM_FAST.alias: HIDREAM_FAST,
