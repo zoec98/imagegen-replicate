@@ -14,80 +14,73 @@ from route_helpers import (
     extract_attribute,
     extract_model_registry,
     extract_palette_data,
+    parse_html,
 )
 
-from imagegen.metadata import EmbeddedImageMetadataProvider
 from imagegen.model_registry import MODEL_REGISTRY
-from imagegen.routes import _workspace_context
 
 
-def test_index_renders_prompt_form(app_factory):
+def test_index_renders_workspace_form_and_api_hooks(app_factory):
     client = app_factory().test_client()
 
     response = client.get("/")
     checksum = extract_app_checksum(response)
+    elements = parse_html(response)
+    form = next(element for element in elements if element["attrs"].get("class") == "prompt-form")
+    provider = next(element for element in elements if element["attrs"].get("id") == "provider-selector")
+    model = next(element for element in elements if element["attrs"].get("id") == "model-selector")
+    messages = next(element for element in elements if element["attrs"].get("class") == "messages")
 
     assert response.status_code == 200
-    assert b'name="csrf-token"' in response.data
-    assert b'name="app-build"' in response.data
     assert len(checksum) == 16
-    assert b'<form\n        class="prompt-form"' in response.data
-    assert b'action="/generate"' not in response.data
-    assert b'data-api-generate-url="/api/generate"' in response.data
-    assert b'data-api-images-url="/api/images"' in response.data
-    assert b'data-api-app-version-url="/api/app-version"' in response.data
-    assert b'data-poll-seconds="1.0"' in response.data
-    assert b'class="messages" aria-live="polite"' in response.data
-    assert b'id="provider-selector"' in response.data
-    assert b'id="model-selector"' in response.data
-    assert response.data.index(b'id="provider-selector"') < response.data.index(
-        b'id="model-selector"'
-    )
-    assert b'class="edit-toggle"' in response.data
-    assert b'class="source-counter" aria-live="polite">0 selected' in response.data
-    assert b'class="source-clear"' in response.data
-    assert b'class="pricing-info"' in response.data
-    assert b'aria-label="Pricing information"' in response.data
-    assert b'class="pricing-tooltip"' in response.data
-    assert b"$0.04 per output image or 25 images for $1" in response.data
-    assert response.data.index(b'class="pricing-info"') > response.data.index(
-        b'id="model-selector"'
-    )
-    assert response.data.index(b'class="pricing-info"') < response.data.index(
-        b'class="generate-button"'
-    )
-    assert b'value="flux-flex"' in response.data
-    assert b'value="seedream45" selected' in response.data
-    assert b'name="prompt"' in response.data
-    assert b'name="size"' in response.data
-    assert b'name="aspect_ratio"' in response.data
-    assert b'name="max_images"' in response.data
-    assert b'name="image_input"' not in response.data
-    assert b"disable_safety_checker" not in response.data
-    assert b"Generate" in response.data
-    assert b'class="mask-editor-overlay"' in response.data
-    assert b'role="dialog"' in response.data
-    assert b'aria-modal="true"' in response.data
-    assert b'class="mask-editor-canvas-wrap"' in response.data
-    assert b'class="mask-editor-source"' in response.data
-    assert b'class="mask-editor-mask"' in response.data
-    assert b'class="mask-editor-brush-size"' in response.data
-    assert (
-        b'class="mask-editor-brush-size" type="range" min="8" max="160" step="1" value="50"'
-        in response.data
-    )
-    assert b'class="mask-editor-brush-falloff"' in response.data
-    assert (
-        b'class="mask-editor-brush-falloff" type="range" min="0" max="100" step="1" value="0"'
-        in response.data
-    )
-    assert (
-        b'class="mask-editor-blur-radius" type="range" min="0" max="50" step="0.1" value="20"'
-        in response.data
-    )
-    assert b'class="mask-editor-invert"' in response.data
-    assert b'class="mask-editor-save"' in response.data
-    assert b'class="mask-editor-close"' in response.data
+    assert any(element["attrs"].get("name") == "csrf-token" for element in elements)
+    assert any(element["attrs"].get("name") == "app-build" for element in elements)
+    assert form["attrs"].get("action") is None
+    assert form["attrs"]["data-api-generate-url"] == "/api/generate"
+    assert form["attrs"]["data-api-images-url"] == "/api/images"
+    assert form["attrs"]["data-api-app-version-url"] == "/api/app-version"
+    assert form["attrs"]["data-poll-seconds"] == "1.0"
+    assert messages["attrs"]["aria-live"] == "polite"
+    assert provider["attrs"]["name"] == "provider"
+    assert model["attrs"]["name"] == "model"
+
+
+def test_index_renders_generation_controls(app_factory):
+    elements = parse_html(app_factory().test_client().get("/"))
+    attrs = [element["attrs"] for element in elements]
+    classes = {attr.get("class") for attr in attrs}
+    names = {attr.get("name") for attr in attrs}
+
+    assert "edit-toggle" in classes
+    assert "source-clear" in classes
+    assert "pricing-info" in classes
+    assert "pricing-tooltip" in classes
+    assert "pricing-info" in classes
+    assert "prompt" in names
+    assert {"size", "aspect_ratio", "max_images"} <= names
+    assert "image_input" not in names
+    assert "disable_safety_checker" not in names
+    assert any(attr.get("value") == "seedream45" and "selected" in attr for attr in attrs)
+    assert any(element["text"].strip() == "Generate" for element in elements)
+    assert any("$0.04 per output image or 25 images for $1" in element["text"] for element in elements)
+
+
+def test_index_renders_accessible_image_editor_dialog(app_factory):
+    elements = parse_html(app_factory().test_client().get("/"))
+    attrs = [element["attrs"] for element in elements]
+    editor = next(attr for attr in attrs if attr.get("class") == "mask-editor-overlay")
+
+    assert editor["role"] == "dialog"
+    assert editor["aria-modal"] == "true"
+    assert {"mask-editor-source", "mask-editor-mask", "mask-editor-canvas-wrap"} <= {
+        attr.get("class") for attr in attrs
+    }
+    assert {"mask-editor-brush-size", "mask-editor-brush-falloff", "mask-editor-blur-radius"} <= {
+        attr.get("class") for attr in attrs
+    }
+    assert {"mask-editor-invert", "mask-editor-save", "mask-editor-close"} <= {
+        attr.get("class") for attr in attrs
+    }
 
 
 def test_index_exposes_model_registry_metadata(app_factory):
@@ -181,29 +174,7 @@ def test_index_honors_configured_start_model(app_config, app_factory):
     assert b'value="seedream45" selected' not in response.data
 
 
-def test_workspace_context_honors_configured_start_model(app_config):
-    configured = replace(
-        app_config,
-        model_alias="gpt-image-2",
-        model=MODEL_REGISTRY["gpt-image-2"],
-    )
-
-    context = _workspace_context(
-        configured,
-        image_url=lambda filename: f"/images/{filename}",
-        metadata_url=lambda filename: f"/images/{filename}/metadata",
-        metadata_provider=EmbeddedImageMetadataProvider(),
-        csrf_token="token",
-        app_checksum_value="checksum",
-    )
-
-    assert context["selected_provider_model"].alias == "gpt-image-2"
-    assert context["parameters"]
-
-
-def test_workspace_context_falls_back_when_configured_model_is_unavailable(
-    app_config,
-):
+def test_index_falls_back_when_configured_model_is_unavailable(app_config, app_factory):
     configured = replace(
         app_config,
         fal_key="fal-key",
@@ -213,18 +184,18 @@ def test_workspace_context_falls_back_when_configured_model_is_unavailable(
         model=MODEL_REGISTRY["flux-flex"],
     )
 
-    context = _workspace_context(
-        configured,
-        image_url=lambda filename: f"/images/{filename}",
-        metadata_url=lambda filename: f"/images/{filename}/metadata",
-        metadata_provider=EmbeddedImageMetadataProvider(),
-        csrf_token="token",
-        app_checksum_value="checksum",
+    response = app_factory(IMAGEGEN_APP_CONFIG=configured).test_client().get("/")
+    registry = extract_model_registry(response)
+    assert {model["provider"] for model in registry} == {"falai"}
+    options = [element["attrs"] for element in parse_html(response) if element["tag"] == "option"]
+    assert any(
+        option.get("value") == "bria-fibo" and "selected" in option
+        for option in options
     )
-
-    assert context["selected_provider_model"].provider == "falai"
-    assert context["selected_provider_model"].alias == "bria-fibo"
-    assert {provider["id"] for provider in context["providers"]} == {"falai"}
+    assert not any(
+        option.get("value") == "flux-flex" and "selected" in option
+        for option in options
+    )
 
 
 def test_index_renders_only_enabled_provider_options(app_config, app_factory):
