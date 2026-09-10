@@ -1,12 +1,15 @@
 # GOOS Test Quality Tickets
 
-Status: proposed for review
+Status: implemented
 Sources: [user-stories.md](user-stories.md),
 [test-quality-review.md](test-quality-review.md)
 
 These tickets convert the six review findings into implementation-sized,
 behavior-focused changes. They are ordered so later deletion of interaction
 tests happens only after replacement coverage exists.
+
+The plan was approved before implementation. Each ticket below is complete;
+the commits are recorded in the implementation log at the end of this file.
 
 For behavior that already works, establish a green baseline and demonstrate a
 new test's sensitivity with a temporary controlled fault. Restore the fault
@@ -240,3 +243,18 @@ Depends on: Tickets 4 and 5 establish replacement composition coverage.
 - Tests make no live provider, Immich, DNS, or arbitrary network calls.
 - The review documents remain the rationale; this file records the approved
   implementation order and behavior boundaries.
+
+## Implementation log
+
+| Ticket | Commit(s) | Verification |
+|--------|-----------|--------------|
+| 1 | `6e66ee9` | Dead helper cleanup; focused Python tests and Ruff passed. |
+| 2 | `5d8d7da` | Independent representative oracles; focused Python tests and Ruff passed. |
+| 3 | `082e1f5` | Semantic workspace HTTP tests; focused Python tests and Ruff passed. |
+| 4 | `7c9ac94` | Backend route-to-worker walking skeleton and provider composition; Python tests and Ruff passed. |
+| 5 | `d850f1f`, `e8590ad` | Composed browser generation, polling, and gallery refresh; `npm run js:check` passed. |
+| 6 | `f331a5e` | Relay-test removal plus metadata/editor workflows; `npm run js:check` passed. |
+
+Final verification: `uv run pytest` passed 531 tests, `uv run ruff check src tests`
+passed, and `npm run js:check` passed 102 JavaScript tests, ESLint, and the
+bundle build. No production source code was changed by this epic.

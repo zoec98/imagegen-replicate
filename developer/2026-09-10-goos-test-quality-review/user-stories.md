@@ -46,5 +46,6 @@ behavior test at a time, the minimum required change, then refactor while green.
 Tests added for existing behavior may pass immediately: demonstrate sensitivity
 with a temporary controlled fault, then restore it. Do not change correct
 production behavior just to manufacture a red phase. Pure test refactoring and
-dead-helper deletion should preserve a green baseline. The remedy stories are
-inputs to that review; they are not approved tickets yet.
+dead-helper deletion should preserve a green baseline. The remedy stories were
+reviewed and converted into the approved tickets in `tickets.md`; this file
+remains the user-facing rationale for those tickets.

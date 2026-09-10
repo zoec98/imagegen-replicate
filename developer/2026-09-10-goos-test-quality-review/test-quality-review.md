@@ -425,7 +425,7 @@ or create a second maintenance location for image-edit rules.
 | Browser feature modules | Mixed | DOM outcomes are strong; synthetic fixtures and callback expectations weaken composition confidence. |
 | Full application composition | Low | No backend generation walking skeleton and only a minimal browser composition test. |
 
-## Review decisions before ticket conversion
+## Review decisions preserved in ticket conversion
 
 1. Accept, reject, or revise F1 and choose the single backend behavior that will
    serve as the walking skeleton.
@@ -439,7 +439,10 @@ or create a second maintenance location for image-edit rules.
    remaining relay tests should be raised to observable workflows.
 6. F6 can become a deletion-only cleanup ticket if accepted.
 
-No ticket plan or implementation changes are part of this review phase.
+The decisions above were accepted and converted into the six tickets in
+`tickets.md`. The ticket plan was committed before implementation; each ticket
+was then implemented as a focused test-suite change with no production-code
+changes.
 
 ## Merge-readiness verification
 
@@ -450,10 +453,10 @@ deleting narrower tests. Existing correct behavior does not require an artificia
 production change to obtain a failing test; use controlled fault injection to
 check sensitivity when needed.
 
-Verification on 2026-09-10: 528 Python tests passed, Ruff passed, and all 102
+Verification on 2026-09-10: 531 Python tests passed, Ruff passed, and all 102
 JavaScript tests plus ESLint and the bundle build passed. The generated bundle
 was unchanged. `git diff --check` passed. Main at `4b974de` differs from the
 audited source only by the package version bump; a read-only three-way merge
-check found no conflicts. This branch changes only the two epic documents and
-is ready for review-document merge. Findings remain pending approval for later
-ticket conversion.
+check found no conflicts. The implementation branch contains the two review
+documents and test-only changes for all six approved tickets; it is ready for
+review and merge into main.
