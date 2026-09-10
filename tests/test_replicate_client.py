@@ -104,26 +104,7 @@ def generate_image_urls(prompt, config, *, source_image_paths=None, **kwargs):
     )
 
 
-def expected_default_inputs(model, target, *, prompt):
-    source_image_parameter = (
-        model.edit_target.source_images.provider_field
-        if model.edit_target and model.edit_target.source_images
-        else target.source_images.provider_field
-        if target.source_images
-        else None
-    )
-    defaults = {
-        parameter.name: parameter.default
-        for parameter in target.parameters
-        if parameter.name != source_image_parameter and parameter.default != ""
-    }
-    defaults["prompt"] = prompt
-    defaults.update(target.fixed_inputs)
-    return defaults
-
-
 def test_provider_payload_includes_defaults_and_fixed_inputs(tmp_path):
-    model = resolve_model("replicate", "seedream45")
     target = resolve_generation_target("replicate", "seedream45", edit_mode=False)
     api = FakePredictionsApi(
         FakePrediction(id="abc123", status="succeeded", output=[]),
@@ -139,7 +120,14 @@ def test_provider_payload_includes_defaults_and_fixed_inputs(tmp_path):
 
     payload = api.create_calls[0]["input"]
     assert payload["prompt"] == "a red house"
-    assert payload == expected_default_inputs(model, target, prompt="a red house")
+    assert payload == {
+        "prompt": "a red house",
+        "size": "4K",
+        "aspect_ratio": "3:4",
+        "sequential_image_generation": "disabled",
+        "max_images": 1,
+        "disable_safety_checker": True,
+    }
     assert payload["disable_safety_checker"] is True
     assert (
         target.source_images is None

@@ -18,20 +18,6 @@ from imagegen.validation import (
 )
 
 
-def expected_default_parameters(model):
-    source_image_parameter = (
-        model.edit_target.source_images.provider_field
-        if model.edit_target is not None and model.edit_target.source_images is not None
-        else None
-    )
-    return {
-        parameter.name: parameter.default
-        for parameter in model.text_target.parameters
-        if parameter.name not in {"prompt", source_image_parameter}
-        and parameter.default not in {"", ()}
-    }
-
-
 def test_validate_generation_payload_accepts_defaults(tmp_path):
     model = MODEL_REGISTRY["seedream45"]
 
@@ -42,7 +28,12 @@ def test_validate_generation_payload_accepts_defaults(tmp_path):
     )
 
     assert result.prompt == "a small red house"
-    assert result.parameters == expected_default_parameters(model)
+    assert result.parameters == {
+        "size": "4K",
+        "aspect_ratio": "3:4",
+        "sequential_image_generation": "disabled",
+        "max_images": 1,
+    }
     assert result.source_images == []
     assert result.edit_mode is False
 

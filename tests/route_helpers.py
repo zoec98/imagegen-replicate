@@ -36,19 +36,3 @@ def extract_palette_data(response):
     end = response.data.index(b"</script>", start)
     return json.loads(response.data[start:end].decode("utf-8"))
 
-
-def expected_response_parameters(model, overrides=None):
-    target = model.text_target
-    source_image_parameter = (
-        model.edit_target.source_images.provider_field
-        if model.edit_target is not None and model.edit_target.source_images is not None
-        else None
-    )
-    parameters = {
-        parameter.name: parameter.default
-        for parameter in target.parameters
-        if parameter.name not in {"prompt", source_image_parameter}
-        and parameter.default not in {"", ()}
-    }
-    parameters.update(overrides or {})
-    return parameters

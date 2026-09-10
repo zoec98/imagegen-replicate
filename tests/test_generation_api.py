@@ -8,7 +8,7 @@ Behaviors protected:
 
 from dataclasses import replace
 
-from route_helpers import expected_response_parameters, extract_csrf_token
+from route_helpers import extract_csrf_token
 
 from imagegen.model_registry import (
     MODEL_REGISTRY,
@@ -18,7 +18,6 @@ from imagegen.model_registry import (
 
 
 def test_api_generate_accepts_json_and_returns_request_id(app_factory):
-    model = MODEL_REGISTRY["seedream45"]
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
     token = extract_csrf_token(index)
@@ -44,10 +43,12 @@ def test_api_generate_accepts_json_and_returns_request_id(app_factory):
     assert response.json["status"] == "queued"
     assert response.json["prompt"] == "a small red house"
     assert response.json["source_images"] == []
-    assert response.json["parameters"] == expected_response_parameters(
-        model,
-        {"size": "2K"},
-    )
+    assert response.json["parameters"] == {
+        "size": "2K",
+        "aspect_ratio": "3:4",
+        "sequential_image_generation": "disabled",
+        "max_images": 1,
+    }
     assert response.json["images"] == []
 
 
@@ -369,7 +370,6 @@ def test_api_generate_rejects_invalid_annotation_before_request_creation(app_fac
 
 def test_api_generate_logs_recreatable_request_payload(app_factory):
     app = app_factory()
-    model = MODEL_REGISTRY["seedream45"]
     client = app.test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
     token = extract_csrf_token(index)
@@ -398,8 +398,11 @@ def test_api_generate_logs_recreatable_request_payload(app_factory):
     assert request_log.model == "bytedance/seedream-4.5"
     assert request_log.prompt == "a small red house"
     assert request_log.request_sent == {
-        **expected_response_parameters(model, {"size": "2K"}),
-        **model.text_target.fixed_inputs,
+        "size": "2K",
+        "aspect_ratio": "3:4",
+        "sequential_image_generation": "disabled",
+        "max_images": 1,
+        "disable_safety_checker": True,
         "prompt": "a small red house",
     }
 
