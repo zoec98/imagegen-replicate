@@ -4,6 +4,8 @@ Date: 2026-09-10
 
 Reviewed source revision: `55712c12d033366e89de174bdb493d4e2bca89e8`.
 All source line references below refer to that revision.
+This assessment is the pre-ticket baseline; the implemented outcome is recorded
+in the ticket implementation log below.
 
 ## Verdict
 
