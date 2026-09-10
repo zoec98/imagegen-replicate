@@ -141,13 +141,25 @@ composition changes. Moving worker creation, changing the provider mapping, or
 altering app configuration can break production while all relevant tests remain
 green.
 
-**Candidate ticket outcome after review**
+**Remedy story**
 
-Add one deterministic, non-threaded walking-skeleton test that posts a
-generation request through the Flask app, crosses the real worker orchestration,
-uses a fake only at the provider boundary, and observes terminal request and
-generation-log state through their public interfaces. Do not add a broad
-end-to-end framework or make a real provider call.
+As a maintainer changing application composition, I want one deterministic
+generation walking-skeleton test so that a valid HTTP request proves the
+assembled route, worker, provider selection, request store, and generation log
+still deliver a terminal result.
+
+**Test-first acceptance examples**
+
+- Start with one failing test that posts valid JSON to `/api/generate` through a
+  real Flask app and crosses `run_generation_request` rather than stopping at a
+  recording worker.
+- Substitute only the external generation provider; make worker execution
+  synchronous through an existing executor/worker seam so the test has no
+  timing race.
+- Observe the accepted response, terminal state through `/api/generation/<id>`,
+  and durable result through the generation-log interface.
+- Do not assert the internal sequence of store/log method calls, add an
+  end-to-end framework, or make a real provider request.
 
 ### F2 — High: browser feature tests do not use the assembled workspace contract
 
@@ -176,12 +188,24 @@ Feature-module tests will often need edits when module ownership changes even if
 the browser behavior remains the same. Conversely, broken top-level wiring may
 not fail them.
 
-**Candidate ticket outcome after review**
+**Remedy story**
 
-Add one or two composed browser workflow tests initialized through `main.js`
-against the real rendered workspace shape (or a fixture generated from it).
-Choose representative user behavior, not every module. Retain focused module
-tests for complex DOM and canvas logic.
+As a user of the generated workspace, I want one representative workflow tested
+through the assembled browser entry point so that incompatible template hooks
+or module wiring cannot leave individually passing components unusable together.
+
+**Test-first acceptance examples**
+
+- Start with one failing jsdom test initialized by `frontend/main.js`, using the
+  real rendered workspace shape or a fixture mechanically produced from it.
+- Exercise one representative workflow end to end in the browser layer: select
+  an existing source image, enable edit mode, submit generation, and observe the
+  request plus visible running state.
+- Fake browser boundaries only (`fetch`, timers, and canvas where required); do
+  not inject callbacks between the production feature modules in this test.
+- Keep focused module tests for complex DOM and image-editor behavior; add a
+  second composed workflow only if the first cannot cover a distinct top-level
+  wiring risk.
 
 ### F3 — Medium: three test oracles copy defaults from production registry data
 
@@ -209,12 +233,24 @@ They are coupled to the registry representation and may fail during a harmless
 registry redesign. At the same time, they can survive an incorrect registry
 content change that should fail.
 
-**Candidate ticket outcome after review**
+**Remedy story**
 
-Replace each self-derived oracle with either one explicit representative
-contract example or an invariant that does not reproduce the implementation.
-Keep broad registry coherence tests separate from provider-specific contract
-examples.
+As a maintainer changing model metadata, I want independent expected values for
+representative defaults and provider requests so that an accidental registry
+contract change fails a test instead of changing both the implementation and
+its oracle.
+
+**Test-first acceptance examples**
+
+- Replace the generated Seedream 4.5 defaults expectation with an explicit
+  expected parameter dictionary owned by the test.
+- Keep registry-wide tests as independent invariants such as unique names,
+  valid bounds, and fixed-input separation; do not calculate an expected payload
+  with the same comprehension as production.
+- Keep one explicit provider payload example per materially different wire shape
+  rather than snapshotting every model.
+- Demonstrate the value of the new oracle during the TDD change by temporarily
+  changing or omitting one required default and confirming the new test fails.
 
 ### F4 — Medium: workspace rendering tests couple to raw markup and one private helper
 
@@ -240,12 +276,25 @@ failure is less diagnostic.
 Low for template refactors and route decomposition; high only when the current
 HTML implementation remains structurally similar.
 
-**Candidate ticket outcome after review**
+**Remedy story**
 
-Keep assertions for intentional browser hooks, accessibility semantics, and
-user-visible content. Move behavior already covered by jsdom into composed
-browser tests, query remaining HTML semantically, and replace private-helper
-tests with requests through `/`.
+As a maintainer refactoring the workspace template and route internals, I want
+rendering tests to describe semantic browser contracts so that harmless
+whitespace, attribute-order, and helper-extraction changes do not break the
+suite.
+
+**Test-first acceptance examples**
+
+- Split `test_index_renders_prompt_form` by observable concern before changing
+  assertions, so each failure names one workspace capability.
+- Parse the `/` response and assert intentional form controls, data hooks,
+  accessibility attributes, and user-visible content semantically rather than
+  as formatting-sensitive byte fragments.
+- Replace both `_workspace_context` tests with requests through `/` that vary the
+  configured model and observe the selected option in the response.
+- Prove refactoring resilience by reformatting attribute order or whitespace and
+  confirming the semantic tests remain green; do not add a new parser dependency
+  if the standard library or installed jsdom tooling suffices.
 
 ### F5 — Medium: a small set of tests specify internal relay choreography
 
@@ -274,11 +323,26 @@ completed.
 Low if callback boundaries are merged, split, renamed, or replaced; reasonable
 only if the callback is intentionally treated as a stable interface.
 
-**Candidate ticket outcome after review**
+**Remedy story**
 
-For each example, either document the collaborator protocol as an intentional
-seam or replace the relay assertion with a composed observable outcome. Do not
-rewrite provider HTTP call assertions covered by strength S3.
+As a maintainer changing module boundaries, I want tests to assert completed
+behavior rather than internal relay calls so that callbacks and worker/provider
+adapters can be reorganized without rewriting otherwise valid specifications.
+
+**Test-first acceptance examples**
+
+- Classify each interaction expectation as either an intentional external seam
+  or an internal relay before changing it; retain exact assertions only for the
+  former.
+- Cover gallery metadata/edit dispatch and metadata application through the
+  composed browser story in F2, then remove relay-only examples that add no
+  distinct behavior.
+- Cover worker model selection through the walking skeleton in F1 plus the
+  provider wire-contract tests in S3, then remove or narrow worker tests that
+  merely repeat provider arguments.
+- For any retained collaborator expectation, name the stable protocol in the
+  test and assert the minimum interaction required by that protocol, not call
+  order or unrelated arguments.
 
 ### F6 — Low: dead duplicated helpers remain in a route test module
 
@@ -294,10 +358,20 @@ Dead test setup obscures the behaviors owned by the trash suite and can be
 mistaken for coverage. It also creates two apparent places to update image-edit
 test rules.
 
-**Candidate ticket outcome after review**
+**Remedy story**
 
-Delete the unused helpers and their now-unused imports. No shared abstraction is
-needed.
+As a test reader, I want the trash route module to contain only setup used by its
+trash behaviors so that helper definitions cannot be mistaken for test coverage
+or create a second maintenance location for image-edit rules.
+
+**Test-first acceptance examples**
+
+- Delete the five unused image-edit helpers from `test_trash_routes.py` and
+  remove imports used only by them.
+- Keep the live helpers local to `test_image_edit_routes.py`; do not introduce a
+  shared helper module for a single caller.
+- Run the full Python suite and Ruff check to prove the deletion changes no
+  behavior and leaves no unused imports.
 
 ## Refactoring survival by surface
 

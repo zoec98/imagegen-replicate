@@ -28,7 +28,8 @@ identify tests that merely mirror implementation details or relay parameters.
 - Distinguish legitimate boundary protocol assertions from implementation-detail
   interaction assertions.
 - Rank findings by impact and include evidence, refactoring risk, and a candidate
-  outcome suitable for later ticket writing.
+  remedy story with observable, test-first acceptance examples suitable for
+  later ticket writing.
 - Record strengths that should be preserved.
 - Do not create `tickets.md` or change tests or production code before review.
 
@@ -38,3 +39,9 @@ This epic produces only the user story and the review in
 [`test-quality-review.md`](test-quality-review.md). Accepted findings can be
 converted into a separately reviewed `tickets.md` in the next specialization
 workflow phase.
+
+When findings are accepted, ticket conversion should preserve each remedy's
+public behavior and seam while splitting work into vertical TDD slices: one
+failing behavior test, the minimum suite or production change needed to make it
+pass, then refactor while green. The remedy stories are inputs to that review;
+they are not approved tickets yet.
