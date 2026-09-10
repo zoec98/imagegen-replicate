@@ -12,8 +12,10 @@ from threading import Event
 
 from imagegen.generation_log import SQLiteGenerationLog
 from imagegen.generation_provider import (
+    FalAIGenerationProvider,
     ReplicateGenerationProvider,
     WiroGenerationProvider,
+    default_generation_providers,
 )
 from imagegen.generation_types import GenerationProviderTimeout, GenerationResult
 from imagegen.image_store import StoredImage
@@ -40,6 +42,15 @@ class ErrorProvider:
 
     def generate(self, request_record, app_config):
         raise self.error
+
+
+def test_default_generation_providers_wire_each_provider_adapter():
+    providers = default_generation_providers()
+
+    assert set(providers) == {"replicate", "falai", "wiro"}
+    assert isinstance(providers["replicate"], ReplicateGenerationProvider)
+    assert isinstance(providers["falai"], FalAIGenerationProvider)
+    assert isinstance(providers["wiro"], WiroGenerationProvider)
 
 
 def test_run_generation_request_succeeded_updates_request(app_config):

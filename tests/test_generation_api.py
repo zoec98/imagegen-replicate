@@ -7,14 +7,93 @@ Behaviors protected:
 """
 
 from dataclasses import replace
+from pathlib import Path
 
 from route_helpers import extract_csrf_token
 
+from imagegen.generation_log import SQLiteGenerationLog
+from imagegen.generation_types import GenerationResult
+from imagegen.image_store import StoredImage
 from imagegen.model_registry import (
     MODEL_REGISTRY,
     PROVIDER_REGISTRIES,
     resolve_model,
 )
+from imagegen.request_store import RequestStore
+from imagegen.worker import ThreadedGenerationWorker
+
+
+class ImmediateExecutor:
+    def submit(self, function, *args):
+        function(*args)
+
+
+class StoredImageProvider:
+    def __init__(self, output_dir: Path):
+        self.output_dir = output_dir
+
+    def generate(self, request_record, app_config):
+        image_path = self.output_dir / "seedream45-request-01.png"
+        image_path.write_bytes(b"image")
+        return GenerationResult(
+            prediction_id="prediction-123",
+            output_urls=["https://example.test/image.png"],
+            stored_images=[
+                StoredImage(
+                    path=image_path,
+                    source_url="https://example.test/image.png",
+                    content_type="image/png",
+                    size_bytes=5,
+                    created_at="2026-09-10T12:00:00+00:00",
+                )
+            ],
+            logs="created\nfinished",
+        )
+
+
+def test_api_generate_runs_real_worker_and_persists_success(app_config, app_factory):
+    store = RequestStore()
+    generation_log = SQLiteGenerationLog(app_config.generation_log_path)
+    worker = ThreadedGenerationWorker(
+        store=store,
+        app_config=app_config,
+        generation_log=generation_log,
+        providers={"replicate": StoredImageProvider(app_config.output_dir)},
+        executor=ImmediateExecutor(),
+    )
+    app = app_factory(
+        IMAGEGEN_REQUEST_STORE=store,
+        IMAGEGEN_GENERATION_LOG=generation_log,
+        IMAGEGEN_WORKER=worker,
+    )
+    client = app.test_client()
+    index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
+    token = extract_csrf_token(index)
+
+    response = client.post(
+        "/api/generate",
+        json={"prompt": "a small red house"},
+        headers={"X-CSRF-Token": token},
+        environ_base={"REMOTE_ADDR": "192.0.2.10"},
+    )
+
+    assert response.status_code == 202
+    assert response.json["status"] == "succeeded"
+    assert response.json["images"] == ["seedream45-request-01.png"]
+
+    status = client.get(response.json["status_url"])
+    assert status.status_code == 200
+    assert status.json["status"] == "succeeded"
+    assert status.json["prediction_id"] == "prediction-123"
+    assert status.json["logs"] == ["created", "finished"]
+    assert status.json["images"] == ["seedream45-request-01.png"]
+
+    result = generation_log.get_logged_result(response.json["request_id"])
+    assets = generation_log.list_logged_assets(response.json["request_id"])
+    assert result is not None
+    assert result.status == "succeeded"
+    assert result.prediction_id == "prediction-123"
+    assert [asset.filename for asset in assets] == ["seedream45-request-01.png"]
 
 
 def test_api_generate_accepts_json_and_returns_request_id(app_factory):
