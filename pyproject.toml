@@ -1,6 +1,6 @@
 [project]
 name = "imagegen"
-version = "0.1.2"
+version = "0.1.3"
 description = "Flask UI for Replicate image generation requests"
 readme = "README.md"
 authors = [
