@@ -9,18 +9,8 @@ Behaviors protected:
 """
 
 import os
-from base64 import b64encode
-from io import BytesIO
 
-from PIL import Image
 from route_helpers import extract_csrf_token
-
-from imagegen.mask_store import (
-    MASK_DATA_URL_PREFIX,
-    MASK_JSON_FIXED_OVERHEAD_BYTES,
-    MASK_PNG_BYTES_PER_PIXEL_LIMIT,
-    MASK_PNG_FIXED_OVERHEAD_BYTES,
-)
 
 
 def test_trash_route_serves_trashed_file(app_config, app_factory):
@@ -358,52 +348,3 @@ def test_api_delete_image_requires_csrf(app_config, app_factory):
     assert response.json == {"error": "Invalid CSRF token."}
     assert image_path.exists()
 
-
-def png_payload(size=(8, 8), color=(255, 255, 255)):
-    buffer = BytesIO()
-    Image.new("RGB", size, color).save(buffer, "PNG")
-    encoded = b64encode(buffer.getvalue()).decode("ascii")
-    return f"data:image/png;base64,{encoded}"
-
-
-def grayscale_png_payload(pixels, size):
-    buffer = BytesIO()
-    image = Image.new("L", size)
-    image.putdata(pixels)
-    image.save(buffer, "PNG")
-    encoded = b64encode(buffer.getvalue()).decode("ascii")
-    return f"data:image/png;base64,{encoded}"
-
-
-def crop_image_via_api(client, token, filename="sample.png"):
-    return client.post(
-        f"/api/images/{filename}/crop",
-        json={"rectangle": {"x": 0, "y": 0, "width": 10, "height": 10}},
-        headers={"X-CSRF-Token": token},
-        environ_base={"REMOTE_ADDR": "192.0.2.10"},
-    )
-
-
-def blur_image_via_api(client, token, filename="sample.png"):
-    return client.post(
-        f"/api/images/{filename}/blur",
-        json={
-            "blur_radius": 2,
-            "mask_png": grayscale_png_payload([255] + [0] * 63, (8, 8)),
-        },
-        headers={"X-CSRF-Token": token},
-        environ_base={"REMOTE_ADDR": "192.0.2.10"},
-    )
-
-
-def mask_limit_values(size):
-    width, height = size
-    decoded = (
-        width * height * MASK_PNG_BYTES_PER_PIXEL_LIMIT + MASK_PNG_FIXED_OVERHEAD_BYTES
-    )
-    base64_chars = ((decoded + 2) // 3) * 4 + len(MASK_DATA_URL_PREFIX)
-    return {
-        "decoded": decoded,
-        "base64": base64_chars,
-        "request": base64_chars + MASK_JSON_FIXED_OVERHEAD_BYTES,
-    }
