@@ -275,7 +275,7 @@ def test_api_generate_logs_wiro_edit_requests_when_wiro_is_enabled(
         wiro_api_key="wiro-key",
         enabled_providers=("wiro",),
         selected_provider="wiro",
-        model_alias="seedream5-lite-uncensored",
+        model_alias="seedream5",
     )
     app_config.output_dir.mkdir(parents=True)
     (app_config.output_dir / "source.png").write_bytes(b"image")
@@ -287,7 +287,7 @@ def test_api_generate_logs_wiro_edit_requests_when_wiro_is_enabled(
         "/api/generate",
         json={
             "provider": "wiro",
-            "model": "seedream5-lite-uncensored",
+            "model": "seedream5",
             "prompt": "edit this",
             "edit_mode": True,
             "source_images": ["source.png"],

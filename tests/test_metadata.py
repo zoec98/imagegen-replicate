@@ -96,7 +96,7 @@ def test_embedded_metadata_provider_recognizes_wiro_model(tmp_path):
         image_path,
         {
             "provider": "wiro",
-            "model_alias": "seedream5-lite-uncensored",
+            "model_alias": "seedream5",
             "model": "bytedance/seedream-v5-lite-uncensored",
             "prompt": "a red house",
         },

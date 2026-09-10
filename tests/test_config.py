@@ -431,8 +431,8 @@ def test_load_config_reports_wiro_enabled_and_selected_when_only_key_is_set(
 
     assert config.enabled_providers == ("wiro",)
     assert config.selected_provider == "wiro"
-    assert config.model_alias == "seedream5-lite-uncensored"
-    assert config.model.alias == "seedream5-lite-uncensored"
+    assert config.model_alias == "seedream5"
+    assert config.model.alias == "seedream5"
     assert config.wiro_api_key == "wiro-key"
 
 

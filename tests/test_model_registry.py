@@ -303,9 +303,9 @@ def test_generation_target_resolution_keeps_provider_parameters_distinct():
 def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
     models = list_models_for_provider("wiro")
     assert {model.alias for model in models} == {
-        "seedream5-pro-uncensored",
-        "seedream5-lite-uncensored",
-        "seedream45-uncensored",
+        "seedream5-pro",
+        "seedream5",
+        "seedream45",
         "z-image-turbo",
         "hidream-dev",
         "hidream-fast",
@@ -316,19 +316,18 @@ def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
         "gpt-image-15",
         "gpt-image-2",
     }
-    assert all(
-        "Uncensored" in model.display_name
+    assert {
+        model.alias: model.display_name
         for model in models
-        if model.alias
-        in {
-            "seedream5-pro-uncensored",
-            "seedream5-lite-uncensored",
-            "seedream45-uncensored",
-        }
-    )
+        if model.alias.startswith("seedream")
+    } == {
+        "seedream5-pro": "Seedream 5 Pro",
+        "seedream5": "Seedream 5 Lite",
+        "seedream45": "Seedream 4.5",
+    }
     assert {model.provider for model in models} == {"wiro"}
 
-    pro = resolve_model("wiro", "seedream5-pro-uncensored")
+    pro = resolve_model("wiro", "seedream5-pro")
     assert pro.text_target.provider_model == "bytedance/seedream-v5-pro-uncensored"
     assert pro.edit_target is not None
     assert pro.edit_target.source_images is not None
@@ -342,18 +341,27 @@ def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
         "watermark",
     ]
     assert pro.text_target.parameters[1].choices == ("1k", "2k")
+    assert pro.text_target.parameters[1].default == "2k"
+    assert pro.text_target.parameters[2].default == "3:4"
     assert pro.text_target.parameters[3].default == "jpeg"
     assert pro.text_target.parameters[-1].choices == ("false", "true")
     assert {price.price for price in pro.text_target.pricing} == {"$0.045", "$0.09"}
     assert all(price.source == "provider-api" for price in pro.text_target.pricing)
 
-    lite = resolve_model("wiro", "seedream5-lite-uncensored")
+    lite = resolve_model("wiro", "seedream5")
     assert lite.text_target.provider_model == "bytedance/seedream-v5-lite-uncensored"
     assert lite.edit_target is not None
     assert lite.edit_target.source_images is not None
     assert lite.edit_target.source_images.max_count == 14
     assert lite.edit_target.source_images.max_total == 15
     assert lite.edit_target.source_images.output_count_parameter == "maxImages"
+    lite_parameters = {
+        parameter.name: parameter for parameter in lite.text_target.parameters
+    }
+    assert lite_parameters["resolution"].choices == ("2k", "3k")
+    assert lite_parameters["resolution"].default == "3k"
+    assert "auto" not in lite_parameters["aspectRatio"].choices
+    assert lite_parameters["aspectRatio"].default == "3:4"
     assert (
         next(
             parameter
@@ -362,15 +370,13 @@ def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
         ).default
         == "false"
     )
-    assert resolve_model_ref("wiro:Seedream 5 Lite Uncensored").alias == (
-        "seedream5-lite-uncensored"
-    )
+    assert resolve_model_ref("wiro:Seedream 5 Lite").alias == ("seedream5")
 
 
 def test_wiro_registry_contains_seedream45_uncensored_contract():
-    model = resolve_model("wiro", "seedream45-uncensored")
+    model = resolve_model("wiro", "seedream45")
 
-    assert model.display_name == "Seedream 4.5 Uncensored"
+    assert model.display_name == "Seedream 4.5"
     assert model.text_target.provider_model == "bytedance/seedream-v4-5-uncensored"
     assert model.text_target.mode == "text-to-image"
     assert model.edit_target is not None
@@ -384,10 +390,9 @@ def test_wiro_registry_contains_seedream45_uncensored_contract():
     parameters = {
         parameter.name: parameter for parameter in model.text_target.parameters
     }
-    assert parameters["resolution"].default == "auto"
-    assert parameters["resolution"].choices == ("auto", "2k", "4k")
+    assert parameters["resolution"].default == "4k"
+    assert parameters["resolution"].choices == ("2k", "4k")
     assert parameters["aspectRatio"].choices == (
-        "auto",
         "1:1",
         "2:3",
         "3:2",
@@ -400,7 +405,7 @@ def test_wiro_registry_contains_seedream45_uncensored_contract():
         "21:9",
         "9:21",
     )
-    assert parameters["aspectRatio"].default == "auto"
+    assert parameters["aspectRatio"].default == "3:4"
     assert parameters["maxImages"].default == 1
     assert parameters["maxImages"].minimum == 1
     assert parameters["maxImages"].maximum == 15

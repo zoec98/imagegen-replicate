@@ -194,7 +194,7 @@ def test_cli_generation_runs_synchronously_through_existing_provider_service(
 
 
 def test_cli_generation_runs_wiro_when_wiro_is_enabled(app_config):
-    model = resolve_model("wiro", "seedream5-lite-uncensored")
+    model = resolve_model("wiro", "seedream5")
     config = replace(
         app_config,
         wiro_api_key="wiro-key",

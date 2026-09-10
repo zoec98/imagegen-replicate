@@ -232,12 +232,12 @@ def test_create_request_persists_provider_for_wiro_rows(tmp_path):
         provider="wiro",
         prompt="a cookie",
         parameters={"watermark": "false"},
-        model_alias="seedream5-lite-uncensored",
+        model_alias="seedream5",
     )
 
     log.create_request(
         record,
-        model_alias="seedream5-lite-uncensored",
+        model_alias="seedream5",
         model="bytedance/seedream-v5-lite-uncensored",
         replicate_input={"prompt": "a cookie", "watermark": "false"},
     )

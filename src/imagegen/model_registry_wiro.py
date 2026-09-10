@@ -14,7 +14,6 @@ from imagegen.model_registry_base import (
 
 ASPECT_RATIOS = ("1:1", "2:3", "3:2", "3:4", "4:3", "16:9", "9:16", "21:9")
 SEEDREAM45_ASPECT_RATIOS = (
-    "auto",
     "1:1",
     "2:3",
     "3:2",
@@ -120,7 +119,7 @@ def _pro_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
             "resolution",
             "Output resolution.",
             "select",
-            "1k",
+            "2k",
             choices=("1k", "2k"),
             order=3 if edit else 2,
         ),
@@ -128,7 +127,7 @@ def _pro_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
             "aspectRatio",
             "Output aspect ratio.",
             "select",
-            "1:1",
+            "3:4",
             choices=ASPECT_RATIOS,
             order=4 if edit else 3,
         ),
@@ -154,8 +153,9 @@ def _pro_parameters(*, edit: bool) -> tuple[ModelParameter, ...]:
 def _lite_parameters(
     *,
     edit: bool,
-    resolution_choices: tuple[object, ...] = ("auto", "2k", "3k"),
-    aspect_ratios: tuple[object, ...] = ("auto", *ASPECT_RATIOS),
+    resolution_choices: tuple[object, ...] = ("2k", "3k"),
+    aspect_ratios: tuple[object, ...] = ASPECT_RATIOS,
+    resolution_default: str = "3k",
 ) -> tuple[ModelParameter, ...]:
     source = (
         (
@@ -183,7 +183,7 @@ def _lite_parameters(
             "resolution",
             "Output resolution.",
             "select",
-            "auto",
+            resolution_default,
             choices=resolution_choices,
             order=3 if edit else 2,
         ),
@@ -191,7 +191,7 @@ def _lite_parameters(
             "aspectRatio",
             "Output aspect ratio.",
             "select",
-            "auto",
+            "3:4",
             choices=aspect_ratios,
             order=4 if edit else 3,
         ),
@@ -256,7 +256,7 @@ def _provider_model(
     if source_binding is None:
         source_binding = (
             SourceImageBinding(provider_field="inputImage", max_count=10)
-            if alias == "seedream5-pro-uncensored"
+            if alias == "seedream5-pro"
             else SourceImageBinding(
                 provider_field="inputImage",
                 max_count=14,
@@ -767,35 +767,37 @@ GPT_IMAGE_15_PROVIDER_MODEL = "openai/gpt-image-1-5"
 GPT_IMAGE_2_PROVIDER_MODEL = "openai/gpt-image-2"
 
 MODEL_REGISTRY: dict[str, ProviderModel] = {
-    "seedream5-pro-uncensored": _provider_model(
-        alias="seedream5-pro-uncensored",
-        display_name="Seedream 5 Pro Uncensored",
+    "seedream5-pro": _provider_model(
+        alias="seedream5-pro",
+        display_name="Seedream 5 Pro",
         provider_model=PROVIDER_MODEL,
         text_parameters=_pro_parameters(edit=False),
         edit_parameters=_pro_parameters(edit=True),
         pricing=(_pricing("$0.045", "1K"), _pricing("$0.09", "2K")),
     ),
-    "seedream5-lite-uncensored": _provider_model(
-        alias="seedream5-lite-uncensored",
-        display_name="Seedream 5 Lite Uncensored",
+    "seedream5": _provider_model(
+        alias="seedream5",
+        display_name="Seedream 5 Lite",
         provider_model=LITE_PROVIDER_MODEL,
         text_parameters=_lite_parameters(edit=False),
         edit_parameters=_lite_parameters(edit=True),
         pricing=(_pricing("$0.035", "per output"),),
     ),
-    "seedream45-uncensored": _provider_model(
-        alias="seedream45-uncensored",
-        display_name="Seedream 4.5 Uncensored",
+    "seedream45": _provider_model(
+        alias="seedream45",
+        display_name="Seedream 4.5",
         provider_model=SEEDREAM45_PROVIDER_MODEL,
         text_parameters=_lite_parameters(
             edit=False,
-            resolution_choices=("auto", "2k", "4k"),
+            resolution_choices=("2k", "4k"),
             aspect_ratios=SEEDREAM45_ASPECT_RATIOS,
+            resolution_default="4k",
         ),
         edit_parameters=_lite_parameters(
             edit=True,
-            resolution_choices=("auto", "2k", "4k"),
+            resolution_choices=("2k", "4k"),
             aspect_ratios=SEEDREAM45_ASPECT_RATIOS,
+            resolution_default="4k",
         ),
         pricing=(_pricing("$0.04", "per output"),),
     ),

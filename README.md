@@ -23,7 +23,7 @@ provider appears in the UI only when its credentials are configured.
 | --- | --- |
 | Replicate | `flux-flex` — Flux 2 Flex (edit)<br>`gpt-image-15` — GPT Image 1.5 (edit)<br>`gpt-image-2` — GPT Image 2 (edit)<br>`gpt-image-25-flare` — GPT Image 2.5 Flare (edit)<br>`gpt-image-25-sunburst` — GPT Image 2.5 Sunburst (edit)<br>`grok-imagine` — Grok Imagine (edit)<br>`hunyuan-image-3` — Hunyuan Image 3 (text)<br>`imagen-4` — Imagen 4 (text)<br>`imagen-4-fast` — Imagen 4 Fast (text)<br>`imagen-4-ultra` — Imagen 4 Ultra (text)<br>`nano-banana-2` — Nano Banana 2 (edit)<br>`nano-banana-pro` — Nano Banana Pro (edit)<br>`qwen-2512` — Qwen Image 2512 (edit)<br>`seedream45` — Seedream 4.5 (edit)<br>`seedream5` — Seedream 5 Lite (edit)<br>`seedream5-pro` — Seedream 5 Pro (edit)<br>`wan-27-pro` — Wan 2.7 Image Pro (edit) |
 | fal.ai | `bria-fibo` — Bria Fibo (edit)<br>`ernie-image` — Ernie Image (text)<br>`ernie-image-turbo` — Ernie Image Turbo (text)<br>`flux-2` — Flux 2 (edit)<br>`flux-2-pro` — Flux 2 Pro (edit)<br>`flux-2-realism` — Flux 2 Realism (text)<br>`gpt-image-2` — GPT Image 2 (edit)<br>`gpt-image-25-flare` — GPT Image 2.5 Flare (edit)<br>`gpt-image-25-sunburst` — GPT Image 2.5 Sunburst (edit)<br>`gpt-image15` — GPT Image 1.5 (edit)<br>`grok` — Grok Imagine Image (edit)<br>`hidream-dev` — HiDream I1 Dev (text)<br>`hidream-fast` — HiDream I1 Fast (text)<br>`hidream-full` — HiDream I1 Full (text)<br>`krea-2-large` — Krea 2 Large (text)<br>`krea-2-medium` — Krea 2 Medium (text)<br>`krea-2-turbo` — Krea 2 Turbo (edit)<br>`nano-banana-2` — Nano Banana 2 (edit)<br>`seedream` — Seedream 4 (edit)<br>`seedream45` — Seedream 4.5 (edit)<br>`seedream5` — Seedream 5 Lite (edit)<br>`seedream5-pro` — Seedream 5 Pro (edit)<br>`zit` — Z-Image Turbo (edit) |
-| Wiro | `flux-2-flex` — Flux 2 Flex (edit)<br>`gpt-image-15` — GPT Image 1.5 (edit)<br>`gpt-image-2` — GPT Image 2 (edit)<br>`grok-imagine` — Grok Imagine Image (edit)<br>`hidream-dev` — HiDream I1 Dev (text)<br>`hidream-fast` — HiDream I1 Fast (text)<br>`nano-banana-2` — Nano Banana 2 (edit)<br>`nano-banana-pro` — Nano Banana Pro (edit)<br>`seedream45-uncensored` — Seedream 4.5 Uncensored (edit)<br>`seedream5-lite-uncensored` — Seedream 5 Lite Uncensored (edit)<br>`seedream5-pro-uncensored` — Seedream 5 Pro Uncensored (edit)<br>`z-image-turbo` — Z-Image Turbo (text) |
+| Wiro | `flux-2-flex` — Flux 2 Flex (edit)<br>`gpt-image-15` — GPT Image 1.5 (edit)<br>`gpt-image-2` — GPT Image 2 (edit)<br>`grok-imagine` — Grok Imagine Image (edit)<br>`hidream-dev` — HiDream I1 Dev (text)<br>`hidream-fast` — HiDream I1 Fast (text)<br>`nano-banana-2` — Nano Banana 2 (edit)<br>`nano-banana-pro` — Nano Banana Pro (edit)<br>`seedream45` — Seedream 4.5 (edit)<br>`seedream5` — Seedream 5 Lite (edit)<br>`seedream5-pro` — Seedream 5 Pro (edit)<br>`z-image-turbo` — Z-Image Turbo (text) |
 
 More providers, missing models or features can be added.
 Join the Support Chat on deviantArt, and request what you need.
@@ -223,7 +223,7 @@ Select a model by its alias or by its display name:
 ```bash
 imagegen --provider replicate --model seedream45 --prompt "a red fox"
 imagegen --provider falai --model "Seedream 4.5" --file prompts/fox.txt
-imagegen --provider wiro --model seedream5-lite-uncensored --prompt "a red fox"
+imagegen --provider wiro --model seedream5 --prompt "a red fox"
 ```
 
 `--prompt` and `--file` are mutually exclusive. Prompt files are read as UTF-8

@@ -94,17 +94,19 @@ provider model identities:
 - `bytedance/seedream-v5-lite-uncensored`
 - `bytedance/seedream-v4-5-uncensored`
 
-Pro has `resolution` (`1k`/`2k`), `aspectRatio`, `outputFormat` (`jpeg`/`png`),
-and string-valued `watermark` (`false`/`true`), with a maximum of 10
-`inputImage` sources for editing. Lite has `resolution` (`auto`/`2k`/`3k`),
-`aspectRatio`, integer `maxImages` (1–15), and the same string-valued
-`watermark`, with a maximum of 14 edit sources and a source-plus-output limit
-of 15. The application defaults output to JPEG and watermark to `false`.
+Pro has `resolution` (`1k`/`2k`, default `2k`), `aspectRatio` (default `3:4`),
+`outputFormat` (`jpeg`/`png`), and string-valued `watermark` (`false`/`true`),
+with a maximum of 10
+`inputImage` sources for editing. Lite has `resolution` (`2k`/`3k`, default
+`3k`), `aspectRatio` (default `3:4`), integer `maxImages` (1–15), and the same
+string-valued `watermark`, with a maximum of 14 edit sources and a
+source-plus-output limit of 15. The application defaults output to JPEG and
+watermark to `false`.
 
 Wiro pricing is provider-reported: Pro is `$0.045` at 1K and `$0.09` at 2K;
 Lite is `$0.035` per output; Seedream 4.5 Uncensored is `$0.04` per output.
-Seedream 4.5 supports `resolution` (`auto`/`2k`/`4k`), `aspectRatio`
-(`auto`, `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `16:9`, `9:16`,
+Seedream 4.5 supports `resolution` (`2k`/`4k`, default `4k`), `aspectRatio`
+(`1:1`, `2:3`, `3:2`, `3:4` (default), `4:3`, `4:5`, `5:4`, `16:9`, `9:16`,
 `21:9`, `9:21`), integer `maxImages` (1–15), and string-valued `watermark`
 (`false`/`true`). It accepts up to 14 edit sources, with source images plus
 outputs limited to 15. Its Tool Detail response contains no output-format or

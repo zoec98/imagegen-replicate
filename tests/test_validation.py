@@ -279,7 +279,7 @@ def test_validate_model_parameters_rejects_image_input_for_mvp():
 
 
 def test_validate_wiro_model_rejects_generic_input_image():
-    model = resolve_model("wiro", "seedream5-pro-uncensored")
+    model = resolve_model("wiro", "seedream5-pro")
     target = model.edit_target
     assert target is not None
 
@@ -427,7 +427,7 @@ def test_validate_wiro_gpt_edit_accepts_sixteen_sources_and_rejects_seventeenth(
 
 
 def test_validate_wiro_lite_rejects_sources_plus_outputs_above_limit(tmp_path):
-    model = resolve_model("wiro", "seedream5-lite-uncensored")
+    model = resolve_model("wiro", "seedream5")
     for index in range(14):
         (tmp_path / f"source-{index}.png").write_bytes(b"image")
 

@@ -299,7 +299,7 @@ def test_wiro_generation_provider_dispatches_selected_model_and_sources(app_conf
     store = RequestStore()
     record = store.create(
         provider="wiro",
-        model_alias="seedream5-lite-uncensored",
+        model_alias="seedream5",
         prompt="edit this",
         parameters={"watermark": "false"},
         source_images=["source.png"],
@@ -317,7 +317,7 @@ def test_wiro_generation_provider_dispatches_selected_model_and_sources(app_conf
     ):
         assert prompt == "edit this"
         assert provider_config.wiro_api_key == ""
-        assert model.alias == "seedream5-lite-uncensored"
+        assert model.alias == "seedream5"
         assert target.provider_model == "bytedance/seedream-v5-lite-uncensored"
         assert parameters == {"watermark": "false"}
         assert source_image_paths == [source_path]
@@ -339,7 +339,7 @@ def test_wiro_generation_provider_timeout_keeps_task_id_in_worker_error(app_conf
     store = RequestStore()
     record = store.create(
         provider="wiro",
-        model_alias="seedream5-lite-uncensored",
+        model_alias="seedream5",
         prompt="a cookie",
         parameters={},
     )

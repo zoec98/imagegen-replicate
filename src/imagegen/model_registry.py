@@ -128,11 +128,8 @@ def default_model_for_provider(provider: ProviderId) -> ProviderModel | None:
         return None
     if provider == "replicate" and DEFAULT_MODEL_ALIAS in PROVIDER_REGISTRIES[provider]:
         return PROVIDER_REGISTRIES[provider][DEFAULT_MODEL_ALIAS]
-    if (
-        provider == "wiro"
-        and "seedream5-lite-uncensored" in PROVIDER_REGISTRIES[provider]
-    ):
-        return PROVIDER_REGISTRIES[provider]["seedream5-lite-uncensored"]
+    if provider == "wiro" and "seedream5" in PROVIDER_REGISTRIES[provider]:
+        return PROVIDER_REGISTRIES[provider]["seedream5"]
     return models[0]
 
 

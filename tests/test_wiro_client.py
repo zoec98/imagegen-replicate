@@ -57,10 +57,8 @@ def app_config(tmp_path):
 
 
 def test_wiro_text_request_submits_once_polls_same_task_and_persists_outputs(tmp_path):
-    model = resolve_model("wiro", "seedream5-pro-uncensored")
-    target = resolve_generation_target(
-        "wiro", "seedream5-pro-uncensored", edit_mode=False
-    )
+    model = resolve_model("wiro", "seedream5-pro")
+    target = resolve_generation_target("wiro", "seedream5-pro", edit_mode=False)
     client = FakeHTTPClient(
         [
             FakeResponse(200, {"result": True, "errors": [], "taskid": "wiro-123"}),
@@ -102,7 +100,7 @@ def test_wiro_text_request_submits_once_polls_same_task_and_persists_outputs(tmp
         persisted.append({"urls": list(urls), **kwargs})
         return [
             StoredImage(
-                path=tmp_path / "seedream5-pro-uncensored-wiro-123-01.jpg",
+                path=tmp_path / "seedream5-pro-wiro-123-01.jpg",
                 source_url=urls[0],
                 content_type="image/jpeg",
                 size_bytes=123,
@@ -133,22 +131,22 @@ def test_wiro_text_request_submits_once_polls_same_task_and_persists_outputs(tmp
     assert client.calls[0]["json"] == {
         "prompt": "a cookie tasty",
         "resolution": "1k",
-        "aspectRatio": "1:1",
+        "aspectRatio": "3:4",
         "outputFormat": "jpeg",
         "watermark": "false",
     }
     assert client.calls[1]["json"] == {"taskid": "wiro-123"}
     assert client.calls[2]["json"] == {"taskid": "wiro-123"}
     assert persisted[0]["provider"] == "wiro"
-    assert persisted[0]["model_alias"] == "seedream5-pro-uncensored"
+    assert persisted[0]["model_alias"] == "seedream5-pro"
     assert persisted[0]["provider_model"] == "bytedance/seedream-v5-pro-uncensored"
     assert persisted[0]["prompt"] == "a cookie (palette: warm tasty)"
     assert persisted[0]["prediction_input"]["prompt"] == "a cookie tasty"
 
 
 def test_wiro_seedream45_text_request_uses_provider_defaults(tmp_path):
-    model = resolve_model("wiro", "seedream45-uncensored")
-    target = resolve_generation_target("wiro", "seedream45-uncensored", edit_mode=False)
+    model = resolve_model("wiro", "seedream45")
+    target = resolve_generation_target("wiro", "seedream45", edit_mode=False)
     client = FakeHTTPClient(
         [
             FakeResponse(200, {"result": True, "errors": [], "taskid": "wiro-45"}),
@@ -194,10 +192,8 @@ def test_wiro_seedream45_text_request_uses_provider_defaults(tmp_path):
 
 
 def test_wiro_failed_task_keeps_task_id_without_accepting_outputs(tmp_path):
-    model = resolve_model("wiro", "seedream5-lite-uncensored")
-    target = resolve_generation_target(
-        "wiro", "seedream5-lite-uncensored", edit_mode=False
-    )
+    model = resolve_model("wiro", "seedream5")
+    target = resolve_generation_target("wiro", "seedream5", edit_mode=False)
     client = FakeHTTPClient(
         [
             FakeResponse(200, {"result": True, "errors": [], "taskid": "wiro-456"}),
@@ -234,10 +230,8 @@ def test_wiro_failed_task_keeps_task_id_without_accepting_outputs(tmp_path):
 
 
 def test_wiro_polling_timeout_does_not_submit_again(tmp_path):
-    model = resolve_model("wiro", "seedream5-pro-uncensored")
-    target = resolve_generation_target(
-        "wiro", "seedream5-pro-uncensored", edit_mode=False
-    )
+    model = resolve_model("wiro", "seedream5-pro")
+    target = resolve_generation_target("wiro", "seedream5-pro", edit_mode=False)
     client = FakeHTTPClient(
         [
             FakeResponse(200, {"result": True, "errors": [], "taskid": "wiro-789"}),
@@ -268,10 +262,8 @@ def test_wiro_polling_timeout_does_not_submit_again(tmp_path):
 
 
 def test_wiro_rejects_success_without_https_image_output(tmp_path):
-    model = resolve_model("wiro", "seedream5-pro-uncensored")
-    target = resolve_generation_target(
-        "wiro", "seedream5-pro-uncensored", edit_mode=False
-    )
+    model = resolve_model("wiro", "seedream5-pro")
+    target = resolve_generation_target("wiro", "seedream5-pro", edit_mode=False)
     client = FakeHTTPClient(
         [
             FakeResponse(200, {"result": True, "errors": [], "taskid": "wiro-999"}),
@@ -318,10 +310,8 @@ def test_wiro_http_failures_are_actionable_without_credentials(
     message,
     expected,
 ):
-    model = resolve_model("wiro", "seedream5-pro-uncensored")
-    target = resolve_generation_target(
-        "wiro", "seedream5-pro-uncensored", edit_mode=False
-    )
+    model = resolve_model("wiro", "seedream5-pro")
+    target = resolve_generation_target("wiro", "seedream5-pro", edit_mode=False)
     client = FakeHTTPClient(
         [FakeResponse(status_code, {"result": False, "errors": [{"message": message}]})]
     )
@@ -338,10 +328,8 @@ def test_wiro_http_failures_are_actionable_without_credentials(
 
 
 def test_wiro_rejects_malformed_task_detail_response(tmp_path):
-    model = resolve_model("wiro", "seedream5-pro-uncensored")
-    target = resolve_generation_target(
-        "wiro", "seedream5-pro-uncensored", edit_mode=False
-    )
+    model = resolve_model("wiro", "seedream5-pro")
+    target = resolve_generation_target("wiro", "seedream5-pro", edit_mode=False)
     client = FakeHTTPClient(
         [
             FakeResponse(200, {"result": True, "errors": [], "taskid": "wiro-bad"}),
@@ -362,10 +350,8 @@ def test_wiro_rejects_malformed_task_detail_response(tmp_path):
 
 
 def test_wiro_edit_uploads_repeated_input_image_parts_and_closes_files(tmp_path):
-    model = resolve_model("wiro", "seedream5-pro-uncensored")
-    target = resolve_generation_target(
-        "wiro", "seedream5-pro-uncensored", edit_mode=True
-    )
+    model = resolve_model("wiro", "seedream5-pro")
+    target = resolve_generation_target("wiro", "seedream5-pro", edit_mode=True)
     source_paths = [
         tmp_path / "source-one.png",
         tmp_path / "source-two.jpg",
@@ -414,8 +400,8 @@ def test_wiro_edit_uploads_repeated_input_image_parts_and_closes_files(tmp_path)
     assert run_call["json"] is None
     assert dict(run_call["data"]) == {
         "prompt": "edit this tasty",
-        "resolution": "1k",
-        "aspectRatio": "1:1",
+        "resolution": "2k",
+        "aspectRatio": "3:4",
         "outputFormat": "jpeg",
         "watermark": "false",
     }
@@ -437,8 +423,8 @@ def test_wiro_edit_uploads_repeated_input_image_parts_and_closes_files(tmp_path)
 
 
 def test_wiro_seedream45_edit_uploads_sources_and_limits_outputs(tmp_path):
-    model = resolve_model("wiro", "seedream45-uncensored")
-    target = resolve_generation_target("wiro", "seedream45-uncensored", edit_mode=True)
+    model = resolve_model("wiro", "seedream45")
+    target = resolve_generation_target("wiro", "seedream45", edit_mode=True)
     source_path = tmp_path / "source.png"
     source_path.write_bytes(b"image")
     client = FakeHTTPClient(
@@ -479,8 +465,8 @@ def test_wiro_seedream45_edit_uploads_sources_and_limits_outputs(tmp_path):
     run_call = client.calls[0]
     assert dict(run_call["data"]) == {
         "prompt": "edit this",
-        "resolution": "auto",
-        "aspectRatio": "auto",
+        "resolution": "4k",
+        "aspectRatio": "3:4",
         "maxImages": "2",
         "watermark": "false",
     }
@@ -855,10 +841,8 @@ def test_wiro_gpt_variants_send_fixed_moderation_and_edit_sources(tmp_path):
 
 
 def test_wiro_edit_serializes_multipart_with_httpx_client(tmp_path):
-    model = resolve_model("wiro", "seedream5-lite-uncensored")
-    target = resolve_generation_target(
-        "wiro", "seedream5-lite-uncensored", edit_mode=True
-    )
+    model = resolve_model("wiro", "seedream5")
+    target = resolve_generation_target("wiro", "seedream5", edit_mode=True)
     source_path = tmp_path / "source.png"
     source_path.write_bytes(b"image")
     responses = iter(
@@ -903,10 +887,8 @@ def test_wiro_edit_serializes_multipart_with_httpx_client(tmp_path):
 
 
 def test_wiro_edit_closes_uploads_when_submission_fails(tmp_path):
-    model = resolve_model("wiro", "seedream5-lite-uncensored")
-    target = resolve_generation_target(
-        "wiro", "seedream5-lite-uncensored", edit_mode=True
-    )
+    model = resolve_model("wiro", "seedream5")
+    target = resolve_generation_target("wiro", "seedream5", edit_mode=True)
     source_path = tmp_path / "source.png"
     source_path.write_bytes(b"image")
     client = FakeHTTPClient(
@@ -927,10 +909,8 @@ def test_wiro_edit_closes_uploads_when_submission_fails(tmp_path):
 
 
 def test_wiro_edit_closes_uploads_on_network_failure(tmp_path):
-    model = resolve_model("wiro", "seedream5-lite-uncensored")
-    target = resolve_generation_target(
-        "wiro", "seedream5-lite-uncensored", edit_mode=True
-    )
+    model = resolve_model("wiro", "seedream5")
+    target = resolve_generation_target("wiro", "seedream5", edit_mode=True)
     source_path = tmp_path / "source.png"
     source_path.write_bytes(b"image")
     client = FakeHTTPClient([], post_error=OSError("offline"))

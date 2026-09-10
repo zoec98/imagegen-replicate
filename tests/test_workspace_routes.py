@@ -287,7 +287,7 @@ def test_index_exposes_wiro_models_when_wiro_is_enabled(app_config, app_factory)
             wiro_api_key="wiro-key",
             enabled_providers=("wiro",),
             selected_provider="wiro",
-            model_alias="seedream5-lite-uncensored",
+            model_alias="seedream5",
         )
     )
 
@@ -297,9 +297,9 @@ def test_index_exposes_wiro_models_when_wiro_is_enabled(app_config, app_factory)
     assert b'<option value="wiro" selected>Wiro</option>' in response.data
     assert b"wiro-key" not in response.data
     assert {model["alias"] for model in registry if model["provider"] == "wiro"} == {
-        "seedream5-pro-uncensored",
-        "seedream5-lite-uncensored",
-        "seedream45-uncensored",
+        "seedream5-pro",
+        "seedream5",
+        "seedream45",
         "z-image-turbo",
         "hidream-dev",
         "hidream-fast",
@@ -313,7 +313,7 @@ def test_index_exposes_wiro_models_when_wiro_is_enabled(app_config, app_factory)
     lite = next(
         model
         for model in registry
-        if model["provider"] == "wiro" and model["alias"] == "seedream5-lite-uncensored"
+        if model["provider"] == "wiro" and model["alias"] == "seedream5"
     )
     assert lite["pricing"]
     assert {parameter["name"] for parameter in lite["parameters"]} >= {
