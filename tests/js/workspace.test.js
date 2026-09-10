@@ -26,6 +26,25 @@ const modelRegistry = [
   },
 ];
 
+const generationModelRegistry = [
+  {
+    alias: "seedream45",
+    display_name: "Seedream 4.5",
+    provider: "replicate",
+    edit_capable: true,
+    source_image_max: 2,
+    parameters: [
+      {
+        name: "size",
+        type: "string",
+        choices: ["1K", "2K"],
+        default: "2K",
+      },
+    ],
+    pricing: [],
+  },
+];
+
 afterEach(() => {
   vi.resetModules();
   document.body.innerHTML = "";
@@ -60,4 +79,51 @@ test("workspace controller exposes the selected model", async () => {
   const controller = setupWorkspace(document);
 
   expect(controller.selectedModel().alias).toBe("seedream45");
+});
+
+test("workspace submits the selected model, parameters, and source images", async () => {
+  renderWorkspace({
+    modelRegistry: generationModelRegistry,
+    selectedProvider: "replicate",
+  });
+  document.querySelector(".gallery").innerHTML = `
+    <figure class="gallery-item" data-filename="source.png">
+      <button class="source-select" type="button"></button>
+    </figure>
+  `;
+  const fetcher = vi.fn().mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        poll_seconds: 60,
+        request_id: "request-1",
+        status_url: "/api/generation/request-1",
+      }),
+      { headers: { "Content-Type": "application/json" } },
+    ),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  vi.stubGlobal("setTimeout", vi.fn());
+
+  await import("../../src/imagegen/frontend/main.js");
+
+  document.querySelector("#prompt").value = "A fox in snow";
+  document.querySelector(".edit-toggle").click();
+  document.querySelector(".source-select").click();
+  document
+    .querySelector(".prompt-form")
+    .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  for (let index = 0; index < 5; index += 1) {
+    await Promise.resolve();
+  }
+
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(fetcher.mock.calls[0][0]).toBe("/api/generate");
+  expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({
+    edit_mode: true,
+    model: "seedream45",
+    parameters: { size: "2K" },
+    prompt: "A fox in snow",
+    provider: "replicate",
+    source_images: ["source.png"],
+  });
 });

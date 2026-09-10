@@ -1,4 +1,5 @@
 export function renderWorkspace({ modelRegistry = [], selectedProvider = "" } = {}) {
+  document.head.innerHTML = '<meta name="csrf-token" content="test-csrf-token">';
   document.body.innerHTML = `
     <script id="model-registry-data" type="application/json">${JSON.stringify(modelRegistry)}</script>
     <script id="palette-data" type="application/json">[]</script>
@@ -30,7 +31,7 @@ export function renderWorkspace({ modelRegistry = [], selectedProvider = "" } = 
         <button class="palette-editor-delete" type="button"></button>
       </div>
       <textarea id="prompt"></textarea>
-      <button class="generate-button" type="submit"></button>
+      <button class="generate-button" data-default-label="Generate" type="submit">Generate</button>
       <button class="edit-toggle" type="button"></button>
       <span class="source-counter"></span>
       <button class="source-clear" type="button" hidden></button>
