@@ -294,7 +294,6 @@ def test_api_delete_image_rejects_path_traversal(app_config, app_factory):
     assert response.json == {"error": "Image not found."}
     assert image_path.exists()
 
-
 def test_api_delete_image_rejects_missing_image(app_factory):
     client = app_factory().test_client()
     index = client.get("/", environ_base={"REMOTE_ADDR": "192.0.2.10"})
@@ -347,4 +346,3 @@ def test_api_delete_image_requires_csrf(app_config, app_factory):
     assert response.status_code == 403
     assert response.json == {"error": "Invalid CSRF token."}
     assert image_path.exists()
-
