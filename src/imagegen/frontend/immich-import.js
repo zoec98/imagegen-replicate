@@ -1,5 +1,5 @@
 import { csrfJsonRequest, requestJson } from "./api.js";
-import { createElement, setBooleanAttribute } from "./dom.js";
+import { createElement, createSvgIcon, setBooleanAttribute } from "./dom.js";
 import {
   createActionRibbon,
   createImageCard,
@@ -8,6 +8,9 @@ import {
   createInfoAction,
   toggleInfoAction,
 } from "./image-card.js";
+
+const IMPORT_ICON_PATH =
+  "M19.35 10.04A7.49 7.49 0 0 0 12 4 7.5 7.5 0 0 0 5.35 8.04 6 6 0 0 0 6 20h13a5 5 0 0 0 .35-9.96zM14 12h3l-5 5-5-5h3V8h4z";
 
 export function setupImmichImport(root = document, services = {}) {
   const {
@@ -206,6 +209,7 @@ function immichAssetFigure(asset, reportThumbnailError) {
       "aria-label": `Import ${asset.label || asset.asset_id || "Immich image"}`,
       title: "Import image",
     },
+    children: [createSvgIcon(IMPORT_ICON_PATH)],
     className: "gallery-action upload-immich-import",
     disabled: !asset.import_eligible || !asset.asset_id,
     type: "button",

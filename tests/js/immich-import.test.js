@@ -99,6 +99,7 @@ describe("setupImmichImport", () => {
     await vi.waitFor(() =>
       expect(document.querySelector(".upload-immich-import")).not.toBeNull(),
     );
+    expect(document.querySelector(".upload-immich-import svg")).not.toBeNull();
     document.querySelector(".upload-immich-import").click();
 
     await vi.waitFor(() => expect(refreshGallery).toHaveBeenCalledTimes(1));

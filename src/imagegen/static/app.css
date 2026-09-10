@@ -1080,6 +1080,11 @@ select {
   position: relative;
 }
 
+.image-card:has(.image-info-open) {
+  overflow: visible;
+  z-index: 1;
+}
+
 .gallery-item-selected {
   border-color: #1d4ed8;
 }
@@ -1335,6 +1340,10 @@ select {
   overflow: hidden;
   padding: 0.5rem;
   position: relative;
+}
+
+.image-card-ribbon:has(.image-info-open) {
+  overflow: visible;
 }
 
 .empty {
