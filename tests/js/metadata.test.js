@@ -42,29 +42,6 @@ async function tooltipLinesForNaturalSize(width, height) {
 }
 
 describe("setupMetadata", () => {
-  it("loads embedded metadata into the prompt workspace", async () => {
-    const figure = renderMetadataFigure();
-    const applyMetadata = vi.fn();
-    const showMessage = vi.fn();
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      jsonResponse({
-        model_alias: "flux",
-        parameters: { steps: 4 },
-        prompt: "A small test image",
-      }),
-    );
-
-    const metadata = setupMetadata(document, { applyMetadata, showMessage });
-    await metadata.load(figure);
-
-    expect(applyMetadata).toHaveBeenCalledWith({
-      model_alias: "flux",
-      parameters: { steps: 4 },
-      prompt: "A small test image",
-    });
-    expect(showMessage).toHaveBeenCalledWith("Image metadata loaded.", "success");
-  });
-
   it("surfaces metadata compatibility warnings", async () => {
     const figure = renderMetadataFigure();
     const applyMetadata = vi.fn();

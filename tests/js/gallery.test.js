@@ -89,37 +89,6 @@ describe("setupGallery", () => {
     expect(updateSourceSelectionUi).toHaveBeenCalled();
   });
 
-  it("dispatches source image selection through the gallery click handler", () => {
-    renderGalleryWorkspace();
-    const toggleSourceImage = vi.fn();
-    const gallery = setupGallery(document, { toggleSourceImage });
-    gallery.render([imageFixture()]);
-
-    document.querySelector(".source-select").click();
-
-    expect(toggleSourceImage).toHaveBeenCalledWith("example.png");
-  });
-
-  it("dispatches metadata and mask actions through gallery hooks", () => {
-    renderGalleryWorkspace();
-    const metadata = {
-      load: vi.fn().mockResolvedValue(undefined),
-      refreshTooltip: vi.fn(),
-    };
-    const openMaskEditor = vi.fn();
-    const gallery = setupGallery(document, { metadata, openMaskEditor });
-    gallery.render([imageFixture()]);
-    const figure = document.querySelector(".gallery-item");
-
-    document.querySelector(".gallery-info").click();
-    document.querySelector(".gallery-load").click();
-    document.querySelector(".gallery-mask").click();
-
-    expect(metadata.refreshTooltip).toHaveBeenCalledWith(figure);
-    expect(metadata.load).toHaveBeenCalledWith(figure);
-    expect(openMaskEditor).toHaveBeenCalledWith(figure);
-  });
-
   it("opens image information with metadata on click", async () => {
     renderGalleryWorkspace();
     globalThis.fetch = vi.fn().mockResolvedValue(

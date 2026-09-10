@@ -127,3 +127,95 @@ test("workspace submits the selected model, parameters, and source images", asyn
     source_images: ["source.png"],
   });
 });
+
+test("workspace loads metadata into the selected model and edit controls", async () => {
+  renderWorkspace({
+    modelRegistry: [
+      ...generationModelRegistry,
+      {
+        alias: "bria-fibo",
+        display_name: "Bria Fibo",
+        provider: "falai",
+        parameters: [],
+        pricing: [],
+      },
+    ],
+    selectedProvider: "falai",
+  });
+  document.querySelector(".gallery").innerHTML = `
+    <figure
+      class="gallery-item"
+      data-filename="source.png"
+      data-metadata-url="/api/images/source.png/metadata"
+    >
+      <img alt="source.png" src="/images/source.png">
+      <button class="gallery-load" type="button"></button>
+      <button class="source-select" type="button"></button>
+    </figure>
+  `;
+  const fetcher = vi.fn().mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        edit_mode: true,
+        model_alias: "seedream45",
+        parameters: { size: "1K" },
+        prompt: "A loaded fox",
+        provider: "replicate",
+        source_images: ["source.png"],
+      }),
+      { headers: { "Content-Type": "application/json" } },
+    ),
+  );
+  vi.stubGlobal("fetch", fetcher);
+
+  await import("../../src/imagegen/frontend/main.js");
+
+  document.querySelector(".gallery-load").click();
+  await vi.waitFor(() => {
+    expect(document.querySelector("#prompt").value).toBe("A loaded fox");
+  });
+
+  expect(fetcher).toHaveBeenCalledWith(
+    "/api/images/source.png/metadata",
+    expect.objectContaining({ credentials: "same-origin" }),
+  );
+  expect(document.querySelector("#provider-selector").value).toBe("replicate");
+  expect(document.querySelector("#model-selector").value).toBe("seedream45");
+  expect(document.querySelector('[name="size"]').value).toBe("1K");
+  expect(document.querySelector(".edit-toggle").getAttribute("aria-pressed")).toBe(
+    "true",
+  );
+  expect(document.querySelector(".source-counter").textContent).toBe("1 selected");
+  expect(document.querySelector(".gallery-item").classList).toContain(
+    "gallery-item-selected",
+  );
+});
+
+test("workspace opens the image editor from a gallery action", async () => {
+  renderWorkspace({
+    modelRegistry: generationModelRegistry,
+    selectedProvider: "replicate",
+  });
+  document.querySelector(".gallery").innerHTML = `
+    <figure
+      class="gallery-item"
+      data-filename="source.png"
+      data-blur-save-url="/api/images/source.png/blur"
+      data-crop-save-url="/api/images/source.png/crop"
+      data-mask-url="/images/source-mask.png"
+      data-mask-save-url="/api/images/source-mask.png"
+    >
+      <img alt="source.png" src="/images/source.png">
+      <button class="gallery-mask" type="button"></button>
+    </figure>
+  `;
+
+  await import("../../src/imagegen/frontend/main.js");
+
+  document.querySelector(".gallery-mask").click();
+
+  const overlay = document.querySelector(".mask-editor-overlay");
+  expect(overlay.hidden).toBe(false);
+  expect(overlay.dataset.filename).toBe("source.png");
+  expect(document.querySelector("#mask-editor-title").textContent).toBe("source.png");
+});
