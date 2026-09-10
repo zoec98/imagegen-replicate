@@ -2,6 +2,12 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import { renderWorkspace } from "./workspace-fixture.js";
 
+function jsonResponse(data) {
+  return new Response(JSON.stringify(data), {
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 const modelRegistry = [
   {
     alias: "seedream45",
@@ -91,18 +97,59 @@ test("workspace submits the selected model, parameters, and source images", asyn
       <button class="source-select" type="button"></button>
     </figure>
   `;
-  const fetcher = vi.fn().mockResolvedValue(
-    new Response(
-      JSON.stringify({
-        poll_seconds: 60,
-        request_id: "request-1",
-        status_url: "/api/generation/request-1",
-      }),
-      { headers: { "Content-Type": "application/json" } },
-    ),
-  );
+  let statusPolls = 0;
+  const fetcher = vi.fn((url) => {
+    if (url === "/api/generate") {
+      return Promise.resolve(
+        jsonResponse({
+          poll_seconds: 0.25,
+          request_id: "request-1",
+          status_url: "/api/generation/request-1",
+        }),
+      );
+    }
+    if (url === "/api/generation/request-1") {
+      statusPolls += 1;
+      return Promise.resolve(
+        jsonResponse(
+          statusPolls === 1
+            ? {
+                logs: ["provider started"],
+                request_id: "request-1",
+                status: "running",
+                status_url: "/api/generation/request-1",
+              }
+            : {
+                images: ["generated.png"],
+                logs: ["finished"],
+                request_id: "request-1",
+                status: "succeeded",
+                status_url: "/api/generation/request-1",
+              },
+        ),
+      );
+    }
+    if (url === "/api/images") {
+      return Promise.resolve(
+        jsonResponse({
+          images: [
+            {
+              filename: "generated.png",
+              url: "/images/generated.png",
+            },
+          ],
+          trash_count: 0,
+        }),
+      );
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  const scheduled = [];
   vi.stubGlobal("fetch", fetcher);
-  vi.stubGlobal("setTimeout", vi.fn());
+  vi.stubGlobal("setTimeout", (callback) => {
+    scheduled.push(callback);
+    return scheduled.length;
+  });
 
   await import("../../src/imagegen/frontend/main.js");
 
@@ -112,7 +159,7 @@ test("workspace submits the selected model, parameters, and source images", asyn
   document
     .querySelector(".prompt-form")
     .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-  for (let index = 0; index < 5; index += 1) {
+  for (let index = 0; index < 10; index += 1) {
     await Promise.resolve();
   }
 
@@ -126,6 +173,30 @@ test("workspace submits the selected model, parameters, and source images", asyn
     provider: "replicate",
     source_images: ["source.png"],
   });
+  expect(document.querySelector(".messages").textContent).toContain(
+    "Generation is running.",
+  );
+
+  await scheduled.shift()();
+  await Promise.resolve();
+  expect(statusPolls).toBe(1);
+  expect(document.querySelector(".messages").textContent).toContain(
+    "provider started",
+  );
+  expect(document.querySelector(".generate-button").disabled).toBe(true);
+
+  await scheduled.shift()();
+  for (let index = 0; index < 10; index += 1) {
+    await Promise.resolve();
+  }
+  expect(statusPolls).toBe(2);
+  expect(document.querySelector(".messages").textContent).toContain(
+    "Generation succeeded.",
+  );
+  expect(document.querySelector(".generate-button").disabled).toBe(false);
+  expect(document.querySelector(".gallery-item").dataset.filename).toBe(
+    "generated.png",
+  );
 });
 
 test("workspace loads metadata into the selected model and edit controls", async () => {
