@@ -42,6 +42,9 @@ workflow phase.
 
 When findings are accepted, ticket conversion should preserve each remedy's
 public behavior and seam while splitting work into vertical TDD slices: one
-failing behavior test, the minimum suite or production change needed to make it
-pass, then refactor while green. The remedy stories are inputs to that review;
-they are not approved tickets yet.
+behavior test at a time, the minimum required change, then refactor while green.
+Tests added for existing behavior may pass immediately: demonstrate sensitivity
+with a temporary controlled fault, then restore it. Do not change correct
+production behavior just to manufacture a red phase. Pure test refactoring and
+dead-helper deletion should preserve a green baseline. The remedy stories are
+inputs to that review; they are not approved tickets yet.

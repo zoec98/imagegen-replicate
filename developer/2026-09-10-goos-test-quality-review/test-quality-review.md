@@ -2,6 +2,9 @@
 
 Date: 2026-09-10
 
+Reviewed source revision: `55712c12d033366e89de174bdb493d4e2bca89e8`.
+All source line references below refer to that revision.
+
 ## Verdict
 
 The suite is strong at behavior and architectural boundaries, but only
@@ -21,14 +24,14 @@ prove that the assembled application delivers the behavior. Three helpers also
 derive expected values from the same registry data consumed by production code,
 which can let contract drift pass unnoticed.
 
-| Quality | Assessment | Reason |
-| --- | --- | --- |
-| Observable behavior | Strong | Route, domain, image, persistence, and browser DOM outcomes dominate the suite. |
-| Boundary/seam discipline | Strong | Network, clock, executor, and provider seams are replaced without real provider calls. |
-| Refactoring resilience | Mixed | Raw HTML assertions, a private helper import, and callback choreography couple some tests to structure. |
-| Outside-in walking skeletons | Weak | Backend generation and browser workflows are mostly tested as separately composed layers. |
-| Oracle independence | Mixed | Most expected values are explicit; three important default/payload expectations are derived from production registry objects. |
-| Failure localization | Mixed | Many focused tests exist, but several large tests assert multiple independent behaviors. |
+| Quality                      | Assessment | Reason                                                                                                                        |
+|------------------------------|------------|-------------------------------------------------------------------------------------------------------------------------------|
+| Observable behavior          | Strong     | Route, domain, image, persistence, and browser DOM outcomes dominate the suite.                                               |
+| Boundary/seam discipline     | Strong     | Network, clock, executor, and provider seams are replaced without real provider calls.                                        |
+| Refactoring resilience       | Mixed      | Raw HTML assertions, a private helper import, and callback choreography couple some tests to structure.                       |
+| Outside-in walking skeletons | Weak       | Backend generation and browser workflows are mostly tested as separately composed layers.                                     |
+| Oracle independence          | Mixed      | Most expected values are explicit; three important default/payload expectations are derived from production registry objects. |
+| Failure localization         | Mixed      | Many focused tests exist, but several large tests assert multiple independent behaviors.                                      |
 
 ## Baseline and method
 
@@ -41,6 +44,13 @@ which can let contract drift pass unnoticed.
   call-inspection or call-assertion lines across 15 files; these were reviewed in
   context rather than treated as automatically bad.
 
+This is a qualitative review of representative tests and their composition,
+supported by suite-wide searches and execution. Refactoring survival is a
+prediction: no mutation campaign, actual refactoring experiment, live provider
+contract verification, or real-browser visual check was performed. Passing test
+counts measure the baseline, not assertion quality. Priorities rank review work,
+not demonstrated production defects.
+
 The review uses these GOOS/TDD criteria:
 
 1. Start from behavior meaningful to a caller or user.
@@ -52,6 +62,16 @@ The review uses these GOOS/TDD criteria:
 5. Prefer tests that remain unchanged when internal structure changes without a
    behavioral change.
 6. Maintain at least one thin end-to-end path through the assembled system.
+
+The [authors' chapter outline](https://growing-object-oriented-software.com/toc.html)
+explicitly covers collaborating-object unit tests, mock objects, walking
+skeletons, and test flexibility (chapters 2, 4, 8, and 24). GOOS does not imply
+that every internal collaborator mock is a bad test. The local TDD skill's
+preference for integration-style tests and boundary-only mocking is a stricter
+project lens. Here an interaction test is a concern when it pins incidental
+implementation or is the only evidence for an assembled behavior; a meaningful
+peer protocol can legitimately be specified with expectations. Neither approach
+promises unchanged tests when the interface under test itself changes.
 
 ## Strengths to preserve
 
@@ -72,8 +92,8 @@ repository refactoring should leave most of them unchanged.
 Image editing, metadata embedding, gallery/trash behavior, palettes, request
 state, and generation history are exercised through public functions with real
 temporary images, directories, and SQLite databases. Representative examples
-are `tests/test_image_edits.py:37`, `tests/test_metadata_embed.py:71`,
-`tests/test_generation_log.py:18`, and `tests/test_palettes.py:14`.
+are `tests/test_image_edits.py:29`, `tests/test_metadata_embed.py:71`,
+`tests/test_generation_log.py:16`, and `tests/test_palettes.py:22`.
 
 This is stronger than mocking the filesystem or SQL layer and checking call
 arguments. The assertions describe stored or returned behavior.
@@ -117,7 +137,7 @@ specification and gives future TDD work useful domain vocabulary.
 
 **Evidence**
 
-- The shared app fixture always supplies `NoopGenerationWorker`
+- The shared app fixture supplies `NoopGenerationWorker` unless overridden
   (`tests/conftest.py:15` and `tests/conftest.py:43`).
 - The route-level worker test only records the request passed to `start`
   (`tests/test_generation_api.py:431`).
@@ -130,9 +150,8 @@ specification and gives future TDD work useful domain vocabulary.
 **Why it matters**
 
 Each layer can pass while the assembled route → worker → selected provider →
-request/log result path is broken. The current route test is exactly a
-“parameter reached another function” test at the most important application
-seam.
+request/log result path is broken. The recording-worker test usefully verifies
+dispatch at the worker interface, but does not establish completion.
 
 **Refactoring survival**
 
@@ -160,6 +179,12 @@ still deliver a terminal result.
   and durable result through the generation-log interface.
 - Do not assert the internal sequence of store/log method calls, add an
   end-to-end framework, or make a real provider request.
+- Explicitly injected providers cover route/worker orchestration but cannot
+  verify the default adapter mapping. If that wiring is in the accepted scope,
+  add a separate example retaining the real selected adapter and replacing its
+  SDK/HTTP boundary. Do not claim that a fake provider proves default wiring or
+  image persistence. Retain the existing Event-based threaded-worker test for
+  concurrency behavior.
 
 ### F2 — High: browser feature tests do not use the assembled workspace contract
 
@@ -198,14 +223,19 @@ or module wiring cannot leave individually passing components unusable together.
 
 - Start with one failing jsdom test initialized by `frontend/main.js`, using the
   real rendered workspace shape or a fixture mechanically produced from it.
-- Exercise one representative workflow end to end in the browser layer: select
-  an existing source image, enable edit mode, submit generation, and observe the
-  request plus visible running state.
+- Exercise one representative workflow end to end in the browser layer: enable
+  edit mode, select an existing source image, submit generation, advance fake
+  time through running and successful responses, and observe the new gallery
+  image, completion message, and enabled submit control.
 - Fake browser boundaries only (`fetch`, timers, and canvas where required); do
   not inject callbacks between the production feature modules in this test.
 - Keep focused module tests for complex DOM and image-editor behavior; add a
   second composed workflow only if the first cannot cover a distinct top-level
   wiring risk.
+- Generate template fixtures during verification or check their freshness so
+  template drift fails automatically. A handwritten fixture copied once does
+  not close this gap. This jsdom test covers composition, not browser layout or
+  real canvas rasterization.
 
 ### F3 — Medium: three test oracles copy defaults from production registry data
 
@@ -223,9 +253,11 @@ or module wiring cannot leave individually passing components unusable together.
 **Why it matters**
 
 If a required default is accidentally changed or removed in the registry, both
-the system and its expected value change together. These tests prove plumbing
-and internal consistency, not the independent product/provider contract their
-names imply.
+the system and its expected value change together. These particular assertions
+prove default propagation and internal consistency, not independent default
+values. That propagation is useful behavior. Other explicit registry or provider
+tests may already catch an individual changed value; no suite-wide surviving
+mutation is claimed here.
 
 **Refactoring survival**
 
@@ -331,15 +363,20 @@ adapters can be reorganized without rewriting otherwise valid specifications.
 
 **Test-first acceptance examples**
 
-- Classify each interaction expectation as either an intentional external seam
-  or an internal relay before changing it; retain exact assertions only for the
-  former.
+- Classify each interaction expectation as a stable peer/external protocol or
+  incidental internal relay before changing it. Preserve protocol assertions
+  that protect a distinct responsibility, even for application-owned peers.
 - Cover gallery metadata/edit dispatch and metadata application through the
-  composed browser story in F2, then remove relay-only examples that add no
-  distinct behavior.
+  an additional composed browser example: click Load metadata and observe the
+  prompt, selected model, and parameter controls; click Edit image and observe
+  the editor opening for the selected image. F2's generation scenario alone
+  cannot replace these tests. Remove relay-only examples only once their
+  distinct responsibilities are covered.
 - Cover worker model selection through the walking skeleton in F1 plus the
-  provider wire-contract tests in S3, then remove or narrow worker tests that
-  merely repeat provider arguments.
+  provider wire-contract tests in S3. Before removing the existing selected-model
+  or edit-source checks, retain the real adapter in an example that distinguishes
+  the requested model from the configured default and observes source inputs at
+  the SDK/HTTP seam. F1's fake provider alone cannot replace these checks.
 - For any retained collaborator expectation, name the stable protocol in the
   test and assert the minimum interaction required by that protocol, not call
   order or unrelated arguments.
@@ -403,3 +440,20 @@ or create a second maintenance location for image-edit rules.
 6. F6 can become a deletion-only cleanup ticket if accepted.
 
 No ticket plan or implementation changes are part of this review phase.
+
+## Merge-readiness verification
+
+The final document review corrected the distinction between GOOS peer-protocol
+tests and the local TDD skill's stricter mocking preference, bounded the claims
+about derived oracles, and clarified which composed examples must exist before
+deleting narrower tests. Existing correct behavior does not require an artificial
+production change to obtain a failing test; use controlled fault injection to
+check sensitivity when needed.
+
+Verification on 2026-09-10: 528 Python tests passed, Ruff passed, and all 102
+JavaScript tests plus ESLint and the bundle build passed. The generated bundle
+was unchanged. `git diff --check` passed. Main at `4b974de` differs from the
+audited source only by the package version bump; a read-only three-way merge
+check found no conflicts. This branch changes only the two epic documents and
+is ready for review-document merge. Findings remain pending approval for later
+ticket conversion.
