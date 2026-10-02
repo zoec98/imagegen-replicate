@@ -8,9 +8,83 @@ Behaviors protected:
 
 import sqlite3
 
+import pytest
+
 from imagegen.generation_log import SQLiteGenerationLog
 from imagegen.image_store import StoredImage
 from imagegen.request_store import RequestStore
+
+
+def test_log_operations_close_connections_without_garbage_collection(
+    tmp_path, monkeypatch
+):
+    connections = []
+    connect = sqlite3.connect
+
+    def tracked_connect(*args, **kwargs):
+        connection = connect(*args, **kwargs)
+        connections.append(connection)
+        return connection
+
+    monkeypatch.setattr(sqlite3, "connect", tracked_connect)
+    log = SQLiteGenerationLog(tmp_path / "imagegen.sqlite3")
+    log.initialize()
+    for sequence in range(10):
+        record = RequestStore().create(
+            provider="replicate", prompt="test", parameters={}
+        )
+        log.create_request(
+            record, model_alias="test", model="test/model", replicate_input={}
+        )
+        log.mark_started(record.request_id)
+        log.add_result(
+            record.request_id,
+            sequence=sequence,
+            image=StoredImage(
+                path=tmp_path / "test.png",
+                source_url="https://example.com/test.png",
+                content_type="image/png",
+                size_bytes=1,
+                created_at=record.created_at.isoformat(),
+            ),
+        )
+        log.mark_finished(record.request_id, status="succeeded")
+        assert log.get_logged_request(record.request_id) is not None
+        assert log.get_logged_result(record.request_id).status == "succeeded"
+        assert len(log.list_logged_assets(record.request_id)) == 1
+
+    try:
+        for connection in connections:
+            with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+                connection.execute("SELECT 1")
+    finally:
+        for connection in connections:
+            connection.close()
+
+
+def test_failed_log_write_rolls_back_and_closes_connection(tmp_path, monkeypatch):
+    log = SQLiteGenerationLog(tmp_path / "imagegen.sqlite3")
+    log.initialize()
+    connection = sqlite3.connect(log.path)
+    monkeypatch.setattr(sqlite3, "connect", lambda *args, **kwargs: connection)
+    record = RequestStore().create(provider="replicate", prompt="test", parameters={})
+    # The first insert succeeds; the second fails and must roll back both.
+    connection.execute("DROP TABLE generation_results")
+    connection.commit()
+    try:
+        with pytest.raises(sqlite3.OperationalError, match="generation_results"):
+            log.create_request(
+                record, model_alias="test", model="test/model", replicate_input={}
+            )
+        with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+            connection.execute("SELECT 1")
+    finally:
+        connection.close()
+    with sqlite3.Connection(log.path) as check:
+        assert (
+            check.execute("SELECT COUNT(*) FROM generation_requests").fetchone()[0] == 0
+        )
+    check.close()
 
 
 def test_initialize_creates_schema_idempotently(tmp_path):
