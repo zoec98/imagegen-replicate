@@ -3,6 +3,7 @@ set -euo pipefail
 
 if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
     printf 'usage: %s text-api-url [edit-api-url]\n' "$0" >&2
+    printf 'Model page URLs are accepted; /api is appended when missing.\n' >&2
     printf 'examples:\n' >&2
     printf '  %s https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image/api\n' "$0" >&2
     printf '  %s https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image/api https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/edit/api\n' "$0" >&2
@@ -11,6 +12,7 @@ fi
 
 if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
     printf 'usage: %s text-api-url [edit-api-url]\n' "$0" >&2
+    printf 'Model page URLs are accepted; /api is appended when missing.\n' >&2
     printf 'examples:\n' >&2
     printf '  %s https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image/api\n' "$0" >&2
     printf '  %s https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image/api https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/edit/api\n' "$0" >&2
@@ -20,12 +22,12 @@ fi
 uv run python - "$@" <<'PY'
 from __future__ import annotations
 
-import html
 import json
 import os
 import re
 import sys
 from dataclasses import dataclass
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -78,9 +80,12 @@ def validate_api_url(value: str) -> str:
     parsed = urlparse(value)
     if parsed.scheme not in {"http", "https"} or parsed.netloc != "fal.ai":
         raise SystemExit(f"expected a https://fal.ai/.../api URL, got: {value}")
-    if not re.search(r"/models/.+/api/?$", parsed.path):
-        raise SystemExit(f"expected a fal.ai model API docs URL ending in /api, got: {value}")
-    return value
+    path = parsed.path.rstrip("/")
+    if not re.fullmatch(r"/models/[^/]+(?:/[^/]+)*", path):
+        raise SystemExit(f"expected a fal.ai model URL, got: {value}")
+    if not path.endswith("/api"):
+        path += "/api"
+    return parsed._replace(path=path).geturl()
 
 
 def fetch_endpoint_page(url: str) -> FalPage:
@@ -138,11 +143,37 @@ def print_page_summary(page: FalPage, *, paired: bool) -> None:
     print_registry_hints(page.endpoint, schema, paired=paired)
 
 
+class JsonLdParser(HTMLParser):
+    """Collect legacy meta JSON-LD and current script JSON-LD."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.documents: list[str] = []
+        self.script_parts: list[str] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = dict(attrs)
+        if tag == "meta" and attributes.get("name") == "application/ld+json":
+            self.documents.append(attributes.get("content") or "")
+        elif tag == "script" and attributes.get("type") == "application/ld+json":
+            self.script_parts = []
+
+    def handle_data(self, data: str) -> None:
+        if self.script_parts is not None:
+            self.script_parts.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "script" and self.script_parts is not None:
+            self.documents.append("".join(self.script_parts))
+            self.script_parts = None
+
+
 def jsonld_metadata(page: str) -> dict[str, Any]:
-    matches = re.findall(r'<meta name="application/ld\+json" content="(.*?)"', page)
-    for match in matches:
+    parser = JsonLdParser()
+    parser.feed(page)
+    for document in parser.documents:
         try:
-            data = json.loads(html.unescape(match))
+            data = json.loads(document)
         except json.JSONDecodeError:
             continue
         if isinstance(data, dict) and data.get("@type") == "WebAPI":
