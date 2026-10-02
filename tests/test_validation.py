@@ -623,3 +623,63 @@ def test_validate_qwen_custom_dimensions_require_width_and_height():
             {"aspect_ratio": "custom"},
             model=MODEL_REGISTRY["qwen-2512"],
         )
+
+
+def test_falai_flux3_defaults():
+    assert validate_model_parameters({}, model=resolve_model("falai", "flux-3")) == {
+        "aspect_ratio": "auto",
+        "resolution": "1k",
+        "enable_prompt_expansion": False,
+        "safety_tolerance": 2,
+        "output_format": "jpeg",
+    }
+
+
+@pytest.mark.parametrize(
+    "parameters",
+    [
+        {"resolution": "8k"},
+        {"aspect_ratio": "4:1"},
+        {"output_format": "webp"},
+        {"safety_tolerance": -1},
+        {"safety_tolerance": 5},
+        {"safety_tolerance": 2.5},
+        {"version": "other"},
+        {"sync_mode": True},
+        {"seed": 42},
+    ],
+)
+def test_falai_flux3_rejects_unsupported_parameters(parameters):
+    with pytest.raises(ValidationError):
+        validate_model_parameters(parameters, model=resolve_model("falai", "flux-3"))
+
+
+@pytest.mark.parametrize("count", [0, 10, 11])
+def test_falai_flux3_edit_source_limits(tmp_path, count):
+    model = resolve_model("falai", "flux-3")
+    filenames = [f"source-{i}.png" for i in range(count)]
+    for name in filenames:
+        (tmp_path / name).write_bytes(b"image")
+    payload = {"prompt": "edit this", "edit_mode": True, "source_images": filenames}
+    if count == 10:
+        result = validate_generation_payload(
+            payload, model=model, target=model.edit_target, output_dir=tmp_path
+        )
+        assert result.source_images == filenames
+    else:
+        with pytest.raises(ValidationError):
+            validate_generation_payload(
+                payload, model=model, target=model.edit_target, output_dir=tmp_path
+            )
+
+
+def test_falai_flux3_rejects_generic_reference_urls():
+    model = resolve_model("falai", "flux-3")
+    with pytest.raises(
+        ValidationError, match="image_urls must be submitted as source_images"
+    ):
+        validate_model_parameters(
+            {"image_urls": ["https://example.test/source.png"]},
+            model=model,
+            target=model.edit_target,
+        )

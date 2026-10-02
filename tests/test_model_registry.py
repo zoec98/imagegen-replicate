@@ -119,6 +119,7 @@ def test_provider_model_lists_are_scoped_by_provider():
         "flux-2",
         "flux-2-pro",
         "flux-2-realism",
+        "flux-3",
         "gpt-image-2",
         "gpt-image-25-flare",
         "gpt-image-25-sunburst",
@@ -889,3 +890,24 @@ def test_edit_target_resolution_fails_when_provider_model_has_no_edit_endpoint()
 def test_default_model_for_provider_prefers_replicate_default_only_for_replicate():
     assert default_model_for_provider("replicate").alias == "seedream45"
     assert default_model_for_provider("falai").provider == "falai"
+
+
+def test_falai_flux3_links_documented_targets():
+    model = resolve_model("falai", "flux-3")
+    assert model.display_name == "Flux 3"
+    assert sum(m.alias == "flux-3" for m in list_models_for_provider("falai")) == 1
+    for edit_mode, endpoint in [(False, "text-to-image"), (True, "edit-image")]:
+        target = resolve_generation_target("falai", "flux-3", edit_mode=edit_mode)
+        assert target.provider_model == f"blackforestlabs/flux-3/{endpoint}"
+        assert (
+            target.documentation_url
+            == f"https://fal.ai/models/blackforestlabs/flux-3/{endpoint}/api"
+        )
+        assert (
+            target.runtime_url == f"https://fal.run/blackforestlabs/flux-3/{endpoint}"
+        )
+        assert target.fixed_inputs == {"sync_mode": False, "version": "latest"}
+        assert "seed" not in {p.name for p in target.parameters}
+    assert model.text_target.source_images is None
+    assert model.edit_target.source_images.provider_field == "image_urls"
+    assert model.edit_target.source_images.max_count == 10

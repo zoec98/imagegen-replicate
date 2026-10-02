@@ -631,6 +631,70 @@ def _flux2_parameters(
     )
 
 
+def _flux3_parameters() -> tuple[ModelParameter, ...]:
+    return (
+        _param(
+            "prompt", "The prompt to generate or edit the image.", "string", order=1
+        ),
+        _param(
+            "aspect_ratio",
+            "Output aspect ratio. Auto uses the first reference image when editing.",
+            "select",
+            "auto",
+            choices=(
+                "auto",
+                "21:9",
+                "2:1",
+                "16:9",
+                "3:2",
+                "7:5",
+                "4:3",
+                "5:4",
+                "1:1",
+                "4:5",
+                "3:4",
+                "5:7",
+                "2:3",
+                "9:16",
+                "1:2",
+            ),
+            order=2,
+        ),
+        _param(
+            "resolution",
+            "Output resolution tier. 4k can take several minutes.",
+            "select",
+            "1k",
+            choices=("512sq", "768sq", "1k", "2k", "4k"),
+            order=3,
+        ),
+        _param(
+            "enable_prompt_expansion",
+            "Expand the prompt while preserving its intent and reference roles.",
+            "boolean",
+            False,
+            order=4,
+        ),
+        _param(
+            "safety_tolerance",
+            "Safety tolerance, from 0 (strictest) to 4.",
+            "integer",
+            2,
+            minimum=0,
+            maximum=4,
+            order=5,
+        ),
+        _param(
+            "output_format",
+            "The format of the generated image.",
+            "select",
+            "jpeg",
+            choices=OUTPUT_FORMAT_CHOICES,
+            order=6,
+        ),
+    )
+
+
 def _flux2_pro_parameters(
     *,
     image_size_default: str = "landscape_4_3",
@@ -1610,6 +1674,55 @@ FLUX_2_PRO = ProviderModel(
     ),
 )
 
+FLUX_3 = ProviderModel(
+    provider="falai",
+    alias="flux-3",
+    display_name="Flux 3",
+    text_target=GenerationTarget(
+        provider="falai",
+        alias="flux-3",
+        display_name="Flux 3",
+        provider_model="blackforestlabs/flux-3/text-to-image",
+        documentation_url="https://fal.ai/models/blackforestlabs/flux-3/text-to-image/api",
+        runtime_url="https://fal.run/blackforestlabs/flux-3/text-to-image",
+        mode="text-to-image",
+        parameters=_flux3_parameters(),
+        fixed_inputs={"sync_mode": False, "version": "latest"},
+        pricing=(
+            ModelPricing(
+                price="Varies",
+                title="per output image by resolution",
+                description="Standard 1K price: $0.048. Provider pricing and promotions apply.",
+                type="per-unit",
+                metric="image_output_count",
+                metric_count=1,
+            ),
+        ),
+    ),
+    edit_target=GenerationTarget(
+        provider="falai",
+        alias="flux-3",
+        display_name="Flux 3",
+        provider_model="blackforestlabs/flux-3/edit-image",
+        documentation_url="https://fal.ai/models/blackforestlabs/flux-3/edit-image/api",
+        runtime_url="https://fal.run/blackforestlabs/flux-3/edit-image",
+        mode="image-edit",
+        parameters=_flux3_parameters(),
+        fixed_inputs={"sync_mode": False, "version": "latest"},
+        source_images=SourceImageBinding(provider_field="image_urls", max_count=10),
+        pricing=(
+            ModelPricing(
+                price="Varies",
+                title="per output image by resolution",
+                description="Standard 1K price: $0.048. Provider pricing and promotions apply.",
+                type="per-unit",
+                metric="image_output_count",
+                metric_count=1,
+            ),
+        ),
+    ),
+)
+
 FLUX_2_REALISM = ProviderModel(
     provider="falai",
     alias="flux-2-realism",
@@ -2000,6 +2113,7 @@ MODEL_REGISTRY: dict[str, ProviderModel] = {
     FLUX_2.alias: FLUX_2,
     FLUX_2_PRO.alias: FLUX_2_PRO,
     FLUX_2_REALISM.alias: FLUX_2_REALISM,
+    FLUX_3.alias: FLUX_3,
     GPT_IMAGE15.alias: GPT_IMAGE15,
     GPT_IMAGE2.alias: GPT_IMAGE2,
     GPT_IMAGE25_FLARE.alias: GPT_IMAGE25_FLARE,

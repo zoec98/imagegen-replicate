@@ -181,11 +181,25 @@ def test_falai_seedream5_lite_text_submission_omits_byteplus_urls(tmp_path):
     assert "return_byteplus_urls" not in arguments
 
 
+@pytest.mark.parametrize(
+    ("alias", "endpoint", "parameters"),
+    [
+        (
+            "seedream45",
+            "fal-ai/bytedance/seedream/v4.5/edit",
+            {"image_size": "auto_2K"},
+        ),
+        ("flux-3", "blackforestlabs/flux-3/edit-image", {"resolution": "4k"}),
+    ],
+)
 def test_falai_edit_submission_uploads_source_images_and_keeps_local_names_in_metadata(
     tmp_path,
+    alias,
+    endpoint,
+    parameters,
 ):
-    model = resolve_model("falai", "seedream45")
-    target = resolve_generation_target("falai", "seedream45", edit_mode=True)
+    model = resolve_model("falai", alias)
+    target = resolve_generation_target("falai", alias, edit_mode=True)
     source_path = tmp_path / "images" / "source.png"
     source_path.parent.mkdir(parents=True)
     source_path.write_bytes(b"source")
@@ -210,7 +224,7 @@ def test_falai_edit_submission_uploads_source_images_and_keeps_local_names_in_me
         config,
         model=model,
         target=target,
-        parameters={"image_size": "auto_2K"},
+        parameters=parameters,
         source_image_paths=[source_path],
         client=client,
         sleep=lambda _: None,
@@ -219,9 +233,7 @@ def test_falai_edit_submission_uploads_source_images_and_keeps_local_names_in_me
     )
 
     assert client.upload_calls == [source_path]
-    assert (
-        client.submit_calls[0]["application"] == "fal-ai/bytedance/seedream/v4.5/edit"
-    )
+    assert client.submit_calls[0]["application"] == endpoint
     assert client.submit_calls[0]["arguments"]["image_urls"] == [
         "https://uploads.test/source.png"
     ]
