@@ -60,8 +60,8 @@ FAL_KEY
 ```
 
 Use `scripts/get_schema_falai text-api-url [edit-api-url]` before adding or
-updating a fal.ai model registry entry. Pass fal.ai model API documentation URLs
-ending in `/api`, such as:
+updating a fal.ai model registry entry. Pass fal.ai model URLs or API
+documentation URLs; the helper appends `/api` when it is missing. For example:
 
 ```text
 https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image/api
