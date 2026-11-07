@@ -38,6 +38,8 @@ def test_every_model_has_required_registry_shape():
             f"https://replicate.com/{target.provider_model}/api/schema"
         )
         assert target.mode in VALID_MODES
+        assert model.default_width is not None
+        assert model.default_height is not None
         assert model.default_width > 0
         assert model.default_height > 0
         assert target.parameters
@@ -667,22 +669,24 @@ def test_falai_edit_target_uses_linked_endpoint_not_selector_duplicate():
 @pytest.mark.parametrize("variant", ["flare", "sunburst"])
 def test_falai_gpt_image25_variants_contract(variant):
     model = resolve_model("falai", f"gpt-image-25-{variant}")
+    edit_target = model.edit_target
+    assert edit_target is not None
     text_parameters = {
         parameter.name: parameter for parameter in model.text_target.parameters
     }
     edit_parameters = {
-        parameter.name: parameter for parameter in model.edit_target.parameters
+        parameter.name: parameter for parameter in edit_target.parameters
     }
 
     assert model.text_target.provider_model == (
         f"openai/gpt-image-2.5/{variant}/text-to-image"
     )
-    assert model.edit_target.provider_model == f"openai/gpt-image-2.5/{variant}/edit"
+    assert edit_target.provider_model == f"openai/gpt-image-2.5/{variant}/edit"
     assert model.text_target.fixed_inputs == {"sync_mode": False}
-    assert model.edit_target.fixed_inputs == {"sync_mode": False}
-    assert model.edit_target.source_images is not None
-    assert model.edit_target.source_images.provider_field == "image_urls"
-    assert model.edit_target.source_images.max_count == 16
+    assert edit_target.fixed_inputs == {"sync_mode": False}
+    assert edit_target.source_images is not None
+    assert edit_target.source_images.provider_field == "image_urls"
+    assert edit_target.source_images.max_count == 16
     assert "image_urls" not in edit_parameters
     assert "mask_url" not in text_parameters
     assert "mask_url" in edit_parameters
@@ -743,6 +747,7 @@ def test_gpt_image26_routes_text_and_edit_to_provider_contracts(
 
     assert text_target.provider_model == text_id.format(variant=variant)
     assert edit_target.provider_model == edit_id.format(variant=variant)
+    assert edit_target.source_images is not None
     assert edit_target.source_images.provider_field == source_field
     assert edit_target.source_images.max_count == source_limit
 
@@ -965,8 +970,12 @@ def test_edit_target_resolution_fails_when_provider_model_has_no_edit_endpoint()
 
 
 def test_default_model_for_provider_prefers_replicate_default_only_for_replicate():
-    assert default_model_for_provider("replicate").alias == "seedream45"
-    assert default_model_for_provider("falai").provider == "falai"
+    replicate_default = default_model_for_provider("replicate")
+    assert replicate_default is not None
+    assert replicate_default.alias == "seedream45"
+    falai_default = default_model_for_provider("falai")
+    assert falai_default is not None
+    assert falai_default.provider == "falai"
 
 
 def test_falai_flux3_links_documented_targets():
@@ -986,5 +995,7 @@ def test_falai_flux3_links_documented_targets():
         assert target.fixed_inputs == {"sync_mode": False, "version": "latest"}
         assert "seed" not in {p.name for p in target.parameters}
     assert model.text_target.source_images is None
+    assert model.edit_target is not None
+    assert model.edit_target.source_images is not None
     assert model.edit_target.source_images.provider_field == "image_urls"
     assert model.edit_target.source_images.max_count == 10

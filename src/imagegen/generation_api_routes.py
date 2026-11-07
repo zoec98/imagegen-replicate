@@ -192,7 +192,7 @@ def _build_provider_request(
     target: GenerationTarget,
     *,
     parameters: dict[str, object] | None = None,
-    source_image_inputs: list[object] | None = None,
+    source_image_inputs: list[str] | None = None,
 ) -> dict[str, object]:
     return build_provider_request(
         prompt,

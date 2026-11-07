@@ -383,6 +383,7 @@ def test_generate_image_urls_closes_source_files_when_prediction_create_fails(tm
             predictions_api=api,
         )
 
+    assert api.input is not None
     image_input = api.input["image_input"]
     assert len(image_input) == 1
     assert image_input[0].closed is True

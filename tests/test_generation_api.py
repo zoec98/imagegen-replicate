@@ -24,8 +24,8 @@ from imagegen.worker import ThreadedGenerationWorker
 
 
 class ImmediateExecutor:
-    def submit(self, function, *args):
-        function(*args)
+    def submit(self, function, /, *args, **kwargs):
+        function(*args, **kwargs)
 
 
 class StoredImageProvider:

@@ -13,7 +13,9 @@ from pathlib import Path
 
 from imagegen.config import AppConfig, load_config
 from imagegen.generation_log import GenerationLog, SQLiteGenerationLog
+from imagegen.generation_provider import GenerationProvider
 from imagegen.model_registry import (
+    PROVIDER_IDS,
     GenerationTarget,
     ModelParameter,
     ProviderId,
@@ -146,7 +148,7 @@ def run_cli_generation(
     request: CliRequest,
     *,
     app_config: AppConfig | None = None,
-    providers: Mapping[str, object] | None = None,
+    providers: Mapping[ProviderId, GenerationProvider] | None = None,
     generation_log: GenerationLog | None = None,
 ) -> GenerationRequest:
     config = app_config or load_config()
@@ -238,6 +240,8 @@ def _bootstrap_parser() -> argparse.ArgumentParser:
 
 def _model_help(arguments: list[str], provider: str, model_ref: str) -> int:
     try:
+        if provider not in PROVIDER_IDS:
+            raise RegistryLookupError(f"Unknown provider `{provider}`.")
         model = resolve_model_ref(model_ref, selected_provider=provider)
         target = resolve_generation_target(provider, model.alias, edit_mode=False)
     except RegistryLookupError as error:
@@ -329,19 +333,21 @@ def _add_parameter_option(
         help_text += f" (choices: {', '.join(map(str, parameter.choices))})"
     if parameter.minimum is not None or parameter.maximum is not None:
         help_text += f" (range: {parameter.minimum!s} to {parameter.maximum!s})"
-    kwargs = {"default": None, "help": help_text}
     if parameter.type == "boolean":
-        kwargs["action"] = argparse.BooleanOptionalAction
+        parser.add_argument(
+            *option_names, action=argparse.BooleanOptionalAction, help=help_text
+        )
     else:
-        kwargs["type"] = {
+        value_type = {
             "integer": int,
             "number": float,
-            "select": str,
-            "string": str,
-        }.get(parameter.type)
-        if parameter.choices:
-            kwargs["choices"] = parameter.choices
-    parser.add_argument(*option_names, **kwargs)
+        }.get(parameter.type, str)
+        parser.add_argument(
+            *option_names,
+            type=value_type,
+            choices=parameter.choices or None,
+            help=help_text,
+        )
 
 
 def _global_help_epilog() -> str:

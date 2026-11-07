@@ -8,6 +8,8 @@ dimensions, and source-image bindings consistently.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+
 from imagegen.model_registry import GenerationTarget, ProviderModel
 
 
@@ -16,8 +18,8 @@ def build_provider_request(
     model: ProviderModel,
     target: GenerationTarget,
     *,
-    parameters: dict[str, object] | None = None,
-    source_image_inputs: list[object] | None = None,
+    parameters: Mapping[str, object] | None = None,
+    source_image_inputs: Sequence[object] | None = None,
 ) -> dict[str, object]:
     custom_dimensions = target.custom_dimensions
     use_custom_dimensions = (
@@ -55,7 +57,7 @@ def build_provider_request(
         provider_request[target.source_images.provider_field] = (
             source_image_inputs[0]
             if target.source_images.max_count == 1
-            else source_image_inputs
+            else list(source_image_inputs)
         )
     provider_request.update(target.fixed_inputs)
     return provider_request

@@ -77,7 +77,15 @@ def test_run_generation_request_succeeded_updates_request(app_config):
         GenerationResult(
             prediction_id="prediction-123",
             output_urls=["https://example.test/image.png"],
-            stored_images=[Path("seedream45-prediction-123-01.png")],
+            stored_images=[
+                StoredImage(
+                    path=Path("seedream45-prediction-123-01.png"),
+                    source_url="https://example.test/image.png",
+                    content_type="image/png",
+                    size_bytes=123,
+                    created_at=record.created_at.isoformat(),
+                )
+            ],
             logs="created\nfinished",
         ),
         on_generate=on_generate,
@@ -346,7 +354,9 @@ def test_wiro_generation_provider_dispatches_selected_model_and_sources(app_conf
     provider = WiroGenerationProvider(generate=fake_generate)
     run_generation_request(store, record, config, {"wiro": provider})
 
-    assert store.get(record.request_id).status == "succeeded"
+    updated_record = store.get(record.request_id)
+    assert updated_record is not None
+    assert updated_record.status == "succeeded"
     assert record.prediction_id == "wiro-task-1"
 
 

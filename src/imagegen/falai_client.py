@@ -12,7 +12,7 @@ import json
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, Protocol
 
 from fal_client.client import Completed, InProgress, Queued, SyncClient
 
@@ -27,7 +27,8 @@ PersistImages = Callable[..., list[StoredImage]]
 
 
 class FalAIHandle(Protocol):
-    request_id: str
+    @property
+    def request_id(self) -> str: ...
 
     def status(self, *, with_logs: bool = False) -> object: ...
 
@@ -145,9 +146,8 @@ def wait_for_request(
         current_logs = _status_logs(current)
         if current_logs:
             last_logs = current_logs
-    completed = cast(Completed, current)
-    completed_logs = _status_logs(completed) or last_logs
-    return completed, _format_logs(completed_logs)
+    completed_logs = _status_logs(current) or last_logs
+    return current, _format_logs(completed_logs)
 
 
 def normalize_output_urls(output: Any) -> list[str]:

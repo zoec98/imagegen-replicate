@@ -34,7 +34,8 @@ MAX_REDIRECTS = 5
 
 
 class StoredImageModel(Protocol):
-    alias: str
+    @property
+    def alias(self) -> str: ...
 
 
 @dataclass(frozen=True)

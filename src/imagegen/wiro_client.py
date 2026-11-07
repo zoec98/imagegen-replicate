@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import mimetypes
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any, BinaryIO, Protocol
 
@@ -13,12 +14,13 @@ import httpx
 from imagegen.config import AppConfig
 from imagegen.generation_types import GenerationResult
 from imagegen.image_store import StoredImage, persist_generated_images
-from imagegen.model_registry import GenerationTarget, ProviderModel
+from imagegen.model_registry import GenerationTarget, ProviderModel, SourceImageBinding
 from imagegen.prompt_annotations import strip_prompt_annotations
 from imagegen.provider_requests import build_provider_request
 
 WIRO_API_ROOT = "https://api.wiro.ai/v1"
 PersistImages = Callable[..., list[StoredImage]]
+MultipartFiles = Sequence[tuple[str, tuple[str, BinaryIO, str]]]
 
 
 class WiroHTTPClient(Protocol):
@@ -28,14 +30,15 @@ class WiroHTTPClient(Protocol):
         *,
         headers: Mapping[str, str],
         json: Mapping[str, object] | None = None,
-        data: object | None = None,
-        files: object | None = None,
+        data: Mapping[str, str] | None = None,
+        files: MultipartFiles | None = None,
         timeout: float | None = None,
-    ) -> object: ...
+    ) -> WiroResponse: ...
 
 
 class WiroResponse(Protocol):
-    status_code: int
+    @property
+    def status_code(self) -> int: ...
 
     def json(self) -> object: ...
 
@@ -58,7 +61,7 @@ def generate_image_urls(
     *,
     model: ProviderModel,
     target: GenerationTarget,
-    parameters: dict[str, object] | None = None,
+    parameters: Mapping[str, object] | None = None,
     source_image_paths: list[Path] | None = None,
     local_request_id: str | None = None,
     client: WiroHTTPClient | None = None,
@@ -92,9 +95,9 @@ def generate_image_urls(
                     f"Wiro source images plus outputs cannot exceed {source_binding.max_total}."
                 )
 
-    http_client = client or httpx.Client(timeout=30.0)
-    close_client = client is None
-    try:
+    with (
+        httpx.Client(timeout=30.0) if client is None else nullcontext(client)
+    ) as http_client:
         provider_prompt = strip_prompt_annotations(prompt)
         submission_input = build_provider_request(
             provider_prompt,
@@ -109,12 +112,13 @@ def generate_image_urls(
             parameters=parameters,
             source_image_inputs=[path.name for path in source_paths],
         )
-        if source_paths:
+        if source_paths and source_binding is not None:
             task_id = _submit_multipart_task(
                 http_client,
                 target=target,
                 payload=submission_input,
                 source_image_paths=source_paths,
+                source_field=source_binding.provider_field,
                 api_key=key,
                 timeout=app_config.replicate_timeout_seconds,
             )
@@ -160,9 +164,6 @@ def generate_image_urls(
             stored_images=stored_images,
             logs=logs,
         )
-    finally:
-        if close_client and hasattr(http_client, "close"):
-            http_client.close()
 
 
 def _submit_task(
@@ -190,10 +191,10 @@ def _submit_multipart_task(
     target: GenerationTarget,
     payload: dict[str, object],
     source_image_paths: list[Path],
+    source_field: str,
     api_key: str,
     timeout: float,
 ) -> str:
-    source_field = target.source_images.provider_field  # validated by caller
     opened_files: list[BinaryIO] = []
     try:
         try:
@@ -241,13 +242,13 @@ def _task_id_from_response(response: Mapping[str, Any]) -> str:
 
 def _output_count(
     target: GenerationTarget,
-    parameters: dict[str, object] | None,
-    source_binding,
+    parameters: Mapping[str, object] | None,
+    source_binding: SourceImageBinding,
 ) -> int:
     parameter_name = source_binding.output_count_parameter
     if parameter_name is None:
         return 0
-    value = next(
+    value: object = next(
         (
             parameter.default
             for parameter in target.parameters
@@ -344,8 +345,8 @@ def _post_form(
     url: str,
     *,
     api_key: str,
-    data: object,
-    files: object,
+    data: Mapping[str, str],
+    files: MultipartFiles,
     timeout: float,
     operation: str,
 ) -> dict[str, Any]:
@@ -365,7 +366,7 @@ def _post_form(
     return _decode_response(response, operation)
 
 
-def _decode_response(response: object, operation: str) -> dict[str, Any]:
+def _decode_response(response: WiroResponse, operation: str) -> dict[str, Any]:
     status_code = getattr(response, "status_code", None)
     if not isinstance(status_code, int):
         raise WiroRequestError(f"Wiro {operation} response had no HTTP status.")

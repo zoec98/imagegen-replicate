@@ -5,6 +5,7 @@ from __future__ import annotations
 import mimetypes
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from os import stat_result
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -423,5 +424,5 @@ def _timestamp(seconds: float) -> str:
     return datetime.fromtimestamp(seconds, UTC).isoformat()
 
 
-def _device_asset_id(image_path: Path, stat: object) -> str:
+def _device_asset_id(image_path: Path, stat: stat_result) -> str:
     return f"imagegen:{image_path.name}:{stat.st_size}:{stat.st_mtime_ns}"

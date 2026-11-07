@@ -50,7 +50,9 @@ def test_log_operations_close_connections_without_garbage_collection(
         )
         log.mark_finished(record.request_id, status="succeeded")
         assert log.get_logged_request(record.request_id) is not None
-        assert log.get_logged_result(record.request_id).status == "succeeded"
+        result = log.get_logged_result(record.request_id)
+        assert result is not None
+        assert result.status == "succeeded"
         assert len(log.list_logged_assets(record.request_id)) == 1
 
     try:
@@ -244,7 +246,7 @@ def test_create_request_persists_recreatable_payload(tmp_path):
         source_images=["source.png"],
         edit_mode=True,
     )
-    replicate_input = {
+    replicate_input: dict[str, object] = {
         "prompt": "edit this",
         "size": "2K",
         "image_input": ["source.png"],

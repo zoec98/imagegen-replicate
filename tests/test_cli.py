@@ -189,8 +189,12 @@ def test_cli_generation_runs_synchronously_through_existing_provider_service(
     assert record.prediction_id == "prediction-1"
     assert record.output_urls == ["https://example.test/fox.png"]
     log = SQLiteGenerationLog(app_config.generation_log_path)
-    assert log.get_request(record.request_id)["model_alias"] == "seedream45"
-    assert log.get_result(record.request_id)["status"] == "succeeded"
+    logged_request = log.get_logged_request(record.request_id)
+    assert logged_request is not None
+    assert logged_request.model_alias == "seedream45"
+    logged_result = log.get_logged_result(record.request_id)
+    assert logged_result is not None
+    assert logged_result.status == "succeeded"
 
 
 def test_cli_generation_runs_wiro_when_wiro_is_enabled(app_config):

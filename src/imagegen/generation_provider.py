@@ -43,6 +43,7 @@ class GenerationProvider(Protocol):
         self,
         request_record: GenerationRequest,
         app_config: AppConfig,
+        /,
     ) -> GenerationResult: ...
 
 

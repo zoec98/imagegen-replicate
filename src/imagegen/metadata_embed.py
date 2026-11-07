@@ -96,7 +96,8 @@ def _write_png_metadata(
     pnginfo = PngImagePlugin.PngInfo()
     for key, value in image.info.items():
         if (
-            isinstance(value, str)
+            isinstance(key, str)
+            and isinstance(value, str)
             and key != PNG_METADATA_KEY
             and key not in PNG_DESCRIPTION_KEYS
             and key not in PNG_SYNTHETIC_KEYS

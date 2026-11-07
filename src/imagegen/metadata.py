@@ -103,7 +103,7 @@ def _metadata_string(metadata: dict[str, object], key: str) -> str | None:
 
 
 def _metadata_provider(metadata: dict[str, object]) -> ProviderId | None:
-    value = metadata.get("provider")
+    value = _metadata_string(metadata, "provider")
     if value in PROVIDER_IDS:
         return value
     model_alias = _metadata_string(metadata, "model_alias")

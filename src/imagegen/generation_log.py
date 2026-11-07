@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, Protocol
 
 from imagegen.image_store import StoredImage
 from imagegen.model_registry import PROVIDER_IDS, ProviderId
@@ -304,18 +304,18 @@ class SQLiteGenerationLog:
         return [
             LoggedGenerationAsset(
                 request_id=str(row["request_id"]),
-                sequence=int(row["sequence"]),
+                sequence=_sqlite_int(row["sequence"]),
                 filename=str(row["filename"]),
                 source_url=str(row["source_url"]),
                 content_type=str(row["content_type"]),
-                size_bytes=int(row["size_bytes"]),
+                size_bytes=_sqlite_int(row["size_bytes"]),
                 created_at=str(row["created_at"]),
             )
             for row in self.list_assets(request_id)
         ]
 
     @contextmanager
-    def _connect(self) -> Iterator[sqlite3.Connection]:
+    def _connect(self) -> Generator[sqlite3.Connection]:
         # SQLite's connection context commits/rolls back but does not close.
         with closing(sqlite3.connect(self.path)) as connection:
             connection.row_factory = sqlite3.Row
@@ -497,16 +497,24 @@ def _optional_string(value: object) -> str | None:
     return str(value)
 
 
+def _sqlite_int(value: object) -> int:
+    if isinstance(value, (int, float, str, bytes)):
+        return int(value)
+    raise TypeError("Expected an integer in the generation log.")
+
+
 def _optional_float(value: object) -> float | None:
     if value is None:
         return None
-    return float(value)
+    if isinstance(value, (int, float, str, bytes)):
+        return float(value)
+    raise TypeError("Expected a number in the generation log.")
 
 
 def _request_status(value: object) -> RequestStatus:
     status = str(value)
     if status in {"queued", "running", "succeeded", "failed", "timeout"}:
-        return cast(RequestStatus, status)
+        return status
     msg = f"Unknown generation request status: {status}."
     raise RuntimeError(msg)
 
@@ -514,7 +522,7 @@ def _request_status(value: object) -> RequestStatus:
 def _provider_id(value: object) -> ProviderId:
     provider = str(value)
     if provider in PROVIDER_IDS:
-        return cast(ProviderId, provider)
+        return provider
     msg = f"Unknown generation provider: {provider}."
     raise RuntimeError(msg)
 

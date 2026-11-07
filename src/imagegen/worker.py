@@ -8,9 +8,8 @@ worker through Flask config.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from typing import Protocol
 
 from imagegen.config import AppConfig
@@ -20,11 +19,18 @@ from imagegen.generation_provider import (
     default_generation_providers,
 )
 from imagegen.generation_types import GenerationProviderTimeout
+from imagegen.model_registry import ProviderId
 from imagegen.request_store import GenerationRequest, RequestStore
 
 
 class GenerationWorker(Protocol):
     def start(self, request_record: GenerationRequest) -> None: ...
+
+
+class _GenerationExecutor(Protocol):
+    def submit[**P](
+        self, fn: Callable[P, None], /, *args: P.args, **kwargs: P.kwargs
+    ) -> object: ...
 
 
 class ThreadedGenerationWorker:
@@ -34,8 +40,8 @@ class ThreadedGenerationWorker:
         store: RequestStore,
         app_config: AppConfig,
         generation_log: GenerationLog | None = None,
-        providers: Mapping[str, GenerationProvider] | None = None,
-        executor: ThreadPoolExecutor | None = None,
+        providers: Mapping[ProviderId, GenerationProvider] | None = None,
+        executor: _GenerationExecutor | None = None,
     ) -> None:
         self._store = store
         self._app_config = app_config
@@ -61,7 +67,7 @@ def run_generation_request(
     store: RequestStore,
     request_record: GenerationRequest,
     app_config: AppConfig,
-    providers: Mapping[str, GenerationProvider] | None = None,
+    providers: Mapping[ProviderId, GenerationProvider] | None = None,
     generation_log: GenerationLog | None = None,
 ) -> None:
     store.update(request_record.request_id, status="running")
@@ -106,7 +112,7 @@ def run_generation_request(
         status="succeeded",
         prediction_id=result.prediction_id,
         output_urls=result.output_urls,
-        images=[_stored_image_filename(image) for image in result.stored_images],
+        images=[image.path.name for image in result.stored_images],
         logs=logs,
     )
     if generation_log is not None:
@@ -117,15 +123,9 @@ def run_generation_request(
             logs=logs,
         )
         for sequence, image in enumerate(result.stored_images, start=1):
-            if hasattr(image, "path"):
-                generation_log.add_result(
-                    request_record.request_id,
-                    sequence=sequence,
-                    image=image,
-                    logs=logs,
-                )
-
-
-def _stored_image_filename(image: object) -> str:
-    path = getattr(image, "path", image)
-    return Path(path).name
+            generation_log.add_result(
+                request_record.request_id,
+                sequence=sequence,
+                image=image,
+                logs=logs,
+            )
