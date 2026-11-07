@@ -21,6 +21,7 @@ uv sync
 uv run pytest
 uv run ruff format src tests
 uv run ruff check --fix src tests
+uv run ty check src tests
 npm run js:format
 npm run js:check
 ```
