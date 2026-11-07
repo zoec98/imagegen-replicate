@@ -1,5 +1,7 @@
 """Configured Replicate models for imagegen."""
 
+from dataclasses import replace
+
 from imagegen.model_registry_base import (
     CustomDimensionsControl,
     GenerationTarget,
@@ -1218,6 +1220,53 @@ OPENAI_GPT_IMAGE_25_SUNBURST = ProviderModel(
     default_width=2048,
     default_height=2048,
 )
+
+
+def _gpt_image26_model(variant: str, *, schema_version: str) -> ProviderModel:
+    alias = f"gpt-image-26-{variant}"
+    display_name = f"GPT Image 2.6 {variant.title()}"
+    provider_model = f"openai/gpt-image-2.6-{variant}"
+    defaults = {"output_compression": 90, "output_format": "webp"}
+    parameters = tuple(
+        replace(parameter, default=defaults.get(parameter.name, parameter.default))
+        for parameter in _gpt_image25_parameters()
+    ) + (
+        _param(
+            "complexity",
+            "How much the model plans before rendering.",
+            "select",
+            "high",
+            choices=("low", "medium", "high"),
+            order=10,
+        ),
+    )
+    text_target = GenerationTarget(
+        provider="replicate",
+        alias=alias,
+        display_name=display_name,
+        provider_model=provider_model,
+        documentation_url=f"https://replicate.com/{provider_model}/api/schema",
+        runtime_url=f"https://replicate.com/{provider_model}",
+        mode="text-to-image",
+        parameters=parameters,
+        fixed_inputs={},
+        version=schema_version,
+    )
+    return ProviderModel(
+        provider="replicate",
+        alias=alias,
+        display_name=display_name,
+        text_target=text_target,
+        edit_target=replace(
+            text_target,
+            mode="image-edit",
+            source_images=SourceImageBinding(
+                provider_field="input_images", max_count=10
+            ),
+        ),
+        default_width=1024,
+        default_height=1024,
+    )
 
 
 OPENAI_GPT_IMAGE_15 = ProviderModel(
@@ -2529,6 +2578,14 @@ MODEL_REGISTRY: dict[str, ProviderModel] = {
     OPENAI_GPT_IMAGE_2.alias: OPENAI_GPT_IMAGE_2,
     OPENAI_GPT_IMAGE_25_FLARE.alias: OPENAI_GPT_IMAGE_25_FLARE,
     OPENAI_GPT_IMAGE_25_SUNBURST.alias: OPENAI_GPT_IMAGE_25_SUNBURST,
+    "gpt-image-26-flare": _gpt_image26_model(
+        "flare",
+        schema_version="6a0b1916900193c203b23c479a562ffc0a4b2990c9eeee28be13f74b4c6d8908",
+    ),
+    "gpt-image-26-sunburst": _gpt_image26_model(
+        "sunburst",
+        schema_version="b4fdded822860ed68bb8b7f00c5dd5e66551d3e08c323c722742bb083a071196",
+    ),
     QWEN_2512.alias: QWEN_2512,
     SEEDREAM45.alias: SEEDREAM45,
     SEEDREAM5.alias: SEEDREAM5,

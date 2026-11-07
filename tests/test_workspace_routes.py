@@ -280,6 +280,8 @@ def test_index_exposes_wiro_models_when_wiro_is_enabled(app_config, app_factory)
         "flux-2-flex",
         "gpt-image-15",
         "gpt-image-2",
+        "gpt-image-26-flare",
+        "gpt-image-26-sunburst",
     }
     lite = next(
         model

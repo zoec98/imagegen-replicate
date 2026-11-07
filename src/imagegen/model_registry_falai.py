@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from imagegen.model_registry_base import (
     GenerationTarget,
     ModelParameter,
@@ -2070,6 +2072,62 @@ GPT_IMAGE25_FLARE = ProviderModel(
     ),
 )
 
+
+def _gpt_image26_model(variant: str) -> ProviderModel:
+    alias = f"gpt-image-26-{variant}"
+    display_name = f"GPT Image 2.6 {variant.title()}"
+    parameters = tuple(
+        replace(parameter, default="png")
+        if parameter.name == "output_format"
+        else parameter
+        for parameter in _gpt_image25_parameters(edit=False)
+        if parameter.name != "output_compression"
+    ) + (
+        _param(
+            "reasoning_effort",
+            "How much the model plans before rendering.",
+            "select",
+            "high",
+            choices=("low", "medium", "high"),
+            order=8,
+        ),
+    )
+    text_endpoint = f"openai/gpt-image-2.6/{variant}/text-to-image"
+    edit_endpoint = f"openai/gpt-image-2.6/{variant}/edit"
+    text_target = GenerationTarget(
+        provider="falai",
+        alias=alias,
+        display_name=display_name,
+        provider_model=text_endpoint,
+        documentation_url=f"https://fal.ai/models/{text_endpoint}/api",
+        runtime_url=f"https://fal.run/{text_endpoint}",
+        mode="text-to-image",
+        parameters=parameters,
+        fixed_inputs=FALAI_FIXED_SAFE_IMAGE_INPUTS,
+        pricing=(_falai_price("$1", "per billing unit", metric="billing_unit_count"),),
+    )
+    return ProviderModel(
+        provider="falai",
+        alias=alias,
+        display_name=display_name,
+        text_target=text_target,
+        edit_target=replace(
+            text_target,
+            provider_model=edit_endpoint,
+            documentation_url=f"https://fal.ai/models/{edit_endpoint}/api",
+            runtime_url=f"https://fal.run/{edit_endpoint}",
+            mode="image-edit",
+            parameters=tuple(
+                replace(parameter, default="auto")
+                if parameter.name == "image_size"
+                else parameter
+                for parameter in parameters
+            ),
+            source_images=SourceImageBinding(provider_field="image_urls", max_count=16),
+        ),
+    )
+
+
 GROK = ProviderModel(
     provider="falai",
     alias="grok",
@@ -2118,6 +2176,8 @@ MODEL_REGISTRY: dict[str, ProviderModel] = {
     GPT_IMAGE2.alias: GPT_IMAGE2,
     GPT_IMAGE25_FLARE.alias: GPT_IMAGE25_FLARE,
     GPT_IMAGE25_SUNBURST.alias: GPT_IMAGE25_SUNBURST,
+    "gpt-image-26-flare": _gpt_image26_model("flare"),
+    "gpt-image-26-sunburst": _gpt_image26_model("sunburst"),
     GROK.alias: GROK,
     HIDREAM_DEV.alias: HIDREAM_DEV,
     HIDREAM_FAST.alias: HIDREAM_FAST,

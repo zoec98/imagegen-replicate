@@ -18,6 +18,7 @@ from imagegen.model_registry import (
     resolve_model,
     resolve_model_ref,
 )
+from imagegen.provider_requests import build_provider_request
 
 VALID_MODES = {"text-to-image", "image-edit"}
 VALID_PARAMETER_TYPES = {"array", "boolean", "integer", "number", "select", "string"}
@@ -316,6 +317,8 @@ def test_wiro_registry_contains_distinct_uncensored_seedream_contracts():
         "flux-2-flex",
         "gpt-image-15",
         "gpt-image-2",
+        "gpt-image-26-flare",
+        "gpt-image-26-sunburst",
     }
     assert {
         model.alias: model.display_name
@@ -698,6 +701,80 @@ def test_falai_gpt_image25_variants_contract(variant):
     assert text_parameters["output_compression"].default == 100
     assert text_parameters["output_compression"].minimum == 0
     assert text_parameters["output_compression"].maximum == 100
+
+
+@pytest.mark.parametrize("variant", ["flare", "sunburst"])
+@pytest.mark.parametrize(
+    ("provider", "text_id", "edit_id", "source_field", "source_limit", "effort"),
+    [
+        (
+            "falai",
+            "openai/gpt-image-2.6/{variant}/text-to-image",
+            "openai/gpt-image-2.6/{variant}/edit",
+            "image_urls",
+            16,
+            "reasoning_effort",
+        ),
+        (
+            "replicate",
+            "openai/gpt-image-2.6-{variant}",
+            "openai/gpt-image-2.6-{variant}",
+            "input_images",
+            10,
+            "complexity",
+        ),
+        (
+            "wiro",
+            "openai/gpt-image-2-6-{variant}",
+            "openai/gpt-image-2-6-{variant}",
+            "inputImage",
+            16,
+            "complexity",
+        ),
+    ],
+)
+def test_gpt_image26_routes_text_and_edit_to_provider_contracts(
+    variant, provider, text_id, edit_id, source_field, source_limit, effort
+):
+    alias = f"gpt-image-26-{variant}"
+    model = resolve_model(provider, alias)
+    text_target = resolve_generation_target(provider, alias, edit_mode=False)
+    edit_target = resolve_generation_target(provider, alias, edit_mode=True)
+
+    assert text_target.provider_model == text_id.format(variant=variant)
+    assert edit_target.provider_model == edit_id.format(variant=variant)
+    assert edit_target.source_images.provider_field == source_field
+    assert edit_target.source_images.max_count == source_limit
+
+    text_request = build_provider_request("A sunset", model, text_target)
+    edit_request = build_provider_request(
+        "Make it brighter",
+        model,
+        edit_target,
+        parameters={effort: "low"},
+        source_image_inputs=["sunset.png"],
+    )
+    assert text_request[effort] == "high"
+    assert source_field not in text_request
+    assert edit_request[effort] == "low"
+    assert edit_request[source_field] == ["sunset.png"]
+
+    format_field = "outputFormat" if provider == "wiro" else "output_format"
+    output_format = next(
+        parameter
+        for parameter in edit_target.parameters
+        if parameter.name == format_field
+    )
+    assert set(output_format.choices) == {"jpeg", "png", "webp"}
+    if provider == "falai":
+        assert text_request["image_size"] == "landscape_4_3"
+        assert edit_request["image_size"] == "auto"
+        assert edit_request["enable_safety_checker"] is False
+        assert edit_request["sync_mode"] is False
+    if provider == "wiro":
+        assert edit_request["ratio"] == ("16:9" if variant == "flare" else "1:1")
+        assert edit_request["moderation"] == "low"
+        assert "inputFidelity" not in edit_request
 
 
 def test_falai_plan_ticket_models_use_linked_edit_endpoints():

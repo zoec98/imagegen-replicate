@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from imagegen.model_registry_base import (
     GenerationTarget,
     ModelParameter,
@@ -753,6 +755,51 @@ def _gpt_parameters(
     )
 
 
+def _gpt_image26_model(variant: str, *, ratio_default: str) -> ProviderModel:
+    base_parameters = _gpt_parameters(
+        edit=False,
+        size_name="resolution",
+        size_choices=("1k", "2k", "4k"),
+        size_default="1k",
+        background_choices=("auto", "transparent", "opaque"),
+        ratio_choices=("1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16"),
+        ratio_default=ratio_default,
+    )
+    parameters = tuple(
+        replace(parameter, choices=("low", "medium", "high", "xhigh", "max"))
+        if parameter.name == "quality"
+        else parameter
+        for parameter in base_parameters
+    ) + (
+        _parameter(
+            "complexity",
+            "How much the model plans before rendering.",
+            "select",
+            "high",
+            choices=("low", "medium", "high"),
+            order=9,
+        ),
+    )
+    return _provider_model(
+        alias=f"gpt-image-26-{variant}",
+        display_name=f"GPT Image 2.6 {variant.title()}",
+        provider_model=f"openai/gpt-image-2-6-{variant}",
+        text_parameters=parameters,
+        edit_parameters=parameters,
+        pricing=(
+            _pricing(
+                "$0.013–$0.712",
+                "price range",
+                description="Wiro Tool Detail per-run price matrix; provider billing remains authoritative.",
+                pricing_type="provider-variable",
+                metric="run",
+            ),
+        ),
+        source_binding=SourceImageBinding(provider_field="inputImage", max_count=16),
+        fixed_inputs={"moderation": "low"},
+    )
+
+
 PROVIDER_MODEL = "bytedance/seedream-v5-pro-uncensored"
 LITE_PROVIDER_MODEL = "bytedance/seedream-v5-lite-uncensored"
 SEEDREAM45_PROVIDER_MODEL = "bytedance/seedream-v4-5-uncensored"
@@ -1005,4 +1052,6 @@ MODEL_REGISTRY: dict[str, ProviderModel] = {
         source_binding=SourceImageBinding(provider_field="inputImage", max_count=16),
         fixed_inputs={"moderation": "low"},
     ),
+    "gpt-image-26-flare": _gpt_image26_model("flare", ratio_default="16:9"),
+    "gpt-image-26-sunburst": _gpt_image26_model("sunburst", ratio_default="1:1"),
 }
