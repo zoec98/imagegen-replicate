@@ -6,8 +6,11 @@ Behaviors protected:
 - Successful outputs are normalized and handed to local image persistence with metadata.
 """
 
+import base64
+import json
 from dataclasses import dataclass, replace
 
+import httpx
 import pytest
 
 from imagegen.config import AppConfig
@@ -19,6 +22,7 @@ from imagegen.model_registry import (
 from imagegen.replicate_client import (
     ReplicatePredictionError,
     ReplicatePredictionTimeout,
+    _replicate_predictions,
 )
 from imagegen.replicate_client import (
     generate_image_urls as _generate_image_urls,
@@ -480,3 +484,203 @@ def test_generate_image_urls_normalizes_nested_provider_output_objects(tmp_path)
         "https://example.com/a.png",
         "https://example.com/file.webp",
     ]
+
+
+@pytest.mark.parametrize(
+    "alias",
+    [
+        "gpt-image-25-flare",
+        "gpt-image-25-sunburst",
+        "gpt-image-26-flare",
+        "gpt-image-26-sunburst",
+    ],
+)
+def test_replicate_predictions_accepts_null_version_for_versionless_models(
+    tmp_path, alias
+):
+    requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path, request.content))
+        if request.method == "POST":
+            return httpx.Response(
+                201,
+                json={
+                    "id": "pred-123",
+                    "model": f"openai/{alias}",
+                    "version": None,
+                    "status": "starting",
+                    "output": None,
+                    "error": None,
+                    "logs": None,
+                },
+            )
+        if request.method == "GET" and request.url.path == "/v1/predictions/pred-123":
+            return httpx.Response(
+                200,
+                json={
+                    "id": "pred-123",
+                    "model": f"openai/{alias}",
+                    "version": None,
+                    "status": "succeeded",
+                    "output": ["https://replicate.delivery/out.webp"],
+                    "error": None,
+                    "logs": "ok",
+                },
+            )
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    api = _replicate_predictions(
+        config_for_model(tmp_path, alias),
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = generate_image_urls(
+        "a red house",
+        config_for_model(tmp_path, alias),
+        predictions_api=api,
+        sleep=lambda seconds: None,
+        persist_images=lambda urls, **kwargs: [],
+    )
+
+    model_slug = MODEL_REGISTRY[alias].text_target.provider_model
+    assert requests[0][:2] == ("POST", f"/v1/models/{model_slug}/predictions")
+    assert json.loads(requests[0][2])["input"]["prompt"] == "a red house"
+    assert requests[1][:2] == ("GET", "/v1/predictions/pred-123")
+    assert result.prediction_id == "pred-123"
+    assert result.output_urls == ["https://replicate.delivery/out.webp"]
+    assert result.logs == "ok"
+
+
+def test_replicate_predictions_uploads_source_images_with_null_version(tmp_path):
+    source_path = tmp_path / "source.png"
+    source_path.write_bytes(b"png-bytes")
+    requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path, request.content))
+        if request.url.path == "/v1/files":
+            return httpx.Response(
+                201,
+                json={
+                    "id": "file-1",
+                    "name": "source.png",
+                    "content_type": "image/png",
+                    "size": 9,
+                    "etag": "etag",
+                    "checksums": {},
+                    "metadata": {},
+                    "created_at": "2026-11-13T00:00:00Z",
+                    "expires_at": None,
+                    "urls": {"get": "https://api.replicate.com/v1/files/file-1"},
+                },
+            )
+        if request.url.path == "/v1/models/bytedance/seedream-4.5/predictions":
+            return httpx.Response(
+                201,
+                json={
+                    "id": "pred-edit",
+                    "status": "succeeded",
+                    "output": ["https://replicate.delivery/edited.webp"],
+                },
+            )
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    api = _replicate_predictions(
+        config_for_model(tmp_path, "seedream45"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = generate_image_urls(
+        "make it blue",
+        config_for_model(tmp_path, "seedream45"),
+        source_image_paths=[source_path],
+        predictions_api=api,
+        persist_images=lambda urls, **kwargs: [],
+    )
+
+    assert requests[0][:2] == ("POST", "/v1/files")
+    assert requests[1][:2] == (
+        "POST",
+        "/v1/models/bytedance/seedream-4.5/predictions",
+    )
+    payload = json.loads(requests[1][2])
+    assert payload["input"]["image_input"] == [
+        "https://api.replicate.com/v1/files/file-1"
+    ]
+    assert result.output_urls == ["https://replicate.delivery/edited.webp"]
+
+
+@pytest.mark.parametrize(
+    "alias",
+    [
+        "gpt-image-15",
+        "gpt-image-2",
+        "gpt-image-25-flare",
+        "gpt-image-25-sunburst",
+        "gpt-image-26-flare",
+        "gpt-image-26-sunburst",
+    ],
+)
+def test_replicate_predictions_encodes_openai_gpt_image_sources_as_data_uris(
+    tmp_path, alias
+):
+    source_path = tmp_path / "source.webp"
+    source_bytes = b"webp-bytes"
+    source_path.write_bytes(source_bytes)
+    requests = []
+    target = resolve_generation_target("replicate", alias, edit_mode=True)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path, request.content))
+        if request.url.path == f"/v1/models/{target.provider_model}/predictions":
+            return httpx.Response(
+                201,
+                json={
+                    "id": "pred-edit",
+                    "version": None,
+                    "status": "succeeded",
+                    "output": ["https://replicate.delivery/edited.webp"],
+                },
+            )
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    api = _replicate_predictions(
+        config_for_model(tmp_path, alias),
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = generate_image_urls(
+        "make it blue",
+        config_for_model(tmp_path, alias),
+        source_image_paths=[source_path],
+        predictions_api=api,
+        persist_images=lambda urls, **kwargs: [],
+    )
+
+    assert [req[:2] for req in requests] == [
+        ("POST", f"/v1/models/{target.provider_model}/predictions")
+    ]
+    payload = json.loads(requests[0][2])
+    assert target.source_images is not None
+    expected_uri = "data:image/webp;base64," + base64.b64encode(source_bytes).decode(
+        "ascii"
+    )
+    assert payload["input"][target.source_images.provider_field] == [expected_uri]
+    assert result.output_urls == ["https://replicate.delivery/edited.webp"]
+
+
+def test_replicate_predictions_rejects_invalid_payload_or_model(tmp_path):
+    def bad_payload_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(201, json={"status": "starting"})
+
+    api = _replicate_predictions(
+        app_config(tmp_path),
+        transport=httpx.MockTransport(bad_payload_handler),
+    )
+
+    with pytest.raises(ReplicatePredictionError, match="without id or status"):
+        api.create(model="openai/gpt-image-2.6-flare", input={"prompt": "test"})
+
+    with pytest.raises(ValueError, match="Invalid Replicate model identifier"):
+        api.create(model="openai/gpt-image-2.6-flare:abc", input={"prompt": "test"})

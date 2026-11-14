@@ -288,9 +288,7 @@ def _fetch_validated_image(
                         pass
                 content = _read_bounded_download(response, max_bytes=max_bytes)
                 content_type = (
-                    response.headers.get("content-type", "")
-                    .split(";", 1)[0]
-                    .lower()
+                    response.headers.get("content-type", "").split(";", 1)[0].lower()
                 )
                 return content, content_type, str(response.url)
         except httpx.HTTPError as error:
@@ -327,10 +325,21 @@ def is_unsafe_download_address(
     )
 
 
+# Replicate's AI-gateway proxy models (e.g. gpt-image-2.5/2.6) return presigned
+# Cloudflare R2 output URLs under Replicate's account host instead of replicate.delivery.
+REPLICATE_AI_GATEWAY_OUTPUT_HOST = (
+    "ai-gateway-outputs.0d37909e38d3e99c29fa2cd343ac421a.r2.cloudflarestorage.com"
+)
+
+
 def _provider_host_allowed(provider: ProviderId, hostname: str) -> bool:
     host = hostname.lower().rstrip(".")
     if provider == "replicate":
-        return host == "replicate.delivery" or host.endswith(".replicate.delivery")
+        return (
+            host == "replicate.delivery"
+            or host.endswith(".replicate.delivery")
+            or host == REPLICATE_AI_GATEWAY_OUTPUT_HOST
+        )
     if provider == "falai":
         return host.endswith(".fal.media")
     if provider == "wiro":

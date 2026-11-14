@@ -375,6 +375,10 @@ def test_download_image_rejects_private_resolved_host_before_fetch(tmp_path):
     [
         ("replicate", "https://replicate.delivery/out.png"),
         ("replicate", "https://cdn.replicate.delivery/out.png"),
+        (
+            "replicate",
+            "https://ai-gateway-outputs.0d37909e38d3e99c29fa2cd343ac421a.r2.cloudflarestorage.com/provider-outputs/out",
+        ),
         ("falai", "https://cdn.fal.media/out.png"),
         ("wiro", "https://cdn.wiro.ai/out.png"),
     ],
@@ -387,6 +391,10 @@ def test_validate_download_url_accepts_documented_provider_hosts(provider, url):
     ("provider", "url"),
     [
         ("replicate", "https://replicate.delivery.evil.example/out.png"),
+        (
+            "replicate",
+            "https://ai-gateway-outputs.00000000000000000000000000000000.r2.cloudflarestorage.com/out.png",
+        ),
         ("falai", "https://fal.media/out.png"),
         ("wiro", "https://wiro.ai/out.png"),
         ("wiro", "https://cdn.fal.media/out.png"),
