@@ -7,7 +7,9 @@ hands returned image URLs to the local image store.
 
 from __future__ import annotations
 
+import base64
 import io
+import mimetypes
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -180,15 +182,54 @@ class ReplicatePrediction:
     logs: str | None = None
 
 
-def _encode_prediction_input(value: Any, client: replicate.Client) -> Any:
-    """Recursively upload file handles inside a prediction payload."""
+# Replicate's OpenAI AI-gateway proxy models return HTTP 500 when given
+# authenticated /v1/files/... URLs, but accept inline base64 data URIs.
+BASE64_FILE_INPUT_MODELS = frozenset(
+    {
+        "openai/gpt-image-1.5",
+        "openai/gpt-image-2",
+        "openai/gpt-image-2.5-flare",
+        "openai/gpt-image-2.5-sunburst",
+        "openai/gpt-image-2.6-flare",
+        "openai/gpt-image-2.6-sunburst",
+    }
+)
+
+
+def _encode_file_as_data_uri(file: io.IOBase) -> str:
+    """Encode a binary image handle as an inline base64 data URI."""
+    file.seek(0)
+    raw = file.read()
+    payload = raw.encode("utf-8") if isinstance(raw, str) else bytes(raw)
+    filename = getattr(file, "name", "")
+    mime_type = (
+        mimetypes.guess_type(filename if isinstance(filename, str) else "")[0]
+        or "application/octet-stream"
+    )
+    encoded = base64.b64encode(payload).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
+
+
+def _encode_prediction_input(
+    value: Any,
+    client: replicate.Client,
+    *,
+    use_data_uris: bool = False,
+) -> Any:
+    """Recursively encode file handles inside a prediction payload."""
     if isinstance(value, Mapping):
         return {
-            key: _encode_prediction_input(item, client) for key, item in value.items()
+            key: _encode_prediction_input(item, client, use_data_uris=use_data_uris)
+            for key, item in value.items()
         }
     if isinstance(value, list | tuple):
-        return [_encode_prediction_input(item, client) for item in value]
+        return [
+            _encode_prediction_input(item, client, use_data_uris=use_data_uris)
+            for item in value
+        ]
     if isinstance(value, io.IOBase):
+        if use_data_uris:
+            return _encode_file_as_data_uri(value)
         return client.files.create(value).urls["get"]
     return value
 
@@ -243,7 +284,11 @@ class _ReplicatePredictionsClient:
         input: dict[str, object],
     ) -> ReplicatePrediction:
         path = _prediction_path_for_model(model)
-        encoded_input = _encode_prediction_input(input, self._client)
+        encoded_input = _encode_prediction_input(
+            input,
+            self._client,
+            use_data_uris=model in BASE64_FILE_INPUT_MODELS,
+        )
         # Replicate's 1.0.7 Prediction Pydantic model rejects `version: null`
         # returned by versionless models (e.g. gpt-image-2.5/2.6), so parse the
         # prediction JSON directly instead of using client.predictions.create.
