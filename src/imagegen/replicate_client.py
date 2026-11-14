@@ -7,11 +7,15 @@ hands returned image URLs to the local image store.
 
 from __future__ import annotations
 
+import io
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, BinaryIO, Protocol
+from urllib.parse import quote
 
+import httpx
 import replicate
 
 from imagegen.config import AppConfig
@@ -165,7 +169,103 @@ def normalize_output_urls(output: Any) -> list[str]:
     return [str(output)]
 
 
-def _replicate_predictions(app_config: AppConfig) -> PredictionsApi:
-    client = replicate.Client(api_token=app_config.replicate_api_token or None)
+@dataclass
+class ReplicatePrediction:
+    """Minimal Replicate prediction record accepting nullable `version` fields."""
+
+    id: str
+    status: str
+    output: Any = None
+    error: str | None = None
+    logs: str | None = None
+
+
+def _encode_prediction_input(value: Any, client: replicate.Client) -> Any:
+    """Recursively upload file handles inside a prediction payload."""
+    if isinstance(value, Mapping):
+        return {
+            key: _encode_prediction_input(item, client) for key, item in value.items()
+        }
+    if isinstance(value, list | tuple):
+        return [_encode_prediction_input(item, client) for item in value]
+    if isinstance(value, io.IOBase):
+        return client.files.create(value).urls["get"]
+    return value
+
+
+def _prediction_path_for_model(model: str) -> str:
+    """Build the Replicate predictions endpoint path for an `owner/name` model."""
+    parts = model.split("/")
+    if len(parts) != 2 or not parts[0] or not parts[1] or ":" in model:
+        msg = f"Invalid Replicate model identifier: {model!r}"
+        raise ValueError(msg)
+    owner = quote(parts[0], safe="")
+    name = quote(parts[1], safe="")
+    return f"/v1/models/{owner}/{name}/predictions"
+
+
+def _parse_prediction_response(payload: object) -> ReplicatePrediction:
+    """Validate and extract prediction fields from a Replicate API JSON body."""
+    if not isinstance(payload, Mapping):
+        msg = "Replicate returned a non-object prediction payload."
+        raise ReplicatePredictionError(msg)
+    prediction_id = payload.get("id")
+    status = payload.get("status")
+    if (
+        not isinstance(prediction_id, str)
+        or not prediction_id
+        or not isinstance(status, str)
+        or not status
+    ):
+        msg = "Replicate returned a prediction payload without id or status."
+        raise ReplicatePredictionError(msg)
+    error = payload.get("error")
+    logs = payload.get("logs")
+    return ReplicatePrediction(
+        id=prediction_id,
+        status=status,
+        output=payload.get("output"),
+        error=error if error is None or isinstance(error, str) else str(error),
+        logs=logs if logs is None or isinstance(logs, str) else str(logs),
+    )
+
+
+class _ReplicatePredictionsClient:
+    """Adapter around `replicate.Client` that tolerates `version: null` predictions."""
+
+    def __init__(self, client: replicate.Client) -> None:
+        self._client = client
+
+    def create(
+        self,
+        *,
+        model: str,
+        input: dict[str, object],
+    ) -> ReplicatePrediction:
+        path = _prediction_path_for_model(model)
+        encoded_input = _encode_prediction_input(input, self._client)
+        # Replicate's 1.0.7 Prediction Pydantic model rejects `version: null`
+        # returned by versionless models (e.g. gpt-image-2.5/2.6), so parse the
+        # prediction JSON directly instead of using client.predictions.create.
+        response = self._client._request("POST", path, json={"input": encoded_input})
+        return _parse_prediction_response(response.json())
+
+    def get(self, id: str) -> ReplicatePrediction:
+        prediction_id = quote(id, safe="")
+        response = self._client._request("GET", f"/v1/predictions/{prediction_id}")
+        return _parse_prediction_response(response.json())
+
+
+def _replicate_predictions(
+    app_config: AppConfig,
+    *,
+    transport: httpx.BaseTransport | None = None,
+) -> PredictionsApi:
+    token = app_config.replicate_api_token or None
+    client = (
+        replicate.Client(api_token=token, transport=transport)
+        if transport is not None
+        else replicate.Client(api_token=token)
+    )
     client.poll_interval = app_config.replicate_poll_seconds
-    return client.predictions
+    return _ReplicatePredictionsClient(client)
